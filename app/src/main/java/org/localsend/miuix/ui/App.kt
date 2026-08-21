@@ -10,17 +10,24 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
@@ -45,6 +52,7 @@ import top.yukonga.miuix.kmp.theme.ThemeController
 @Composable
 fun App(manager: LocalSendManager) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val settings by manager.settings.collectAsState()
     val pendingIncomingSession by manager.pendingIncomingSession.collectAsState()
 
@@ -61,8 +69,8 @@ fun App(manager: LocalSendManager) {
     }
     val themeController = remember(colorSchemeMode) { ThemeController(colorSchemeMode) }
 
-    // 2. Navigation Tab State
-    var selectedTab by remember { mutableIntStateOf(0) }
+    // 2. Horizontal Pager State for Smooth Tab Swiping (Send, Receive, Settings)
+    val pagerState = rememberPagerState(pageCount = { 3 })
 
     // 3. Dialog Visibility States
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -70,7 +78,7 @@ fun App(manager: LocalSendManager) {
     var showSendTextDialog by remember { mutableStateOf(false) }
     var showAddContentSheet by remember { mutableStateOf(false) }
 
-    // 4. Activity Result Launchers for File/Media Picking
+    // 4. Activity Result Launchers
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
@@ -125,39 +133,76 @@ fun App(manager: LocalSendManager) {
         }
     }
 
+    val pickClipboard = {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        if (clipboard.hasPrimaryClip() && clipboard.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true) {
+            val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
+            if (!clipText.isNullOrEmpty()) {
+                val bytes = clipText.toByteArray(Charsets.UTF_8)
+                val item = FileItem(
+                    name = "clipboard_${System.currentTimeMillis()}.txt",
+                    size = bytes.size.toLong(),
+                    textContent = clipText,
+                    mimeType = "text/plain"
+                )
+                manager.addFiles(listOf(item))
+                Toast.makeText(context, "已提取剪贴板文本并添加", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "剪贴板为空", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(context, "剪贴板中无文本内容", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     MiuixTheme(controller = themeController) {
         Scaffold(
             bottomBar = {
-                FloatingNavigationBar {
+                FloatingNavigationBar(
+                    modifier = Modifier.navigationBarsPadding(),
+                    color = MiuixTheme.colorScheme.surfaceContainer,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     FloatingNavigationBarItem(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
+                        selected = pagerState.currentPage == 0,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
                         icon = AppIcons.Send,
                         label = "发送"
                     )
                     FloatingNavigationBarItem(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
+                        selected = pagerState.currentPage == 1,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(1) } },
                         icon = AppIcons.Receive,
                         label = "接收",
                         badge = if (pendingIncomingSession != null) ({ Badge { Text("1") } }) else null
                     )
                     FloatingNavigationBarItem(
-                        selected = selectedTab == 2,
-                        onClick = { selectedTab = 2 },
+                        selected = pagerState.currentPage == 2,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(2) } },
                         icon = AppIcons.Settings,
                         label = "设置"
                     )
                 }
             }
         ) { innerPadding ->
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (selectedTab) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
                     0 -> SendScreen(
                         manager = manager,
                         contentPadding = innerPadding,
                         onOpenAddSheet = { showAddContentSheet = true },
-                        onOpenManualIp = { showManualIpDialog = true }
+                        onOpenManualIp = { showManualIpDialog = true },
+                        onPickFiles = { filePickerLauncher.launch("*/*") },
+                        onPickMedia = {
+                            mediaPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                            )
+                        },
+                        onSendText = { showSendTextDialog = true },
+                        onPasteClipboard = pickClipboard
                     )
                     1 -> ReceiveScreen(
                         manager = manager,
@@ -234,27 +279,7 @@ fun App(manager: LocalSendManager) {
                     )
                 },
                 onSendText = { showSendTextDialog = true },
-                onPasteClipboard = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    if (clipboard.hasPrimaryClip() && clipboard.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true) {
-                        val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
-                        if (!clipText.isNullOrEmpty()) {
-                            val bytes = clipText.toByteArray(Charsets.UTF_8)
-                            val item = FileItem(
-                                name = "clipboard_${System.currentTimeMillis()}.txt",
-                                size = bytes.size.toLong(),
-                                textContent = clipText,
-                                mimeType = "text/plain"
-                            )
-                            manager.addFiles(listOf(item))
-                            Toast.makeText(context, "已提取剪贴板文本并添加", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, "剪贴板为空", Toast.LENGTH_SHORT).show()
-                        }
-                    } else {
-                        Toast.makeText(context, "剪贴板中无文本内容", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                onPasteClipboard = pickClipboard
             )
         }
     }

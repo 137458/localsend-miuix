@@ -9,6 +9,6 @@
 ### 新增特性
 - 完整复刻 LocalSend v2 局域网传输协议与网络引擎（UDP 多播广播发现、局域网子网并发扫描、Ktor 异步 HTTP 服务端与客户端）。
 - 全面采用 Miuix 0.9.4-rc01 组件库构建纯正 Xiaomi HyperOS 视觉规范界面。
-- 引入 HyperOS 悬浮底栏（FloatingNavigationBar）主导航架构，支持未处理请求动态徽标提醒。
+- 深度参考 Miuix 官方示例重构界面层，引入 HorizontalPager 与 FloatingNavigationBar 联动平滑滑动切换，优化快速选择与全网段探测视觉反馈。
 - 实现发送、接收、设置三大核心功能板块及完整交互。
 - 提供基于 OverlayDialog 与 OverlayBottomSheet 的设备重命名、手动 IP 发送、纯文本发送与传输确认等弹窗交互。
