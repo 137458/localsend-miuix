@@ -18,10 +18,8 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.utils.io.readAvailable
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.localsend.miuix.model.Device
@@ -55,23 +53,29 @@ class LocalSendServer(
     fun start() {
         if (engine != null) return
         val port = getPort()
-        engine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
-            install(ContentNegotiation) {
-                json(this@LocalSendServer.json)
-            }
-            install(CORS) {
-                anyHost()
-                allowHeader("*")
-                allowMethod(io.ktor.http.HttpMethod.Get)
-                allowMethod(io.ktor.http.HttpMethod.Post)
-                allowMethod(io.ktor.http.HttpMethod.Options)
-            }
-            configureRouting()
-        }.start(wait = false)
+        try {
+            engine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
+                install(ContentNegotiation) {
+                    json(this@LocalSendServer.json)
+                }
+                install(CORS) {
+                    anyHost()
+                    allowHeader("*")
+                    allowMethod(io.ktor.http.HttpMethod.Get)
+                    allowMethod(io.ktor.http.HttpMethod.Post)
+                    allowMethod(io.ktor.http.HttpMethod.Options)
+                }
+                configureRouting()
+            }.start(wait = false)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun stop() {
-        engine?.stop(1000, 2000)
+        try {
+            engine?.stop(500, 1000)
+        } catch (ignored: Exception) {}
         engine = null
         activeSessions.clear()
         sessionTokens.clear()
@@ -80,11 +84,22 @@ class LocalSendServer(
     private fun Application.configureRouting() {
         routing {
             get("/api/localsend/v2/info") {
-                val local = getLocalDevice().toDto()
-                call.respond(local)
+                call.respond(getLocalDevice().toDto())
+            }
+
+            get("/api/localsend/v1/info") {
+                call.respond(getLocalDevice().toDto())
             }
 
             post("/api/localsend/v2/register") {
+                val remoteDto = call.receive<DeviceDto>()
+                val remoteIp = call.request.origin.remoteHost
+                val remoteDevice = Device.fromDto(remoteDto, remoteIp)
+                onDeviceDiscovered(remoteDevice)
+                call.respond(getLocalDevice().toDto())
+            }
+
+            post("/api/localsend/v1/register") {
                 val remoteDto = call.receive<DeviceDto>()
                 val remoteIp = call.request.origin.remoteHost
                 val remoteDevice = Device.fromDto(remoteDto, remoteIp)

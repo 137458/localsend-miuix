@@ -29,6 +29,7 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.MulticastSocket
+import javax.net.ssl.X509TrustManager
 
 class DiscoveryService(
     private val context: Context,
@@ -44,6 +45,11 @@ class DiscoveryService(
 
     private val httpClient by lazy {
         HttpClient(CIO) {
+            engine {
+                https {
+                    trustManager = SslHelper.trustAllCerts[0] as X509TrustManager
+                }
+            }
             install(ContentNegotiation) {
                 json(this@DiscoveryService.json)
             }
@@ -129,7 +135,7 @@ class DiscoveryService(
                                 val device = Device.fromDto(dto, senderIp)
                                 onDeviceDiscovered(device)
 
-                                // If it is an announcement, send back response if requested
+                                // If it is an announcement, send back direct register response
                                 if (dto.announcement == true) {
                                     sendDirectResponse(device)
                                 }
@@ -222,17 +228,23 @@ class DiscoveryService(
                 async {
                     val targetIp = "$baseIp.$i"
                     if (!localIps.contains(targetIp)) {
-                        try {
-                            val url = "http://$targetIp:${localDevice.port}/api/localsend/v2/info"
-                            val response = httpClient.get(url)
-                            val dto = response.body<DeviceDto>()
-                            if (dto.fingerprint != localDevice.fingerprint) {
-                                val device = Device.fromDto(dto, targetIp)
-                                onDeviceDiscovered(device)
-                                sendDirectResponse(device)
+                        // Try HTTPS first (LocalSend default), then HTTP
+                        var found = false
+                        for (proto in listOf("https", "http")) {
+                            if (found) break
+                            try {
+                                val url = "$proto://$targetIp:53317/api/localsend/v2/info"
+                                val response = httpClient.get(url)
+                                val dto = response.body<DeviceDto>()
+                                if (dto.fingerprint != localDevice.fingerprint) {
+                                    val device = Device.fromDto(dto, targetIp)
+                                    onDeviceDiscovered(device)
+                                    sendDirectResponse(device)
+                                    found = true
+                                }
+                            } catch (ignored: Exception) {
+                                // Target not responding on this proto
                             }
-                        } catch (ignored: Exception) {
-                            // Offline or unreachable IP
                         }
                     }
                     synchronized(this@DiscoveryService) {

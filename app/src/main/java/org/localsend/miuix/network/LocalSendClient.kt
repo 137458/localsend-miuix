@@ -6,15 +6,10 @@ import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.forms.formData
-import io.ktor.client.request.forms.submitFormWithBinaryData
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
-import io.ktor.http.Headers
-import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -22,7 +17,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.localsend.miuix.model.Device
-import org.localsend.miuix.model.FileDto
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.PrepareUploadRequestDto
 import org.localsend.miuix.model.PrepareUploadResponseDto
@@ -31,6 +25,8 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.X509TrustManager
 
 class LocalSendClient(
     private val context: Context,
@@ -38,15 +34,24 @@ class LocalSendClient(
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
 
+    init {
+        SslHelper.trustAllHttps()
+    }
+
     private val httpClient by lazy {
         HttpClient(CIO) {
+            engine {
+                https {
+                    trustManager = SslHelper.trustAllCerts[0] as X509TrustManager
+                }
+            }
             install(ContentNegotiation) {
                 json(this@LocalSendClient.json)
             }
             install(HttpTimeout) {
-                requestTimeoutMillis = 30000
-                connectTimeoutMillis = 5000
-                socketTimeoutMillis = 30000
+                requestTimeoutMillis = 60000
+                connectTimeoutMillis = 10000
+                socketTimeoutMillis = 60000
             }
         }
     }
@@ -74,7 +79,7 @@ class LocalSendClient(
                 Result.success(responseDto)
             } else {
                 val text = response.bodyAsText()
-                Result.failure(Exception("Target rejected transfer: ${response.status} ($text)"))
+                Result.failure(Exception("目标设备拒绝了接收请求: ${response.status} ($text)"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -96,17 +101,23 @@ class LocalSendClient(
                 fileItem.uri != null -> context.contentResolver.openInputStream(fileItem.uri)
                 fileItem.path != null -> File(fileItem.path).inputStream()
                 fileItem.textContent != null -> fileItem.textContent.byteInputStream(Charsets.UTF_8)
-                else -> throw IllegalArgumentException("No file source available for ${fileItem.name}")
-            } ?: throw IllegalStateException("Cannot open stream for ${fileItem.name}")
+                else -> throw IllegalArgumentException("No source available for ${fileItem.name}")
+            } ?: throw IllegalStateException("Cannot open input stream for ${fileItem.name}")
 
-            val uploadUrl = URL("${targetDevice.url}/api/localsend/v2/upload?sessionId=$sessionId&fileId=${fileItem.id}&token=$token")
+            val uploadUrlStr = "${targetDevice.url}/api/localsend/v2/upload?sessionId=$sessionId&fileId=${fileItem.id}&token=$token"
+            val uploadUrl = URL(uploadUrlStr)
+
             connection = (uploadUrl.openConnection() as HttpURLConnection).apply {
+                if (this is HttpsURLConnection) {
+                    sslSocketFactory = SslHelper.sslSocketFactory
+                    hostnameVerifier = SslHelper.trustAllHostnameVerifier
+                }
                 requestMethod = "POST"
                 doOutput = true
                 setChunkedStreamingMode(64 * 1024)
-                connectTimeout = 10000
-                readTimeout = 60000
-                setRequestProperty("Content-Type", fileItem.mimeType)
+                connectTimeout = 15000
+                readTimeout = 120000
+                setRequestProperty("Content-Type", "application/octet-stream")
             }
 
             val outputStream: OutputStream = connection.outputStream
@@ -134,11 +145,11 @@ class LocalSendClient(
             outputStream.close()
 
             val responseCode = connection.responseCode
-            if (responseCode == HttpURLConnection.HTTP_OK) {
+            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
                 onProgress(bytesWritten, 0L)
                 Result.success(Unit)
             } else {
-                Result.failure(Exception("Upload failed with HTTP $responseCode"))
+                Result.failure(Exception("Upload failed with HTTP $responseCode: ${connection.responseMessage}"))
             }
         } catch (e: Exception) {
             Result.failure(e)
