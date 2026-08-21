@@ -11,8 +11,11 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -34,6 +37,7 @@ import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.ui.component.AddContentBottomSheet
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.IncomingTransferDialog
+import org.localsend.miuix.ui.component.LiquidGlassBottomBar
 import org.localsend.miuix.ui.component.ManualIpDialog
 import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
@@ -41,10 +45,11 @@ import org.localsend.miuix.ui.screen.ReceiveScreen
 import org.localsend.miuix.ui.screen.SendScreen
 import org.localsend.miuix.ui.screen.SettingsScreen
 import top.yukonga.miuix.kmp.basic.Badge
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
+import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
@@ -69,16 +74,25 @@ fun App(manager: LocalSendManager) {
     }
     val themeController = remember(colorSchemeMode) { ThemeController(colorSchemeMode) }
 
-    // 2. Horizontal Pager State for Smooth Tab Swiping (Send, Receive, Settings)
+    // 2. Horizontal Pager State
     val pagerState = rememberPagerState(pageCount = { 3 })
 
-    // 3. Dialog Visibility States
+    // 3. Navigation Items
+    val navigationItems = remember {
+        listOf(
+            NavigationItem("发送", AppIcons.Send),
+            NavigationItem("接收", AppIcons.Receive),
+            NavigationItem("设置", AppIcons.Settings)
+        )
+    }
+
+    // 4. Dialog Visibility States
     var showRenameDialog by remember { mutableStateOf(false) }
     var showManualIpDialog by remember { mutableStateOf(false) }
     var showSendTextDialog by remember { mutableStateOf(false) }
     var showAddContentSheet by remember { mutableStateOf(false) }
 
-    // 4. Activity Result Launchers
+    // 5. Activity Result Launchers
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
@@ -156,64 +170,78 @@ fun App(manager: LocalSendManager) {
     }
 
     MiuixTheme(controller = themeController) {
+        val surfaceColor = MiuixTheme.colorScheme.surface
+        val backdrop = rememberLayerBackdrop {
+            drawRect(surfaceColor)
+            drawContent()
+        }
+
+        val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        val bottomBarTotalPadding = 80.dp + navBarBottomPadding
+
         Scaffold(
             bottomBar = {
-                FloatingNavigationBar(
-                    modifier = Modifier.navigationBarsPadding(),
-                    color = MiuixTheme.colorScheme.surfaceContainer,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp + navBarBottomPadding),
+                    contentAlignment = Alignment.BottomCenter
                 ) {
-                    FloatingNavigationBarItem(
-                        selected = pagerState.currentPage == 0,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
-                        icon = AppIcons.Send,
-                        label = "发送"
-                    )
-                    FloatingNavigationBarItem(
-                        selected = pagerState.currentPage == 1,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(1) } },
-                        icon = AppIcons.Receive,
-                        label = "接收",
-                        badge = if (pendingIncomingSession != null) ({ Badge { Text("1") } }) else null
-                    )
-                    FloatingNavigationBarItem(
-                        selected = pagerState.currentPage == 2,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(2) } },
-                        icon = AppIcons.Settings,
-                        label = "设置"
+                    LiquidGlassBottomBar(
+                        items = navigationItems,
+                        selectedIndex = { pagerState.currentPage },
+                        onSelected = { index ->
+                            scope.launch { pagerState.animateScrollToPage(index) }
+                        },
+                        backdrop = backdrop,
+                        badge = { index ->
+                            if (index == 1 && pendingIncomingSession != null) {
+                                { Badge { Text("1") } }
+                            } else null
+                        }
                     )
                 }
             }
         ) { innerPadding ->
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
-                when (page) {
-                    0 -> SendScreen(
-                        manager = manager,
-                        contentPadding = innerPadding,
-                        onOpenAddSheet = { showAddContentSheet = true },
-                        onOpenManualIp = { showManualIpDialog = true },
-                        onPickFiles = { filePickerLauncher.launch("*/*") },
-                        onPickMedia = {
-                            mediaPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                            )
-                        },
-                        onSendText = { showSendTextDialog = true },
-                        onPasteClipboard = pickClipboard
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(backdrop)
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    val pagePadding = PaddingValues(
+                        top = innerPadding.calculateTopPadding(),
+                        bottom = bottomBarTotalPadding
                     )
-                    1 -> ReceiveScreen(
-                        manager = manager,
-                        contentPadding = innerPadding,
-                        onOpenRenameDialog = { showRenameDialog = true }
-                    )
-                    2 -> SettingsScreen(
-                        manager = manager,
-                        contentPadding = innerPadding,
-                        onOpenRenameDialog = { showRenameDialog = true }
-                    )
+                    when (page) {
+                        0 -> SendScreen(
+                            manager = manager,
+                            contentPadding = pagePadding,
+                            onOpenAddSheet = { showAddContentSheet = true },
+                            onOpenManualIp = { showManualIpDialog = true },
+                            onPickFiles = { filePickerLauncher.launch("*/*") },
+                            onPickMedia = {
+                                mediaPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                                )
+                            },
+                            onSendText = { showSendTextDialog = true },
+                            onPasteClipboard = pickClipboard
+                        )
+                        1 -> ReceiveScreen(
+                            manager = manager,
+                            contentPadding = pagePadding,
+                            onOpenRenameDialog = { showRenameDialog = true }
+                        )
+                        2 -> SettingsScreen(
+                            manager = manager,
+                            contentPadding = pagePadding,
+                            onOpenRenameDialog = { showRenameDialog = true }
+                        )
+                    }
                 }
             }
 
