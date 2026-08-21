@@ -65,9 +65,7 @@ fun ReceiveScreen(
     val scrollBehavior = MiuixScrollBehavior()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = contentPadding.calculateTopPadding())
+        modifier = Modifier.fillMaxSize()
     ) {
         TopAppBar(
             title = "接收",

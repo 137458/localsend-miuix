@@ -3,7 +3,6 @@
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -81,9 +80,7 @@ fun SendScreen(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = contentPadding.calculateTopPadding())
+        modifier = Modifier.fillMaxSize()
     ) {
         TopAppBar(
             title = "发送",
@@ -279,7 +276,10 @@ fun SendScreen(
                                     color = MiuixTheme.colorScheme.primary
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                LinearProgressIndicator(
+                                    progress = 0.5f,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
 

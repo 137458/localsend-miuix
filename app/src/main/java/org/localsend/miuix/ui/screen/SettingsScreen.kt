@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -24,8 +23,8 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 
 @Composable
 fun SettingsScreen(
@@ -49,9 +48,7 @@ fun SettingsScreen(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = contentPadding.calculateTopPadding())
+        modifier = Modifier.fillMaxSize()
     ) {
         TopAppBar(
             title = "设置",
@@ -79,7 +76,7 @@ fun SettingsScreen(
                         summary = settings.alias,
                         onClick = onOpenRenameDialog
                     )
-                    OverlayDropdownPreference(
+                    WindowDropdownPreference(
                         title = "应用主题",
                         items = themeOptions,
                         selectedIndex = settings.themeModeIndex,

@@ -28,10 +28,10 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 fun RenameDeviceDialog(
@@ -42,7 +42,7 @@ fun RenameDeviceDialog(
 ) {
     var name by remember(show, initialName) { mutableStateOf(initialName) }
 
-    OverlayDialog(
+    WindowDialog(
         show = show,
         title = "修改设备名称",
         onDismissRequest = onDismissRequest
@@ -101,7 +101,7 @@ fun ManualIpDialog(
     var ip by remember(show) { mutableStateOf("") }
     var port by remember(show) { mutableStateOf("53317") }
 
-    OverlayDialog(
+    WindowDialog(
         show = show,
         title = "手动输入 IP 发送",
         onDismissRequest = onDismissRequest
@@ -173,7 +173,7 @@ fun SendTextDialog(
 ) {
     var text by remember(show) { mutableStateOf("") }
 
-    OverlayDialog(
+    WindowDialog(
         show = show,
         title = "发送纯文本",
         onDismissRequest = onDismissRequest
@@ -208,15 +208,16 @@ fun SendTextDialog(
                 }
                 Button(
                     onClick = {
-                        if (text.isNotEmpty()) {
-                            onConfirm(text)
+                        val trimmed = text.trim()
+                        if (trimmed.isNotEmpty()) {
+                            onConfirm(trimmed)
                             onDismissRequest()
                         }
                     },
                     colors = ButtonDefaults.buttonColorsPrimary(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("添加至列表")
+                    Text("发送文本")
                 }
             }
         }
@@ -229,90 +230,87 @@ fun IncomingTransferDialog(
     onAccept: () -> Unit,
     onDecline: () -> Unit
 ) {
-    if (session == null) return
-
-    OverlayDialog(
-        show = true,
+    WindowDialog(
+        show = session != null,
         title = "收到传输请求",
         onDismissRequest = onDecline
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-        ) {
-            Text(
-                text = "来自: ${session.device.alias} (${session.device.ip})",
-                style = MiuixTheme.textStyles.headline1
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "文件总数: ${session.files.size} 个 | 总大小: ${session.formattedTotalSize}",
-                style = MiuixTheme.textStyles.body2,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Card(
+        if (session != null) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp)
+                    .padding(top = 8.dp)
             ) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
-                ) {
-                    items(session.files) { file ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = AppIcons.getFileIcon(file.mimeType, file.name),
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MiuixTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = file.name,
-                                style = MiuixTheme.textStyles.body1,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1
-                            )
-                            Text(
-                                text = file.formattedSize,
-                                style = MiuixTheme.textStyles.footnote1,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
+                Text(
+                    text = "来自设备: ${session.device.alias} (${session.device.ip})",
+                    style = MiuixTheme.textStyles.body1
+                )
+                Text(
+                    text = "共 ${session.files.size} 个文件，大小 ${session.formattedTotalSize}",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(session.files) { file ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = AppIcons.getFileIcon(file.mimeType, file.name),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MiuixTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = file.name,
+                                    style = MiuixTheme.textStyles.body1,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = file.formattedSize,
+                                    style = MiuixTheme.textStyles.footnote1,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Button(
-                    onClick = onDecline,
-                    colors = ButtonDefaults.buttonColors(),
-                    modifier = Modifier.weight(1f)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("拒绝")
-                }
-                Button(
-                    onClick = onAccept,
-                    colors = ButtonDefaults.buttonColorsPrimary(),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("接收")
+                    Button(
+                        onClick = onDecline,
+                        colors = ButtonDefaults.buttonColors(),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("拒绝")
+                    }
+                    Button(
+                        onClick = onAccept,
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("接收")
+                    }
                 }
             }
         }
@@ -328,7 +326,7 @@ fun AddContentBottomSheet(
     onSendText: () -> Unit,
     onPasteClipboard: () -> Unit
 ) {
-    OverlayBottomSheet(
+    WindowBottomSheet(
         show = show,
         title = "添加发送内容",
         onDismissRequest = onDismissRequest
