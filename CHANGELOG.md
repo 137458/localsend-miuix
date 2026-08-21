@@ -15,6 +15,8 @@
 - 全面基于 WindowDialog、WindowBottomSheet 与 WindowDropdownPreference 实现独立窗口级弹窗体系。
 
 ### 缺陷修复
+- 引入 Android WifiManager.MulticastLock 多播锁与定向子网广播，解决局域网设备发现与多播接收受阻问题。
+- 优化网络接口 IP 获取算法，优先适配 WLAN/Wi-Fi 局域网真实地址。
 - 全面迁移所有弹窗为 WindowDialog 与 WindowBottomSheet，彻底解决弹窗在 Backdrop 图层转换下的闪退崩溃问题。
 - 紧凑化重构悬浮底栏尺寸（精简至 210~240dp 紧凑胶囊），优化内部图标与文字排版比例。
 - 消除子页面顶层多余的 PaddingValues 累加，使 TopAppBar 页面标题位置自然贴合格局。

@@ -1,17 +1,24 @@
 ﻿package org.localsend.miuix.network
 
+import android.content.Context
+import android.net.wifi.WifiManager
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -20,17 +27,20 @@ import org.localsend.miuix.model.DeviceDto
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.MulticastSocket
 
 class DiscoveryService(
+    private val context: Context,
     private val scope: CoroutineScope,
     private val getLocalDevice: () -> Device,
     private val onDeviceDiscovered: (Device) -> Unit
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
     private var multicastJob: Job? = null
-    private var broadcastJob: Job? = null
+    private var periodicBroadcastJob: Job? = null
     private var scanJob: Job? = null
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     private val httpClient by lazy {
         HttpClient(CIO) {
@@ -38,25 +48,53 @@ class DiscoveryService(
                 json(this@DiscoveryService.json)
             }
             install(HttpTimeout) {
-                requestTimeoutMillis = 1500
+                requestTimeoutMillis = 2000
                 connectTimeoutMillis = 1000
-                socketTimeoutMillis = 1500
+                socketTimeoutMillis = 2000
             }
         }
     }
 
     fun start() {
+        acquireLocks()
         startMulticastListener()
-        sendAnnouncement()
+        startPeriodicBroadcast()
+        scanSubnet()
     }
 
     fun stop() {
         multicastJob?.cancel()
-        broadcastJob?.cancel()
+        periodicBroadcastJob?.cancel()
         scanJob?.cancel()
         multicastJob = null
-        broadcastJob = null
+        periodicBroadcastJob = null
         scanJob = null
+        releaseLocks()
+    }
+
+    private fun acquireLocks() {
+        try {
+            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            if (wifiManager != null) {
+                multicastLock = wifiManager.createMulticastLock("LocalSendMiuixMulticastLock").apply {
+                    setReferenceCounted(true)
+                    acquire()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun releaseLocks() {
+        try {
+            multicastLock?.let {
+                if (it.isHeld) it.release()
+            }
+            multicastLock = null
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun startMulticastListener() {
@@ -64,8 +102,9 @@ class DiscoveryService(
             var socket: MulticastSocket? = null
             try {
                 val group = InetAddress.getByName("224.0.0.167")
-                socket = MulticastSocket(53317).apply {
+                socket = MulticastSocket(null).apply {
                     reuseAddress = true
+                    bind(InetSocketAddress(53317))
                     joinGroup(group)
                     soTimeout = 3000
                 }
@@ -89,6 +128,11 @@ class DiscoveryService(
                             if (dto.fingerprint != localDevice.fingerprint) {
                                 val device = Device.fromDto(dto, senderIp)
                                 onDeviceDiscovered(device)
+
+                                // If it is an announcement, send back response if requested
+                                if (dto.announcement == true) {
+                                    sendDirectResponse(device)
+                                }
                             }
                         } catch (e: Exception) {
                             // Ignored malformed packets
@@ -109,6 +153,15 @@ class DiscoveryService(
         }
     }
 
+    private fun startPeriodicBroadcast() {
+        periodicBroadcastJob = scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                sendAnnouncement()
+                delay(10000)
+            }
+        }
+    }
+
     fun sendAnnouncement() {
         scope.launch(Dispatchers.IO) {
             try {
@@ -117,21 +170,42 @@ class DiscoveryService(
                 val payload = json.encodeToString(DeviceDto.serializer(), dto).toByteArray(Charsets.UTF_8)
 
                 val multicastGroup = InetAddress.getByName("224.0.0.167")
-                val broadcastAddr = InetAddress.getByName("255.255.255.255")
+                val broadcasts = NetworkUtils.getBroadcastAddresses()
 
                 DatagramSocket().use { socket ->
                     socket.broadcast = true
-                    // Send to multicast
-                    val packet1 = DatagramPacket(payload, payload.size, multicastGroup, 53317)
-                    socket.send(packet1)
 
-                    // Send to broadcast
-                    val packet2 = DatagramPacket(payload, payload.size, broadcastAddr, 53317)
-                    socket.send(packet2)
+                    // 1. Send to multicast 224.0.0.167
+                    try {
+                        val packet1 = DatagramPacket(payload, payload.size, multicastGroup, 53317)
+                        socket.send(packet1)
+                    } catch (ignored: Exception) {}
+
+                    // 2. Send to all broadcast addresses (directed subnet + 255.255.255.255)
+                    for (bcast in broadcasts) {
+                        try {
+                            val addr = InetAddress.getByName(bcast)
+                            val packet2 = DatagramPacket(payload, payload.size, addr, 53317)
+                            socket.send(packet2)
+                        } catch (ignored: Exception) {}
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun sendDirectResponse(targetDevice: Device) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val url = "${targetDevice.url}/api/localsend/v2/register"
+                val localDevice = getLocalDevice()
+                httpClient.post(url) {
+                    contentType(ContentType.Application.Json)
+                    setBody(localDevice.toDto())
+                }
+            } catch (ignored: Exception) {}
         }
     }
 
@@ -155,6 +229,7 @@ class DiscoveryService(
                             if (dto.fingerprint != localDevice.fingerprint) {
                                 val device = Device.fromDto(dto, targetIp)
                                 onDeviceDiscovered(device)
+                                sendDirectResponse(device)
                             }
                         } catch (ignored: Exception) {
                             // Offline or unreachable IP

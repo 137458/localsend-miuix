@@ -32,10 +32,18 @@ class LocalSendManager(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val fingerprint = UUID.randomUUID().toString()
 
+    private val defaultDownloadDir: File by lazy {
+        val pubDownload = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (pubDownload != null && (pubDownload.exists() || pubDownload.mkdirs())) {
+            pubDownload
+        } else {
+            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
+        }
+    }
+
     private val _settings = MutableStateFlow(
         AppSettings(
-            downloadPath = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.absolutePath
-                ?: context.filesDir.absolutePath
+            downloadPath = defaultDownloadDir.absolutePath
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -61,6 +69,7 @@ class LocalSendManager(private val context: Context) {
     private val incomingApprovalDeferreds = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
 
     private val discoveryService = DiscoveryService(
+        context = context,
         scope = scope,
         getLocalDevice = { getLocalDevice() },
         onDeviceDiscovered = { device ->
@@ -89,7 +98,11 @@ class LocalSendManager(private val context: Context) {
         isQuickSave = { _settings.value.quickSave },
         getDownloadDir = {
             val path = _settings.value.downloadPath
-            if (path.isNotEmpty()) File(path) else context.filesDir
+            if (path.isNotEmpty()) {
+                val f = File(path)
+                if (!f.exists()) f.mkdirs()
+                f
+            } else defaultDownloadDir
         },
         onDeviceDiscovered = { device ->
             scope.launch {
@@ -179,6 +192,7 @@ class LocalSendManager(private val context: Context) {
 
     fun refreshDevices() {
         discoveryService.sendAnnouncement()
+        scanSubnet()
     }
 
     fun scanSubnet() {
