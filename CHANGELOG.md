@@ -13,3 +13,8 @@
 - 深度结合 HorizontalPager 实现三页横向手势平滑滑屏与底栏指示器流畅联动。
 - 实现发送、接收、设置三大核心功能板块及完整交互。
 - 提供基于 OverlayDialog 与 OverlayBottomSheet 的设备重命名、手动 IP 发送、纯文本发送与传输确认等弹窗交互。
+
+### 缺陷修复
+- 修复液态玻璃悬浮底栏在 IntrinsicSize.Min 测量下嵌套 weight 导致的测量异常与界面崩溃问题，优化底栏尺寸与居中胶囊排版。
+- 解决多层嵌套 Scaffold 导致 OverlayDialog 与 OverlayBottomSheet 弹窗宿主冲突与手势拦截问题。
+- 优化文件与媒体选择器 ActivityResult 契约及安全 URI 访问容错机制。

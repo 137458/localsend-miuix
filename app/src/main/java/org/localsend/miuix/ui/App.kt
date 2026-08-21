@@ -3,6 +3,7 @@
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -94,23 +95,34 @@ fun App(manager: LocalSendManager) {
 
     // 5. Activity Result Launchers
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) {
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri>? ->
+        if (!uris.isNullOrEmpty()) {
             val items = uris.map { uri ->
                 var name = "file_${System.currentTimeMillis()}"
                 var size = 0L
                 try {
+                    try {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (ignored: Exception) {}
+
                     context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                         val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                         val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
                         if (cursor.moveToFirst()) {
-                            if (nameIndex != -1) name = cursor.getString(nameIndex)
-                            if (sizeIndex != -1) size = cursor.getLong(sizeIndex)
+                            if (nameIndex != -1 && !cursor.isNull(nameIndex)) {
+                                name = cursor.getString(nameIndex) ?: name
+                            }
+                            if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
+                                size = cursor.getLong(sizeIndex)
+                            }
                         }
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    name = uri.lastPathSegment ?: name
                 }
                 val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
                 FileItem(name = name, size = size, uri = uri, mimeType = mime)
@@ -122,8 +134,8 @@ fun App(manager: LocalSendManager) {
 
     val mediaPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
-    ) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) {
+    ) { uris: List<Uri>? ->
+        if (!uris.isNullOrEmpty()) {
             val items = uris.map { uri ->
                 var name = "media_${System.currentTimeMillis()}.jpg"
                 var size = 0L
@@ -132,12 +144,16 @@ fun App(manager: LocalSendManager) {
                         val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                         val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
                         if (cursor.moveToFirst()) {
-                            if (nameIndex != -1) name = cursor.getString(nameIndex)
-                            if (sizeIndex != -1) size = cursor.getLong(sizeIndex)
+                            if (nameIndex != -1 && !cursor.isNull(nameIndex)) {
+                                name = cursor.getString(nameIndex) ?: name
+                            }
+                            if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
+                                size = cursor.getLong(sizeIndex)
+                            }
                         }
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    name = uri.lastPathSegment ?: name
                 }
                 val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
                 FileItem(name = name, size = size, uri = uri, mimeType = mime)
@@ -148,24 +164,28 @@ fun App(manager: LocalSendManager) {
     }
 
     val pickClipboard = {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        if (clipboard.hasPrimaryClip() && clipboard.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true) {
-            val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
-            if (!clipText.isNullOrEmpty()) {
-                val bytes = clipText.toByteArray(Charsets.UTF_8)
-                val item = FileItem(
-                    name = "clipboard_${System.currentTimeMillis()}.txt",
-                    size = bytes.size.toLong(),
-                    textContent = clipText,
-                    mimeType = "text/plain"
-                )
-                manager.addFiles(listOf(item))
-                Toast.makeText(context, "已提取剪贴板文本并添加", Toast.LENGTH_SHORT).show()
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            if (clipboard.hasPrimaryClip()) {
+                val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
+                if (!clipText.isNullOrEmpty()) {
+                    val bytes = clipText.toByteArray(Charsets.UTF_8)
+                    val item = FileItem(
+                        name = "clipboard_${System.currentTimeMillis()}.txt",
+                        size = bytes.size.toLong(),
+                        textContent = clipText,
+                        mimeType = "text/plain"
+                    )
+                    manager.addFiles(listOf(item))
+                    Toast.makeText(context, "已提取剪贴板文本并添加", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "剪贴板为空", Toast.LENGTH_SHORT).show()
+                }
             } else {
-                Toast.makeText(context, "剪贴板为空", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "剪贴板中无内容", Toast.LENGTH_SHORT).show()
             }
-        } else {
-            Toast.makeText(context, "剪贴板中无文本内容", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(context, "无法访问剪贴板: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -184,7 +204,7 @@ fun App(manager: LocalSendManager) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp + navBarBottomPadding),
+                        .padding(bottom = 12.dp + navBarBottomPadding, start = 24.dp, end = 24.dp),
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     LiquidGlassBottomBar(
@@ -222,7 +242,7 @@ fun App(manager: LocalSendManager) {
                             contentPadding = pagePadding,
                             onOpenAddSheet = { showAddContentSheet = true },
                             onOpenManualIp = { showManualIpDialog = true },
-                            onPickFiles = { filePickerLauncher.launch("*/*") },
+                            onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
                             onPickMedia = {
                                 mediaPickerLauncher.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
@@ -300,7 +320,7 @@ fun App(manager: LocalSendManager) {
             AddContentBottomSheet(
                 show = showAddContentSheet,
                 onDismissRequest = { showAddContentSheet = false },
-                onPickFiles = { filePickerLauncher.launch("*/*") },
+                onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
                 onPickMedia = {
                     mediaPickerLauncher.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)

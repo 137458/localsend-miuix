@@ -1,9 +1,6 @@
 ﻿package org.localsend.miuix.ui.screen
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,13 +18,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -54,7 +49,6 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
-import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -86,29 +80,31 @@ fun SendScreen(
         selectedFiles.sumOf { it.size }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = "发送",
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    IconButton(
-                        onClick = {
-                            manager.refreshDevices()
-                            Toast.makeText(context, "已发送局域网发现广播", Toast.LENGTH_SHORT).show()
-                        }
-                    ) {
-                        Icon(imageVector = AppIcons.Refresh, contentDescription = "刷新")
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = contentPadding.calculateTopPadding())
+    ) {
+        TopAppBar(
+            title = "发送",
+            scrollBehavior = scrollBehavior,
+            actions = {
+                IconButton(
+                    onClick = {
+                        manager.refreshDevices()
+                        Toast.makeText(context, "已发送局域网发现广播", Toast.LENGTH_SHORT).show()
                     }
-                    IconButton(
-                        onClick = onOpenManualIp
-                    ) {
-                        Icon(imageVector = AppIcons.Scan, contentDescription = "手动 IP")
-                    }
+                ) {
+                    Icon(imageVector = AppIcons.Refresh, contentDescription = "刷新")
                 }
-            )
-        }
-    ) { innerPadding ->
+                IconButton(
+                    onClick = onOpenManualIp
+                ) {
+                    Icon(imageVector = AppIcons.Scan, contentDescription = "手动 IP")
+                }
+            }
+        )
+
         PullToRefresh(
             isRefreshing = isRefreshing,
             onRefresh = {
@@ -125,7 +121,7 @@ fun SendScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                    top = innerPadding.calculateTopPadding(),
+                    top = 8.dp,
                     bottom = contentPadding.calculateBottomPadding() + 16.dp,
                     start = 12.dp,
                     end = 12.dp
@@ -159,7 +155,7 @@ fun SendScreen(
                             )
                             QuickActionItem(
                                 title = "剪贴板",
-                                icon = Icons.Default.Assignment,
+                                icon = Icons.AutoMirrored.Filled.Assignment,
                                 onClick = onPasteClipboard
                             )
                         }
@@ -340,7 +336,7 @@ fun SendScreen(
                     }
                 }
 
-                // Section 4: Manual Connection & Tools
+                // Section 4: Manual Tools
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
                     SmallTitle(text = "快捷工具")

@@ -10,21 +10,21 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -45,7 +45,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.shadow.Shadow
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -296,13 +295,17 @@ fun LiquidGlassBottomBar(
     }
 
     Box(
-        modifier = modifier.width(IntrinsicSize.Min),
+        modifier = modifier
+            .widthIn(min = 260.dp, max = 320.dp)
+            .fillMaxWidth()
+            .height(64.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         // 1. Base Layer
         CompositionLocalProvider(LocalLiquidBarContentColor provides contentColor) {
             Row(
-                Modifier
+                modifier = Modifier
+                    .fillMaxSize()
                     .onGloballyPositioned { coords ->
                         totalWidthPx = coords.size.width.toFloat()
                         val contentWidthPx = totalWidthPx - with(density) { 8.dp.toPx() }
@@ -360,7 +363,6 @@ fun LiquidGlassBottomBar(
                         }
                     )
                     .then(if (isLiquidGlassMode && interactiveHighlight != null) interactiveHighlight.modifier else Modifier)
-                    .height(64.dp)
                     .padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 content = tabsContent,
@@ -376,10 +378,11 @@ fun LiquidGlassBottomBar(
                 LocalLiquidBarContentColor provides primaryColor
             ) {
                 Row(
-                    Modifier
+                    modifier = Modifier
                         .clearAndSetSemantics {}
                         .alpha(0f)
                         .layerBackdrop(tabsBackdrop)
+                        .fillMaxSize()
                         .graphicsLayer { translationX = panelOffset }
                         .drawBackdrop(
                             backdrop = backdrop,
@@ -395,8 +398,7 @@ fun LiquidGlassBottomBar(
                             onDrawSurface = { drawRect(containerColor) },
                         )
                         .then(interactiveHighlight?.modifier ?: Modifier)
-                        .height(56.dp)
-                        .padding(horizontal = 4.dp),
+                        .padding(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     content = tabsContent,
                 )
