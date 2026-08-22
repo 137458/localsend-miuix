@@ -244,8 +244,14 @@ class LocalSendManager(private val context: Context) {
                     // 全新设备：追加
                     alive + device
                 } else if (sameIdentity(alive[index], device) && alive[index].ip == device.ip) {
-                    // 内容未变，仅刷新 lastSeen：返回原列表，避免无意义重组导致 UI 卡顿
-                    current
+                    // 内容未变。仅当列表没有过滤掉过期设备、且 lastSeen 也未变化时，
+                    // 才返回原列表避免无意义重组；否则仍以 device 替换，刷新 lastSeen
+                    // 并顺带消除本次被过滤掉的过期设备，避免其永远残留。
+                    if (alive.size == current.size && alive[index].lastSeen == device.lastSeen) {
+                        current
+                    } else {
+                        alive.toMutableList().apply { set(index, device) }
+                    }
                 } else {
                     alive.toMutableList().apply { set(index, device) }
                 }

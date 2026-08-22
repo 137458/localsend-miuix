@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.launch
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.FileItem
@@ -356,6 +357,8 @@ fun App(manager: LocalSendManager) {
 
             // 独立传输历史页（接收页右上角图标进入，覆盖底层页面）
             if (showHistory) {
+                // 历史页存在时，系统返回先关闭历史页而非退出应用
+                BackHandler { showHistory = false }
                 HistoryScreen(
                     manager = manager,
                     contentPadding = PaddingValues(bottom = bottomBarTotalPadding),

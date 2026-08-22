@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -127,7 +128,13 @@ fun HistoryScreen(
 
 @Composable
 private fun HistoryItemCard(item: TransferHistoryItem) {
-    val statusInfo = statusInfo(status = item.status, primaryColor = MiuixTheme.colorScheme.primary)
+    val primary = MiuixTheme.colorScheme.primary
+    val statusInfo = remember(primary, item.status) {
+        statusInfo(status = item.status, primaryColor = primary)
+    }
+    val timeText = remember(item.timestamp) {
+        SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(item.timestamp))
+    }
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -172,7 +179,7 @@ private fun HistoryItemCard(item: TransferHistoryItem) {
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(item.timestamp)),
+                    text = timeText,
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )

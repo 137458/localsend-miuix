@@ -178,7 +178,9 @@ fun ReceiveScreen(
                             }
                         }
                     } else {
-                        val session = shares.first()
+                        // StateFlow 单例共享（empty↔single 原子切换），此处安全性对当前实现保证；
+                        // 用 firstOrNull 防御，避免未来引入多共享时抛 NoSuchElementException
+                        val session = shares.firstOrNull() ?: return@Card
                         val device = manager.getLocalDevice()
                         val link = session.downloadLink(device.ip, device.port)
                         Column(modifier = Modifier.padding(16.dp)) {
