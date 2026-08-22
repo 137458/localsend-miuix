@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Link
@@ -38,6 +39,7 @@ object AppIcons {
     val Wifi: ImageVector = Icons.Default.Wifi
     val Link: ImageVector = Icons.Default.Link
     val Copy: ImageVector = Icons.Default.ContentCopy
+    val History: ImageVector = Icons.Default.History
 
     fun getDeviceIcon(type: DeviceType): ImageVector {
         return when (type) {

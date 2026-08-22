@@ -1,5 +1,7 @@
 package org.localsend.miuix.ui.screen
 
+import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,29 +15,33 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.FileItem
-import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.network.NetworkUtils
+import org.localsend.miuix.ui.component.AppIcons
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
@@ -44,15 +50,23 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+/**
+ * 接收页（第 0 页）：本机信息 + Web Share 链接共享 + 正在接收的传输进度。
+ * 传输历史通过右上角图标进入独立历史页。
+ */
 @Composable
 fun ReceiveScreen(
     manager: LocalSendManager,
     contentPadding: PaddingValues,
-    onOpenRenameDialog: () -> Unit
+    onOpenRenameDialog: () -> Unit,
+    onOpenHistory: () -> Unit
 ) {
+    val context = LocalContext.current
     val settings by manager.settings.collectAsState()
     val activeSessions by manager.activeSessions.collectAsState()
-    val transferHistory by manager.transferHistory.collectAsState()
+    val incomingSessions = activeSessions.filter { it.isIncoming }
+    val shares by manager.shares.collectAsState()
+    val selectedFiles by manager.selectedFiles.collectAsState()
 
     val localIps = remember { NetworkUtils.getLocalIpAddresses() }
     val primaryIp = localIps.firstOrNull() ?: "127.0.0.1"
@@ -63,7 +77,12 @@ fun ReceiveScreen(
     ) {
         TopAppBar(
             title = "接收",
-            scrollBehavior = scrollBehavior
+            scrollBehavior = scrollBehavior,
+            actions = {
+                IconButton(onClick = onOpenHistory) {
+                    Icon(imageVector = AppIcons.History, contentDescription = "传输历史")
+                }
+            }
         )
 
         LazyColumn(
@@ -111,100 +130,186 @@ fun ReceiveScreen(
                 }
             }
 
-            // Section 2: Active Ongoing Sessions
-            if (activeSessions.isNotEmpty()) {
+            // Section 1.5: Incoming Transfer Progress（设备名称下方加进度条）
+            if (incomingSessions.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = "正在传输 (${activeSessions.count { it.status == TransferStatus.InProgress }})")
+                    SmallTitle(text = "正在接收 (${incomingSessions.count { it.status == TransferStatus.InProgress }})")
                 }
-                items(activeSessions, key = { it.sessionId }) { session ->
-                    org.localsend.miuix.ui.component.TransferSessionCard(
+                items(incomingSessions, key = { it.sessionId }) { session ->
+                    IncomingProgressCard(
                         session = session,
                         onCancel = { manager.cancelTransfer(session.sessionId) }
                     )
                 }
             }
 
-            // Section 3: History List
+            // Section 2: Web Share（通过链接共享给局域网浏览器）
             item {
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SmallTitle(text = "传输历史 (${transferHistory.size})")
-                    if (transferHistory.isNotEmpty()) {
-                        Button(
-                            onClick = { manager.clearHistory() },
-                            colors = ButtonDefaults.buttonColors()
-                        ) {
-                            Text("清空")
-                        }
-                    }
-                }
-            }
-
-            if (transferHistory.isEmpty()) {
-                item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                SmallTitle(text = "通过链接分享")
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    if (shares.isEmpty()) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(24.dp),
+                                .padding(20.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "暂无传输历史记录",
-                                style = MiuixTheme.textStyles.body2,
+                                text = "把选中的文件共享为可浏览/下载的链接，接收方无需安装应用",
+                                style = MiuixTheme.textStyles.footnote1,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = {
+                                    if (selectedFiles.isEmpty()) {
+                                        Toast.makeText(context, "请先在发送页添加待分享的文件", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        manager.startShare(selectedFiles)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColorsPrimary()
+                            ) {
+                                Icon(imageVector = AppIcons.Link, contentDescription = null)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("开启链接共享")
+                            }
+                        }
+                    } else {
+                        val session = shares.first()
+                        val device = manager.getLocalDevice()
+                        val link = session.downloadLink(device.ip, device.port)
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "收件人浏览器打开以下地址即可下载",
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.1f))
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = link,
+                                    style = MiuixTheme.textStyles.body2,
+                                    color = MiuixTheme.colorScheme.primary,
+                                    maxLines = 1
+                                )
+                                Spacer(modifier = Modifier.weight(1f))
+                                Text(
+                                    text = "共 ${session.files.size} 个文件",
+                                    style = MiuixTheme.textStyles.footnote1,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        val clipboard = context.getSystemService(
+                                            android.content.Context.CLIPBOARD_SERVICE
+                                        ) as android.content.ClipboardManager
+                                        clipboard.setPrimaryClip(
+                                            android.content.ClipData.newPlainText("LocalSend", link)
+                                        )
+                                        Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
+                                    },
+                                    colors = ButtonDefaults.buttonColorsPrimary()
+                                ) {
+                                    Icon(imageVector = AppIcons.Copy, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("复制链接")
+                                }
+                                Button(
+                                    onClick = { manager.stopShare() },
+                                    colors = ButtonDefaults.buttonColors()
+                                ) {
+                                    Text("结束共享")
+                                }
+                            }
                         }
                     }
-                }
-            } else {
-                items(transferHistory, key = { it.id }) { item ->
-                    HistoryItemCard(item = item)
                 }
             }
         }
     }
 }
 
+/**
+ * 精简的接收进度卡片：设备名称下方直接附进度条，对齐原版 LocalSend 的展示方式。
+ */
 @Composable
-private fun HistoryItemCard(item: TransferHistoryItem) {
+private fun IncomingProgressCard(
+    session: org.localsend.miuix.model.TransferSession,
+    onCancel: () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = when (item.status) {
-                    TransferStatus.Completed -> Icons.Default.CheckCircle
-                    TransferStatus.Failed -> Icons.Default.Error
-                    else -> Icons.Default.Cancel
-                },
-                contentDescription = null,
-                tint = when (item.status) {
-                    TransferStatus.Completed -> Color(0xFF4CAF50)
-                    TransferStatus.Failed -> MiuixTheme.colorScheme.error
-                    else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
-                },
-                modifier = Modifier.size(24.dp)
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = session.device.alias,
+                            style = MiuixTheme.textStyles.headline1
+                        )
+                        Text(
+                            text = "${session.files.size} 个文件 • ${FileItem.formatFileSize(session.totalBytes)}",
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+                    }
+                }
+                if (session.status == TransferStatus.InProgress) {
+                    IconButton(onClick = onCancel) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "取消",
+                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            LinearProgressIndicator(
+                progress = session.progress,
+                modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    text = "${if (item.isIncoming) "接收自" else "发送至"}: ${item.deviceAlias}",
-                    style = MiuixTheme.textStyles.body1
+                    text = "${FileItem.formatFileSize(session.transferredBytes)} / ${FileItem.formatFileSize(session.totalBytes)}",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
                 Text(
-                    text = "${item.fileCount} 个文件 (${FileItem.formatFileSize(item.totalSize)}) • ${item.fileNames.firstOrNull() ?: ""}",
+                    text = "${FileItem.formatFileSize(session.speed)}/s",
                     style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    maxLines = 1
+                    color = MiuixTheme.colorScheme.primary
                 )
             }
         }

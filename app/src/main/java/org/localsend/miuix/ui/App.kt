@@ -35,16 +35,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.localsend.miuix.manager.LocalSendManager
-import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.ui.component.AddContentBottomSheet
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.IncomingTransferDialog
 import org.localsend.miuix.ui.component.LiquidGlassBottomBar
-import org.localsend.miuix.ui.component.ManualIpDialog
 import org.localsend.miuix.ui.component.PortDialog
 import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
+import org.localsend.miuix.ui.screen.HistoryScreen
 import org.localsend.miuix.ui.screen.ReceiveScreen
 import org.localsend.miuix.ui.screen.SendScreen
 import org.localsend.miuix.ui.screen.SettingsScreen
@@ -89,21 +88,21 @@ fun App(manager: LocalSendManager) {
     // 2. Horizontal Pager State
     val pagerState = rememberPagerState(pageCount = { 3 })
 
-    // 3. Navigation Items
+    // 3. Navigation Items（接收在第 0 页，发送在第 1 页）
     val navigationItems = remember {
         listOf(
-            NavigationItem("发送", AppIcons.Send),
             NavigationItem("接收", AppIcons.Receive),
+            NavigationItem("发送", AppIcons.Send),
             NavigationItem("设置", AppIcons.Settings)
         )
     }
 
     // 4. Dialog Visibility States
     var showRenameDialog by remember { mutableStateOf(false) }
-    var showManualIpDialog by remember { mutableStateOf(false) }
     var showSendTextDialog by remember { mutableStateOf(false) }
     var showAddContentSheet by remember { mutableStateOf(false) }
     var showPortDialog by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
 
     // 5. Activity Result Launchers
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -243,7 +242,7 @@ fun App(manager: LocalSendManager) {
                         },
                         backdrop = backdrop,
                         badge = { index ->
-                            if (index == 1 && pendingIncomingSession != null) {
+                            if (index == 0 && pendingIncomingSession != null) {
                                 { Badge { Text("1") } }
                             } else null
                         }
@@ -265,11 +264,16 @@ fun App(manager: LocalSendManager) {
                         bottom = bottomBarTotalPadding
                     )
                     when (page) {
-                        0 -> SendScreen(
+                        0 -> ReceiveScreen(
+                            manager = manager,
+                            contentPadding = pagePadding,
+                            onOpenRenameDialog = { showRenameDialog = true },
+                            onOpenHistory = { showHistory = true }
+                        )
+                        1 -> SendScreen(
                             manager = manager,
                             contentPadding = pagePadding,
                             onOpenAddSheet = { showAddContentSheet = true },
-                            onOpenManualIp = { showManualIpDialog = true },
                             onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
                             onPickMedia = {
                                 mediaPickerLauncher.launch(
@@ -278,11 +282,6 @@ fun App(manager: LocalSendManager) {
                             },
                             onSendText = { showSendTextDialog = true },
                             onPasteClipboard = pickClipboard
-                        )
-                        1 -> ReceiveScreen(
-                            manager = manager,
-                            contentPadding = pagePadding,
-                            onOpenRenameDialog = { showRenameDialog = true }
                         )
                         2 -> SettingsScreen(
                             manager = manager,
@@ -313,21 +312,6 @@ fun App(manager: LocalSendManager) {
                 onConfirm = { newAlias ->
                     manager.updateSettings { it.copy(alias = newAlias) }
                     Toast.makeText(context, "设备名称已更新为: $newAlias", Toast.LENGTH_SHORT).show()
-                }
-            )
-
-            ManualIpDialog(
-                show = showManualIpDialog,
-                onDismissRequest = { showManualIpDialog = false },
-                onSend = { targetIp, targetPort ->
-                    val manualDevice = Device(
-                        alias = "指定设备 ($targetIp)",
-                        fingerprint = "$targetIp:$targetPort",
-                        port = targetPort,
-                        ip = targetIp
-                    )
-                    manager.sendFilesTo(manualDevice)
-                    Toast.makeText(context, "正在向 $targetIp 发起连接与传输", Toast.LENGTH_SHORT).show()
                 }
             )
 
@@ -369,6 +353,15 @@ fun App(manager: LocalSendManager) {
                 onSendText = { showSendTextDialog = true },
                 onPasteClipboard = pickClipboard
             )
+
+            // 独立传输历史页（接收页右上角图标进入，覆盖底层页面）
+            if (showHistory) {
+                HistoryScreen(
+                    manager = manager,
+                    contentPadding = PaddingValues(bottom = bottomBarTotalPadding),
+                    onBack = { showHistory = false }
+                )
+            }
         }
     }
 }

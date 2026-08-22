@@ -1,7 +1,6 @@
 package org.localsend.miuix.ui.screen
 
 import android.widget.Toast
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -38,9 +37,10 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.manager.LocalSendManager
-import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.ui.component.AppIcons
+import org.localsend.miuix.ui.component.TransferSessionCard
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -61,7 +61,6 @@ fun SendScreen(
     manager: LocalSendManager,
     contentPadding: PaddingValues,
     onOpenAddSheet: () -> Unit,
-    onOpenManualIp: () -> Unit,
     onPickFiles: () -> Unit,
     onPickMedia: () -> Unit,
     onSendText: () -> Unit,
@@ -73,15 +72,11 @@ fun SendScreen(
     val isScanning by manager.isScanning.collectAsState()
     val activeSessions by manager.activeSessions.collectAsState()
     val outgoingSessions = activeSessions.filter { !it.isIncoming }
-    val shares by manager.shares.collectAsState()
+    val totalSelectedSize = selectedFiles.sumOf { it.size }
 
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
     val scrollBehavior = MiuixScrollBehavior()
-
-    val totalSelectedSize = remember(selectedFiles) {
-        selectedFiles.sumOf { it.size }
-    }
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -97,11 +92,6 @@ fun SendScreen(
                     }
                 ) {
                     Icon(imageVector = AppIcons.Refresh, contentDescription = "刷新")
-                }
-                IconButton(
-                    onClick = onOpenManualIp
-                ) {
-                    Icon(imageVector = AppIcons.Scan, contentDescription = "手动 IP")
                 }
             }
         )
@@ -139,21 +129,9 @@ fun SendScreen(
                                 .padding(vertical = 12.dp, horizontal = 8.dp),
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
-                            QuickActionItem(
-                                title = "文件",
-                                icon = Icons.Default.Folder,
-                                onClick = onPickFiles
-                            )
-                            QuickActionItem(
-                                title = "媒体",
-                                icon = Icons.Default.Image,
-                                onClick = onPickMedia
-                            )
-                            QuickActionItem(
-                                title = "文本",
-                                icon = Icons.Default.TextFields,
-                                onClick = onSendText
-                            )
+                            QuickActionItem(title = "文件", icon = Icons.Default.Folder, onClick = onPickFiles)
+                            QuickActionItem(title = "媒体", icon = Icons.Default.Image, onClick = onPickMedia)
+                            QuickActionItem(title = "文本", icon = Icons.Default.TextFields, onClick = onSendText)
                             QuickActionItem(
                                 title = "剪贴板",
                                 icon = Icons.AutoMirrored.Filled.Assignment,
@@ -163,34 +141,12 @@ fun SendScreen(
                     }
                 }
 
-                // Section 2: Selected Content Queue
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = "待发送内容 (${selectedFiles.size})")
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        if (selectedFiles.isEmpty()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "尚未选择任何内容",
-                                    style = MiuixTheme.textStyles.body2,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Button(
-                                    onClick = onOpenAddSheet,
-                                    colors = ButtonDefaults.buttonColorsPrimary()
-                                ) {
-                                    Icon(imageVector = Icons.Default.Add, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("添加文件 / 媒体 / 文本")
-                                }
-                            }
-                        } else {
+                // Section 2: Selected Content Queue（仅在选择内容后显示）
+                if (selectedFiles.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        SmallTitle(text = "待发送内容 (${selectedFiles.size})")
+                        Card(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -263,109 +219,16 @@ fun SendScreen(
                     }
                 }
 
-                // Section 2.4: Web Share（通过链接共享给局域网页面的浏览器）
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = "通过链接分享")
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        if (shares.isEmpty()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(20.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "把选中的文件共享为可浏览/下载的链接，接收方无需安装应用",
-                                    style = MiuixTheme.textStyles.footnote1,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Button(
-                                    onClick = {
-                                        if (selectedFiles.isEmpty()) {
-                                            Toast.makeText(context, "请先添加待分享的文件", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            manager.startShare(selectedFiles)
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColorsPrimary()
-                                ) {
-                                    Icon(imageVector = AppIcons.Link, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("开启链接共享")
-                                }
-                            }
-                        } else {
-                            val session = shares.first()
-                            val device = manager.getLocalDevice()
-                            val link = session.downloadLink(device.ip, device.port)
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = "收件人浏览器打开以下地址即可下载",
-                                    style = MiuixTheme.textStyles.footnote1,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.1f))
-                                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = link,
-                                        style = MiuixTheme.textStyles.body2,
-                                        color = MiuixTheme.colorScheme.primary,
-                                        maxLines = 1
-                                    )
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    Text(
-                                        text = "共 ${session.files.size} 个文件",
-                                        style = MiuixTheme.textStyles.footnote1,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(
-                                        onClick = {
-                                            val clipboard = context.getSystemService(
-                                                android.content.Context.CLIPBOARD_SERVICE
-                                            ) as android.content.ClipboardManager
-                                            clipboard.setPrimaryClip(
-                                                android.content.ClipData.newPlainText("LocalSend", link)
-                                            )
-                                            Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
-                                        },
-                                        colors = ButtonDefaults.buttonColorsPrimary()
-                                    ) {
-                                        Icon(imageVector = AppIcons.Copy, contentDescription = null)
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("复制链接")
-                                    }
-                                    Button(
-                                        onClick = { manager.stopShare() },
-                                        colors = ButtonDefaults.buttonColors()
-                                    ) {
-                                        Text("结束共享")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // Section 2.5: Active Outgoing Sessions (发送进度)
                 if (outgoingSessions.isNotEmpty()) {
                     item {
                         Spacer(modifier = Modifier.height(4.dp))
-                        SmallTitle(text = "正在传输 (${outgoingSessions.count { it.status == org.localsend.miuix.model.TransferStatus.InProgress }})")
+                        SmallTitle(
+                            text = "正在传输 (${outgoingSessions.count { it.status == TransferStatus.InProgress }})"
+                        )
                     }
                     items(outgoingSessions, key = { it.sessionId }) { session ->
-                        org.localsend.miuix.ui.component.TransferSessionCard(
+                        TransferSessionCard(
                             session = session,
                             onCancel = { manager.cancelTransfer(session.sessionId) }
                         )
@@ -446,27 +309,6 @@ fun SendScreen(
                                 )
                             }
                         }
-                    }
-                }
-
-                // Section 4: Manual Tools
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = "快捷工具")
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        ArrowPreference(
-                            title = "手动输入 IP 发送",
-                            summary = "直接连接到指定 IP 地址与端口",
-                            onClick = onOpenManualIp
-                        )
-                        ArrowPreference(
-                            title = if (isScanning) "正在全网段扫描中..." else "扫描局域网子网段",
-                            summary = "并发探测 192.168.x.1..254，解决多播受阻问题",
-                            onClick = {
-                                manager.scanSubnet()
-                                Toast.makeText(context, "开始全网段异步扫描", Toast.LENGTH_SHORT).show()
-                            }
-                        )
                     }
                 }
             }

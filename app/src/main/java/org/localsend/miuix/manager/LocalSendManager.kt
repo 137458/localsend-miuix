@@ -103,16 +103,7 @@ class LocalSendManager(private val context: Context) {
         scope = scope,
         getLocalDevice = { getLocalDevice() },
         onDeviceDiscovered = { device ->
-            scope.launch {
-                _nearbyDevices.update { list ->
-                    val existingIndex = list.indexOfFirst { it.fingerprint == device.fingerprint || (it.ip == device.ip && it.port == device.port) }
-                    if (existingIndex >= 0) {
-                        list.toMutableList().apply { set(existingIndex, device) }
-                    } else {
-                        list + device
-                    }
-                }
-            }
+            upsertDevice(device)
         }
     )
 
@@ -133,16 +124,7 @@ class LocalSendManager(private val context: Context) {
         getUseHttps = { _settings.value.useHttps },
         getShares = { _shares.value },
         onDeviceDiscovered = { device ->
-            scope.launch {
-                _nearbyDevices.update { list ->
-                    val existingIndex = list.indexOfFirst { it.fingerprint == device.fingerprint || (it.ip == device.ip && it.port == device.port) }
-                    if (existingIndex >= 0) {
-                        list.toMutableList().apply { set(existingIndex, device) }
-                    } else {
-                        list + device
-                    }
-                }
-            }
+            upsertDevice(device)
         },
         onIncomingRequest = { session ->
             val deferred = CompletableDeferred<Boolean>()
@@ -236,6 +218,37 @@ class LocalSendManager(private val context: Context) {
         discoveryService.scanSubnet { current, total ->
             if (current >= total) {
                 _isScanning.value = false
+            }
+        }
+    }
+
+    /** 发现到的新设备与列表内已有条目是否"数据一致"（仅指纹/协议/端口改变才值得刷新，降低扫描期重组开销）。 */
+    private fun sameIdentity(a: Device, b: Device): Boolean =
+        a.fingerprint == b.fingerprint && a.port == b.port && a.protocol == b.protocol
+
+    /**
+     * 集中处理设备发现：多播 / 广播 / 子网扫描 / HTTP register 都走这里合并进 nearbyDevices。
+     * 去重键为 fingerprint，其次 (ip+port)；同时清理长时间未刷新的过期设备，
+     * 避免同一设备因更换 IP / HTTPS↔HTTP 指纹变化而在列表中残留成多个同名条目。
+     */
+    private fun upsertDevice(device: Device) {
+        scope.launch {
+            _nearbyDevices.update { current ->
+                val now = System.currentTimeMillis()
+                val alive = current.filter { now - it.lastSeen < DEVICE_TTL_MS }
+                val index = alive.indexOfFirst {
+                    it.fingerprint == device.fingerprint ||
+                        (it.ip == device.ip && it.port == device.port)
+                }
+                if (index < 0) {
+                    // 全新设备：追加
+                    alive + device
+                } else if (sameIdentity(alive[index], device) && alive[index].ip == device.ip) {
+                    // 内容未变，仅刷新 lastSeen：返回原列表，避免无意义重组导致 UI 卡顿
+                    current
+                } else {
+                    alive.toMutableList().apply { set(index, device) }
+                }
             }
         }
     }
@@ -473,6 +486,8 @@ class LocalSendManager(private val context: Context) {
     }
 
     companion object {
+        // 设备发现的过期清理阈值：超过该时长未刷新的设备从附近设备列表移除
+        private const val DEVICE_TTL_MS = 90_000L
         private const val KEY_ALIAS = "alias"
         private const val KEY_PORT = "port"
         private const val KEY_QUICK_SAVE = "quick_save"

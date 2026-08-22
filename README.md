@@ -30,8 +30,8 @@ LocalSend Miuix 是基于 Xiaomi HyperOS 设计风格与 Miuix KMP 现代化组�
 | 页面 / 模块 | 核心 Miuix 组件 | 功能描述 |
 |---|---|---|
 | 主架构 Shell | `MiuixTheme`, `ThemeController`, `Scaffold`, `FloatingNavigationBar`, `FloatingNavigationBarItem`, `Badge` | 动态主题控制、全局弹窗宿主、悬浮底栏切换 |
-| 发送 (Send) | `TopAppBar`, `MiuixScrollBehavior`, `PullToRefresh`, `Card`, `SmallTitle`, `Button`, `IconButton` | 待发送内容清单、下拉刷新局域网设备、附近设备列表、手动 IP 发送 |
-| 接收 (Receive) | `TopAppBar`, `Card`, `SmallTitle`, `LinearProgressIndicator`, `SwitchPreference`, `ArrowPreference` | 本机网络状态展示、实时传输进度与速度、传输历史管理 |
+| 接收 (Receive) | `TopAppBar`, `Card`, `SmallTitle`, `LinearProgressIndicator`, `Button` | 本机名称/IP/端口展示、实时传输进度、Web Share 分享链接，点击右上角图标进入独立传输历史页 |
+| 发送 (Send) | `TopAppBar`, `MiuixScrollBehavior`, `PullToRefresh`, `Card`, `SmallTitle`, `Button`, `IconButton` | 快速选择入口、下拉刷新局域网设备、附近设备列表、待发送内容清单（选择内容后显示） |
 | 设置 (Settings) | `TopAppBar`, `Card`, `SmallTitle`, `ArrowPreference`, `SwitchPreference`, `OverlayDropdownPreference` | 设备别名、快速保存、服务端口与多播地址、主题色彩模式切换 |
 | 弹窗交互 (Overlays) | `OverlayDialog`, `OverlayBottomSheet`, `TextField`, `ButtonDefaults` | 设备名称修改、手动 IP 发送输入、文本消息发送、传输请求接收/拒绝、发送内容选择菜单 |
 
