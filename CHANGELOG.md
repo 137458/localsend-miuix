@@ -1,4 +1,4 @@
-﻿# 更新日志 (CHANGELOG)
+# 更新日志 (CHANGELOG)
 
 所有对 LocalSend Miuix 项目的重要更新都将记录在此文件中。格式遵循 Keep a Changelog 规范与语义化版本规则。
 
@@ -22,3 +22,4 @@
 - 紧凑化重构悬浮底栏尺寸（精简至 210~240dp 紧凑胶囊），优化内部图标与文字排版比例。
 - 消除子页面顶层多余的 PaddingValues 累加，使 TopAppBar 页面标题位置自然贴合格局。
 - 优化文件与媒体选择器 ActivityResult 契约及安全 URI 访问容错机制。
+- 在 MainActivity 提供 NavigationEventDispatcherOwner，修复 ManualIpDialog / 设备别名 / 发送文本等 WindowDialog 弹窗打开即闪退的问题。

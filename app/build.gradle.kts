@@ -50,6 +50,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
 
+    // Provides LocalNavigationEventDispatcherOwner needed by Miuix WindowDialog/NavigationBackHandler
+    implementation("androidx.navigationevent:navigationevent-compose:1.1.2")
+
     // Jetpack Compose
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
@@ -60,11 +63,11 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     // Miuix (HyperOS Compose UI Library & Blur Engine)
-    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.4-rc01")
-    implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.4-rc01")
-    implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.9.4-rc01")
-    implementation("top.yukonga.miuix.kmp:miuix-squircle-android:0.9.4-rc01")
-    implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.4-rc01")
+    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-squircle-android:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
 
     // Kotlinx Coroutines & Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
