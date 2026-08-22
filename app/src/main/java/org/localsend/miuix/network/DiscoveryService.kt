@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.network
+package org.localsend.miuix.network
 
 import android.content.Context
 import android.net.wifi.WifiManager
@@ -136,7 +136,7 @@ class DiscoveryService(
                                 onDeviceDiscovered(device)
 
                                 // If it is an announcement, send back direct register response
-                                if (dto.announcement == true) {
+                                if (dto.announce == true) {
                                     sendDirectResponse(device)
                                 }
                             }
@@ -172,7 +172,7 @@ class DiscoveryService(
         scope.launch(Dispatchers.IO) {
             try {
                 val localDevice = getLocalDevice()
-                val dto = localDevice.toDto(announcement = true)
+                val dto = localDevice.toDto(announce = true)
                 val payload = json.encodeToString(DeviceDto.serializer(), dto).toByteArray(Charsets.UTF_8)
 
                 val multicastGroup = InetAddress.getByName("224.0.0.167")

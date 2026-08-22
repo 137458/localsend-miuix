@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix
+package org.localsend.miuix
 
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -28,7 +28,7 @@ class LocalSendProtocolTest {
             port = 53317,
             protocol = "http",
             download = true,
-            announcement = true
+            announce = true
         )
 
         val encoded = json.encodeToString(DeviceDto.serializer(), dto)

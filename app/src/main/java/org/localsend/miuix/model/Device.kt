@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.model
+package org.localsend.miuix.model
 
 import kotlinx.serialization.Serializable
 
@@ -27,7 +27,7 @@ data class DeviceDto(
     val port: Int = 53317,
     val protocol: String = "http",
     val download: Boolean = true,
-    val announcement: Boolean? = null
+    val announce: Boolean? = null
 )
 
 data class Device(
@@ -42,7 +42,7 @@ data class Device(
     val ip: String,
     val lastSeen: Long = System.currentTimeMillis()
 ) {
-    fun toDto(announcement: Boolean? = null): DeviceDto {
+    fun toDto(announce: Boolean? = null): DeviceDto {
         return DeviceDto(
             alias = alias,
             version = version,
@@ -52,7 +52,7 @@ data class Device(
             port = port,
             protocol = protocol,
             download = download,
-            announcement = announcement
+            announce = announce
         )
     }
 
