@@ -28,6 +28,7 @@ import org.localsend.miuix.network.LocalSendClient
 import org.localsend.miuix.network.LocalSendServer
 import org.localsend.miuix.network.NetworkUtils
 import org.localsend.miuix.network.TlsStore
+import org.localsend.miuix.notification.TransferNotifier
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -94,6 +95,9 @@ class LocalSendManager(private val context: Context) {
 
     private val incomingApprovalDeferreds = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
 
+    // 记录哪些 incoming 会话已弹出过首帧"收到文件"通知，避免进度更新时重复弹
+    private val notifiedIncoming = ConcurrentHashMap.newKeySet<String>()
+
     private val discoveryService = DiscoveryService(
         context = context,
         scope = scope,
@@ -151,6 +155,9 @@ class LocalSendManager(private val context: Context) {
         },
         onSessionUpdated = { session ->
             scope.launch {
+                // 接收端通知：进度与结果反馈（仅对 incoming 会话发通知，避免发送端刷屏）
+                updateTransferNotification(session)
+
                 // 进行中的会话写入正在传输区；已结束的会话移入历史并从活动列表移除
                 if (isTerminal(session.status)) {
                     _activeSessions.update { list -> list.filterNot { it.sessionId == session.sessionId } }
@@ -342,6 +349,21 @@ class LocalSendManager(private val context: Context) {
             status == TransferStatus.Failed ||
             status == TransferStatus.Canceled
 
+    /**
+     * 接收端的系统通知：仅对 incoming 会话弹出。
+     * 非终止状态：首帧弹"收到文件"，随后仅更新进度条；终止状态：弹最终结果。
+     */
+    private fun updateTransferNotification(session: TransferSession) {
+        if (!session.isIncoming) return
+        if (isTerminal(session.status)) {
+            TransferNotifier.notifyResult(context, session)
+        } else if (notifiedIncoming.add(session.sessionId)) {
+            TransferNotifier.notifyIncoming(context, session)
+        } else {
+            TransferNotifier.updateProgress(context, session)
+        }
+    }
+
     fun consumeSessionMessage() {
         _sessionMessage.value = null
     }
@@ -403,7 +425,7 @@ class LocalSendManager(private val context: Context) {
     fun applyPortChange(newPort: Int) {
         if (newPort == _settings.value.port) return
         updateSettings { it.copy(port = newPort) }
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             server.stop()
             server.start()
         }
@@ -413,10 +435,11 @@ class LocalSendManager(private val context: Context) {
     fun applyUseHttpsChange(useHttps: Boolean) {
         if (useHttps == _settings.value.useHttps) return
         updateSettings { it.copy(useHttps = useHttps) }
-        scope.launch {
+        // HTTPS 引擎（Netty + 自签名证书解析）初始化较重，切到 IO 线程执行，避免冻结主线程（UI）
+        scope.launch(Dispatchers.IO) {
             server.stop()
             server.start()
-            discoveryService.sendAnnouncement()
+            scope.launch { discoveryService.sendAnnouncement() }
         }
     }
 

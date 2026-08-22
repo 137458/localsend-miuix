@@ -17,6 +17,9 @@
 - 全面基于 WindowDialog、WindowBottomSheet 与 WindowDropdownPreference 实现独立窗口级弹窗体系。
 
 ### 缺陷修复
+- 修复发送到原版 LocalSend 失败：updateFile 上传处 fingerprint 的 pin 过早解除（unpin 发生在真正 TLS 握手之前），导致 HTTPS 目标握手必然失败；现改为整个上传结束（finally）才 unpin。
+- 快速保存（默认接收）路径补充系统通知：收到文件时弹"收到文件"通知，接收过程中实时更新进度条，完成/取消/失败后弹最终结果，即使应用退到后台也有反馈。
+- 修复 HTTPS/端口开关切换时界面卡顿：服务引擎（Netty+证书解析）初始化较重，原先在主线程执行导致冻结；现切换到 IO 线程执行。
 - 100% 对齐 LocalSend 官方 v2.2 传输规范，增加自签名证书信任管理器（SslHelper），解决与官方客户端 HTTPS 握手与连接失败问题。
 - 引入 Android WifiManager.MulticastLock 多播锁与定向子网广播，解决局域网设备发现与多播接收受阻问题。
 - 优化网络接口 IP 获取算法，优先适配 WLAN/Wi-Fi 局域网真实地址。

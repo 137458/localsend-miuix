@@ -139,8 +139,9 @@ class LocalSendClient(
                 readTimeout = 120000
                 setRequestProperty("Content-Type", "application/octet-stream")
             }
-            FingerprintTrust.unpin(targetDevice.fingerprint)
 
+            // 注意：openConnection() 是惰性的，真正的 TLS 握手发生在获取 outputStream/读取响应时，
+            // 因此 fingerprint 的 pin 必须保持到整个上传结束，直到 finally 才 unpin。
             val outputStream: OutputStream = connection.outputStream
             val buffer = ByteArray(64 * 1024)
             var bytesWritten = 0L
@@ -180,6 +181,7 @@ class LocalSendClient(
         } catch (e: Exception) {
             Result.failure(e)
         } finally {
+            FingerprintTrust.unpin(targetDevice.fingerprint)
             try {
                 inputStream?.close()
             } catch (ignored: Exception) {}
