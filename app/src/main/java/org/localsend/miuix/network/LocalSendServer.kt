@@ -6,20 +6,30 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.documentfile.provider.DocumentFile
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import io.ktor.http.Headers
+import io.ktor.http.content.OutgoingContent
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.ApplicationEngine
+import io.ktor.server.engine.applicationEngineEnvironment
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.engine.sslConnector
+import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveChannel
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
@@ -32,11 +42,15 @@ import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
 import org.localsend.miuix.model.FileDto
 import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.model.PrepareDownloadResponseDto
 import org.localsend.miuix.model.PrepareUploadRequestDto
 import org.localsend.miuix.model.PrepareUploadResponseDto
 import org.localsend.miuix.model.SaveTarget
+import org.localsend.miuix.model.ShareSession
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
+import java.io.File
+import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
 import java.util.UUID
@@ -51,6 +65,8 @@ class LocalSendServer(
     private val isQuickSave: () -> Boolean,
     private val getSaveTarget: () -> SaveTarget,
     private val getPin: () -> String?,
+    private val getUseHttps: () -> Boolean,
+    private val getShares: () -> List<ShareSession>,
     private val onDeviceDiscovered: (Device) -> Unit,
     private val onIncomingRequest: suspend (session: TransferSession) -> Boolean,
     private val onSessionUpdated: (TransferSession) -> Unit
@@ -169,21 +185,55 @@ class LocalSendServer(
         if (engine != null) return
         val port = getPort()
         try {
-            engine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
-                install(ContentNegotiation) {
-                    json(this@LocalSendServer.json)
-                }
-                install(CORS) {
-                    anyHost()
-                    allowHeader("*")
-                    allowMethod(io.ktor.http.HttpMethod.Get)
-                    allowMethod(io.ktor.http.HttpMethod.Post)
-                    allowMethod(io.ktor.http.HttpMethod.Options)
-                }
-                configureRouting()
-            }.start(wait = false)
+            if (getUseHttps()) startHttps(port) else startHttp(port)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    /** 纯 HTTP 模式：CIO 引擎直接监听指定端口。 */
+    private fun startHttp(port: Int) {
+        engine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
+            installCommon()
+            configureRouting()
+        }.start(wait = false)
+    }
+
+    /**
+     * HTTPS 模式：CIO 服务端引擎不支持 TLS，需切换到 Netty 引擎并挂载自签名证书（sslConnector）。
+     */
+    private fun startHttps(port: Int) {
+        val keystore = TlsStore.loadKeyStore(context)
+        val keyStoreFile = File(context.filesDir, TlsStore.KEYSTORE_FILENAME)
+        val password = TlsStore.STORE_PASSWORD.toCharArray()
+        val environment = applicationEngineEnvironment {
+            sslConnector(
+                keyStore = keystore,
+                keyAlias = TlsStore.KEY_ALIAS,
+                keyStorePassword = { password },
+                privateKeyPassword = { password }
+            ) {
+                this.port = port
+                keyStorePath = keyStoreFile
+            }
+            module {
+                installCommon()
+                configureRouting()
+            }
+        }
+        engine = embeddedServer(Netty, environment).start(wait = false)
+    }
+
+    private fun Application.installCommon() {
+        install(ContentNegotiation) {
+            json(this@LocalSendServer.json)
+        }
+        install(CORS) {
+            anyHost()
+            allowHeader("*")
+            allowMethod(HttpMethod.Get)
+            allowMethod(HttpMethod.Post)
+            allowMethod(HttpMethod.Options)
         }
     }
 
@@ -196,6 +246,26 @@ class LocalSendServer(
         sessionTokens.clear()
         requestHits.clear()
     }
+
+    /** 打开 Web Share 共享文件的源输入流（URI / 路径 / 文本内容）。 */
+    private fun openShareStream(fileItem: FileItem): InputStream? = try {
+        when {
+            fileItem.uri != null -> context.contentResolver.openInputStream(fileItem.uri)
+            fileItem.path != null -> File(fileItem.path).inputStream()
+            fileItem.textContent != null -> fileItem.textContent.byteInputStream(Charsets.UTF_8)
+            else -> null
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    /** 简单的 HTML 转义，用于根页展示文件名，避免注入。 */
+    private fun escapeHtml(str: String): String = str
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&#39;")
 
     /** 校验 PIN：未配置 PIN 视为放行；配置后要求查询参数 ?pin= 精确匹配，否则回 401。 */
     private fun pinOk(pinFromRequest: String?): Boolean {
@@ -219,6 +289,96 @@ class LocalSendServer(
 
     private fun Application.configureRouting() {
         routing {
+
+            // 协议 §5.1：Web Share 浏览器入口页，展示待共享文件并允许逐个下载
+            get("/") {
+                val shares = getShares()
+                if (shares.isEmpty()) {
+                    call.respondText("<html><body><h3>没有正在共享的文件</h3></body></html>", ContentType.Text.Html)
+                    return@get
+                }
+                val session = shares.first()
+                val rows = session.files.joinToString("") { file ->
+                    val url = "/api/localsend/v2/download?sessionId=${session.sessionId}&fileId=${file.id}"
+                    "<li><a href=\"$url\">${escapeHtml(file.name)} (${file.formattedSize})</a></li>"
+                }
+                call.respondText(
+                    "<html><body><h3>${escapeHtml(getLocalDevice().alias)} 分享的文件</h3><ul>$rows</ul></body></html>",
+                    ContentType.Text.Html
+                )
+            }
+
+            // 协议 §5.2：接收方请求文件元数据（支持 ?sessionId= 避免刷新后丢失会话）
+            post("/api/localsend/v2/prepare-download") {
+                if (!pinOk(call.request.queryParameters["pin"])) {
+                    call.respond(HttpStatusCode.Unauthorized, "Request is unauthorized")
+                    return@post
+                }
+                val remoteIp = call.request.origin.remoteHost
+                if (tooFrequent(remoteIp)) {
+                    call.respond(HttpStatusCode.TooManyRequests, "Too many requests")
+                    return@post
+                }
+                val shares = getShares()
+                if (shares.isEmpty()) {
+                    call.respond(HttpStatusCode.NotFound, "No active share session")
+                    return@post
+                }
+                val requestedSessionId = call.request.queryParameters["sessionId"]
+                val session = shares.firstOrNull {
+                    requestedSessionId == null || it.sessionId == requestedSessionId
+                } ?: run {
+                    call.respond(HttpStatusCode.Forbidden, "Session not found")
+                    return@post
+                }
+                val filesMap = session.files.associate { it.id to it.toDto() }
+                call.respond(
+                    PrepareDownloadResponseDto(
+                        info = getLocalDevice().toDto(),
+                        sessionId = session.sessionId,
+                        files = filesMap
+                    )
+                )
+            }
+
+            // 协议 §5.3：按 fileId 流式回传文件二进制
+            get("/api/localsend/v2/download") {
+                val sessionId = call.request.queryParameters["sessionId"]
+                val fileId = call.request.queryParameters["fileId"]
+                if (sessionId == null || fileId == null) {
+                    call.respond(HttpStatusCode.BadRequest, "Missing sessionId or fileId")
+                    return@get
+                }
+                val session = getShares().firstOrNull { it.sessionId == sessionId }
+                if (session == null) {
+                    call.respond(HttpStatusCode.NotFound, "Session not found")
+                    return@get
+                }
+                val file = session.files.firstOrNull { it.id == fileId }
+                if (file == null) {
+                    call.respond(HttpStatusCode.NotFound, "File not found in session")
+                    return@get
+                }
+                val input = openShareStream(file)
+                if (input == null) {
+                    call.respond(HttpStatusCode.NotFound, "File source unavailable")
+                    return@get
+                }
+                call.respond(
+                    object : OutgoingContent.ByteArrayContent() {
+                        override val contentType: ContentType? =
+                            ContentType.parse(file.mimeType.ifEmpty { "application/octet-stream" })
+                        override val contentLength: Long? = file.size
+                        override val headers: Headers = headersOf(
+                            HttpHeaders.ContentDisposition,
+                            "inline; filename=\"${file.name.replace("\"", "")}\""
+                        )
+                        override fun bytes(): ByteArray = input.readBytes()
+                    }
+                )
+                input.close()
+            }
+
             get("/api/localsend/v2/info") {
                 call.respond(getLocalDevice().toDto())
             }

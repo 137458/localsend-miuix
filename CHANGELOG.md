@@ -8,6 +8,8 @@
 
 ### 新增特性
 - 完整复刻 LocalSend v2.2 局域网传输协议与网络引擎（UDP 多播广播发现、局域网子网并发扫描、自签名 TLS/HTTPS 互通与 Ktor 异步 HTTP 服务端与客户端）。
+- 实现 Web Share（Download API，协议 §5）：可将选中文件共享为局域网链接，接收方浏览器打开 `http://设备IP:端口` 即可预览并逐个下载，无需安装应用；发送页新增"通过链接分享"卡片（复制链接 / 结束共享）。
+- HTTPS 模式下本机指纹对齐协议 §2（fingerprint=自签名证书 SHA-256），并通过指纹加固 TrustManager 校验对端证书，杜绝中间人攻击。
 - 全面采用 Miuix 0.9.4-rc01 组件库构建纯正 Xiaomi HyperOS 视觉规范界面。
 - 引入 iOS / HyperOS 液态玻璃（Liquid Glass）悬浮导航栏：集成 GPU 实时 RuntimeShader 折射透镜、色散色差、内阴影及物理阻尼滑动动画。
 - 深度结合 HorizontalPager 实现三页横向手势平滑滑屏与底栏指示器流畅联动。

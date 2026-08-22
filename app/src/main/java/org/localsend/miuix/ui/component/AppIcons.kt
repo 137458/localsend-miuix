@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.ui.component
+package org.localsend.miuix.ui.component
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -8,6 +8,8 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -34,6 +36,8 @@ object AppIcons {
     val Folder: ImageVector = Icons.Default.Folder
     val Text: ImageVector = Icons.Default.TextFields
     val Wifi: ImageVector = Icons.Default.Wifi
+    val Link: ImageVector = Icons.Default.Link
+    val Copy: ImageVector = Icons.Default.ContentCopy
 
     fun getDeviceIcon(type: DeviceType): ImageVector {
         return when (type) {

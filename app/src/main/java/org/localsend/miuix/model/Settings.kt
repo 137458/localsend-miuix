@@ -14,6 +14,8 @@ data class AppSettings(
     val quickSave: Boolean = false,
     val autoFinish: Boolean = false,
     val useHttps: Boolean = false,
+    // 是否允许其他方通过 Download(Web Share) API 请求本机文件，announce 时置入 download 字段
+    val download: Boolean = false,
     // 接收方 PIN 保护：非空时，发送方需在 prepare-upload/download 携带 ?pin= 且匹配才被接受
     val pin: String? = null,
     val themeModeIndex: Int = 0 // 0: System, 1: Light, 2: Dark, 3: MonetSystem, 4: MonetLight, 5: MonetDark

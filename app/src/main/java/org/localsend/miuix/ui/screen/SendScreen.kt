@@ -1,6 +1,7 @@
 package org.localsend.miuix.ui.screen
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -72,6 +73,7 @@ fun SendScreen(
     val isScanning by manager.isScanning.collectAsState()
     val activeSessions by manager.activeSessions.collectAsState()
     val outgoingSessions = activeSessions.filter { !it.isIncoming }
+    val shares by manager.shares.collectAsState()
 
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
@@ -254,6 +256,101 @@ fun SendScreen(
                                                 tint = MiuixTheme.colorScheme.error
                                             )
                                         }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Section 2.4: Web Share（通过链接共享给局域网页面的浏览器）
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    SmallTitle(text = "通过链接分享")
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        if (shares.isEmpty()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "把选中的文件共享为可浏览/下载的链接，接收方无需安装应用",
+                                    style = MiuixTheme.textStyles.footnote1,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = {
+                                        if (selectedFiles.isEmpty()) {
+                                            Toast.makeText(context, "请先添加待分享的文件", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            manager.startShare(selectedFiles)
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColorsPrimary()
+                                ) {
+                                    Icon(imageVector = AppIcons.Link, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("开启链接共享")
+                                }
+                            }
+                        } else {
+                            val session = shares.first()
+                            val device = manager.getLocalDevice()
+                            val link = session.downloadLink(device.ip, device.port)
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "收件人浏览器打开以下地址即可下载",
+                                    style = MiuixTheme.textStyles.footnote1,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.1f))
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = link,
+                                        style = MiuixTheme.textStyles.body2,
+                                        color = MiuixTheme.colorScheme.primary,
+                                        maxLines = 1
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Text(
+                                        text = "共 ${session.files.size} 个文件",
+                                        style = MiuixTheme.textStyles.footnote1,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = {
+                                            val clipboard = context.getSystemService(
+                                                android.content.Context.CLIPBOARD_SERVICE
+                                            ) as android.content.ClipboardManager
+                                            clipboard.setPrimaryClip(
+                                                android.content.ClipData.newPlainText("LocalSend", link)
+                                            )
+                                            Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
+                                        },
+                                        colors = ButtonDefaults.buttonColorsPrimary()
+                                    ) {
+                                        Icon(imageVector = AppIcons.Copy, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("复制链接")
+                                    }
+                                    Button(
+                                        onClick = { manager.stopShare() },
+                                        colors = ButtonDefaults.buttonColors()
+                                    ) {
+                                        Text("结束共享")
                                     }
                                 }
                             }

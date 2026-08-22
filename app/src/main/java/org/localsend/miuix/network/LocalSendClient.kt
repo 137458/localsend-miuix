@@ -27,7 +27,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.X509TrustManager
 
 class LocalSendClient(
     private val context: Context,
@@ -36,15 +35,12 @@ class LocalSendClient(
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
 
-    init {
-        SslHelper.trustAllHttps()
-    }
-
     private val httpClient by lazy {
         HttpClient(CIO) {
             engine {
                 https {
-                    trustManager = SslHelper.trustAllCerts[0] as X509TrustManager
+                    // HTTPS 模式：仅信任已通过 FingerprintTrust.pin() 登记了证书指纹的对端
+                    trustManager = FingerprintTrust.trustManager
                 }
             }
             install(ContentNegotiation) {
@@ -79,9 +75,14 @@ class LocalSendClient(
             val urlBuilder = StringBuilder("${targetDevice.url}/api/localsend/v2/prepare-upload")
             getPin()?.takeIf { it.isNotEmpty() }?.let { urlBuilder.append("?pin=").append(it) }
             val url = urlBuilder.toString()
-            val response = httpClient.post(url) {
-                contentType(ContentType.Application.Json)
-                setBody(requestDto)
+            FingerprintTrust.pin(targetDevice.fingerprint)
+            val response = try {
+                httpClient.post(url) {
+                    contentType(ContentType.Application.Json)
+                    setBody(requestDto)
+                }
+            } finally {
+                FingerprintTrust.unpin(targetDevice.fingerprint)
             }
 
             if (response.status == HttpStatusCode.OK) {
@@ -125,9 +126,10 @@ class LocalSendClient(
             val uploadUrlStr = "${targetDevice.url}/api/localsend/v2/upload?sessionId=$sessionId&fileId=${fileItem.id}&token=$token"
             val uploadUrl = URL(uploadUrlStr)
 
+            FingerprintTrust.pin(targetDevice.fingerprint)
             connection = (uploadUrl.openConnection() as HttpURLConnection).apply {
                 if (this is HttpsURLConnection) {
-                    sslSocketFactory = SslHelper.sslSocketFactory
+                    sslSocketFactory = FingerprintTrust.pinnedSslSocketFactory
                     hostnameVerifier = SslHelper.trustAllHostnameVerifier
                 }
                 requestMethod = "POST"
@@ -137,6 +139,7 @@ class LocalSendClient(
                 readTimeout = 120000
                 setRequestProperty("Content-Type", "application/octet-stream")
             }
+            FingerprintTrust.unpin(targetDevice.fingerprint)
 
             val outputStream: OutputStream = connection.outputStream
             val buffer = ByteArray(64 * 1024)
@@ -189,7 +192,12 @@ class LocalSendClient(
     suspend fun cancelUpload(targetDevice: Device, sessionId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val url = "${targetDevice.url}/api/localsend/v2/cancel?sessionId=$sessionId"
-            httpClient.post(url)
+            FingerprintTrust.pin(targetDevice.fingerprint)
+            try {
+                httpClient.post(url)
+            } finally {
+                FingerprintTrust.unpin(targetDevice.fingerprint)
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

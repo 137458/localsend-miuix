@@ -19,6 +19,7 @@ import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.SaveTarget
+import org.localsend.miuix.model.ShareSession
 import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
@@ -26,6 +27,7 @@ import org.localsend.miuix.network.DiscoveryService
 import org.localsend.miuix.network.LocalSendClient
 import org.localsend.miuix.network.LocalSendServer
 import org.localsend.miuix.network.NetworkUtils
+import org.localsend.miuix.network.TlsStore
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -54,6 +56,7 @@ class LocalSendManager(private val context: Context) {
             port = prefs.getInt(KEY_PORT, 53317),
             quickSave = prefs.getBoolean(KEY_QUICK_SAVE, false),
             useHttps = prefs.getBoolean(KEY_USE_HTTPS, false),
+            download = prefs.getBoolean(KEY_DOWNLOAD, false),
             pin = prefs.getString(KEY_PIN, null),
             themeModeIndex = prefs.getInt(KEY_THEME, 0),
             downloadTreeUri = prefs.getString(KEY_TREE_URI, null),
@@ -84,6 +87,10 @@ class LocalSendManager(private val context: Context) {
     // 传输过程中的一次性提示（如"对方拒绝接收"），UI 读取后清空
     private val _sessionMessage = MutableStateFlow<String?>(null)
     val sessionMessage: StateFlow<String?> = _sessionMessage.asStateFlow()
+
+    // Web Share：当前正在共享给它人浏览器下载的文件会话；空即未共享
+    private val _shares = MutableStateFlow<List<ShareSession>>(emptyList())
+    val shares: StateFlow<List<ShareSession>> = _shares.asStateFlow()
 
     private val incomingApprovalDeferreds = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
 
@@ -119,6 +126,8 @@ class LocalSendManager(private val context: Context) {
         isQuickSave = { _settings.value.quickSave },
         getSaveTarget = { getSaveTarget() },
         getPin = { _settings.value.pin },
+        getUseHttps = { _settings.value.useHttps },
+        getShares = { _shares.value },
         onDeviceDiscovered = { device ->
             scope.launch {
                 _nearbyDevices.update { list ->
@@ -182,15 +191,18 @@ class LocalSendManager(private val context: Context) {
 
     fun getLocalDevice(): Device {
         val primaryIp = NetworkUtils.getLocalIpAddresses().firstOrNull() ?: "127.0.0.1"
+        val useHttps = _settings.value.useHttps
         return Device(
             alias = _settings.value.alias,
             version = "2.1",
             deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
             deviceType = DeviceType.mobile,
-            fingerprint = fingerprint,
+            // HTTPS 模式下指纹 = 自签名证书的 SHA-256 哈希（协议 §2），否则用稳定的随机 UUID
+            fingerprint = if (useHttps) TlsStore.fingerprint(context) else fingerprint,
             port = _settings.value.port,
-            protocol = if (_settings.value.useHttps) "https" else "http",
-            download = false,
+            protocol = if (useHttps) "https" else "http",
+            // Web Share 启用时按协议 §2 announce download=true；否则沿用设置
+            download = _shares.value.isNotEmpty() || _settings.value.download,
             ip = primaryIp
         )
     }
@@ -397,6 +409,32 @@ class LocalSendManager(private val context: Context) {
         }
     }
 
+    /** 切换 HTTPS/HTTP 后重启服务（引擎与指纹会随之变化），并重新广播设备信息。 */
+    fun applyUseHttpsChange(useHttps: Boolean) {
+        if (useHttps == _settings.value.useHttps) return
+        updateSettings { it.copy(useHttps = useHttps) }
+        scope.launch {
+            server.stop()
+            server.start()
+            discoveryService.sendAnnouncement()
+        }
+    }
+
+    /** 开始 Web Share：把指定文件共享给局域网浏览器，并重新广播（download=true）。 */
+    fun startShare(files: List<FileItem>) {
+        if (files.isEmpty() || _shares.value.isNotEmpty()) return
+        val session = ShareSession(files = files)
+        _shares.value = listOf(session)
+        discoveryService.sendAnnouncement()
+    }
+
+    /** 结束 Web Share 并重新广播（download=false）。 */
+    fun stopShare() {
+        if (_shares.value.isEmpty()) return
+        _shares.value = emptyList()
+        discoveryService.sendAnnouncement()
+    }
+
     private fun persistSettings(s: AppSettings) {
         prefs.edit()
             .putString(KEY_ALIAS, s.alias)
@@ -405,6 +443,7 @@ class LocalSendManager(private val context: Context) {
             .putString(KEY_DOWNLOAD_DISPLAY, s.downloadDisplay)
             .putBoolean(KEY_QUICK_SAVE, s.quickSave)
             .putBoolean(KEY_USE_HTTPS, s.useHttps)
+            .putBoolean(KEY_DOWNLOAD, s.download)
             .putString(KEY_PIN, s.pin)
             .putInt(KEY_THEME, s.themeModeIndex)
             .apply()
@@ -415,6 +454,7 @@ class LocalSendManager(private val context: Context) {
         private const val KEY_PORT = "port"
         private const val KEY_QUICK_SAVE = "quick_save"
         private const val KEY_USE_HTTPS = "use_https"
+        private const val KEY_DOWNLOAD = "download"
         private const val KEY_PIN = "pin"
         private const val KEY_THEME = "theme_mode_index"
         private const val KEY_TREE_URI = "download_tree_uri"

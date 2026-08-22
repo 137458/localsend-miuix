@@ -112,7 +112,7 @@ fun SettingsScreen(
                         summary = "使用 TLS 进行局域网传输加密",
                         checked = settings.useHttps,
                         onCheckedChange = { checked ->
-                            manager.updateSettings { it.copy(useHttps = checked) }
+                            manager.applyUseHttpsChange(checked)
                         }
                     )
                     ArrowPreference(

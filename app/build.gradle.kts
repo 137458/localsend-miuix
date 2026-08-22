@@ -40,6 +40,21 @@ android {
         compose = true
         buildConfig = true
     }
+
+    packaging {
+        // Netty 多个模块 jar 内都含相同 META-INF/INDEX.LIST，打包时丢弃，避免 java resource 冲突
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt"
+            )
+        }
+    }
 }
 
 dependencies {
@@ -78,8 +93,12 @@ dependencies {
     val ktorVersion = "2.3.12"
     implementation("io.ktor:ktor-server-core:$ktorVersion")
     implementation("io.ktor:ktor-server-cio:$ktorVersion")
+    // Netty 服务端引擎：CIO 服务端不支持 TLS，HTTPS 模式需切换 Netty
+    implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-server-cors:$ktorVersion")
+    // BouncyCastle：用于在运行时生成自签名证书（HTTPS）
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
