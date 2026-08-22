@@ -1,6 +1,10 @@
 package org.localsend.miuix.network
 
+import android.content.ContentValues
 import android.content.Context
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.documentfile.provider.DocumentFile
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -33,8 +37,6 @@ import org.localsend.miuix.model.PrepareUploadResponseDto
 import org.localsend.miuix.model.SaveTarget
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
-import java.io.File
-import java.io.FileOutputStream
 import java.io.OutputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -55,12 +57,33 @@ class LocalSendServer(
     private val activeSessions = ConcurrentHashMap<String, TransferSession>()
     private val sessionTokens = ConcurrentHashMap<String, MutableMap<String, String>>() // sessionId -> (fileId -> token)
 
-    /** 根据保存目标打开文件写入流，兼容默认目录与 SAF 自定义目录。 */
+    /**
+     * 打开文件写入流。默认走公共 Download（MediaStore），用户自定义时走 SAF 目录树。
+     * 返回目标流；MediaStore 路径写入完成后需调用 [confirmMediaStoreWrite] 清除 IS_PENDING 标记。
+     */
     private fun openSaveStream(fileItem: FileItem, target: SaveTarget): OutputStream = when (target) {
-        is SaveTarget.FileTarget -> {
-            val targetDir = target.file
-            if (!targetDir.exists()) targetDir.mkdirs()
-            FileOutputStream(uniqueFilePath(targetDir, fileItem.name))
+        is SaveTarget.MediaStoreTarget -> {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                throw IllegalStateException("MediaStore 保存需要 Android 10 (API 29) 及以上")
+            }
+            val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            val displayName = uniqueMediaName(fileItem.name)
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+                put(MediaStore.MediaColumns.MIME_TYPE, fileItem.mimeType)
+                put(
+                    MediaStore.MediaColumns.RELATIVE_PATH,
+                    Environment.DIRECTORY_DOWNLOADS + "/LocalSend"
+                )
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val uri = context.contentResolver.insert(collection, values)
+                ?: throw IllegalStateException("无法在公共下载目录中创建文件")
+            // 记录实际写入的 Uri（文件名可能被系统自动加后缀），完成后用于清除 PENDING
+            fileItem.mediaStoreUri = uri
+            fileItem.name = displayName
+            context.contentResolver.openOutputStream(uri)
+                ?: throw IllegalStateException("无法打开公共下载目录中的文件")
         }
         is SaveTarget.UriTarget -> {
             val parent = DocumentFile.fromTreeUri(context, target.treeUri)
@@ -69,21 +92,46 @@ class LocalSendServer(
             val uniqueName = uniqueTreeName(fileItem.name, existing)
             val created = parent.createFile(fileItem.mimeType, uniqueName)
                 ?: throw IllegalStateException("无法在自定义保存目录中创建文件")
+            fileItem.name = uniqueName
             context.contentResolver.openOutputStream(created.uri)
                 ?: throw IllegalStateException("无法在自定义保存目录中创建文件")
         }
     }
 
-    private fun uniqueFilePath(dir: File, name: String): File {
-        var f = File(dir, name)
-        val base = f.nameWithoutExtension
-        val ext = f.extension.let { if (it.isNotEmpty()) ".$it" else "" }
+    /** MediaStore 写入完成后清除 IS_PENDING，使文件在文件管理器中立即可见。 */
+    private fun confirmMediaStoreWrite(fileItem: FileItem) {
+        val uri = fileItem.mediaStoreUri ?: return
+        try {
+            val values = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+            context.contentResolver.update(uri, values, null, null)
+        } catch (ignored: Exception) {}
+    }
+
+    /** 基于 MediaStore 公共下载目录的子目录列表生成不重复的文件名。 */
+    private fun uniqueMediaName(name: String): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return name
+        val existing = HashSet<String>()
+        try {
+            val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            val projection = arrayOf(MediaStore.MediaColumns.DISPLAY_NAME)
+            val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} = ?"
+            val selectionArgs = arrayOf(Environment.DIRECTORY_DOWNLOADS + "/LocalSend/")
+            context.contentResolver.query(collection, projection, selection, selectionArgs, null)
+                ?.use { cursor ->
+                    val index = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
+                    while (cursor.moveToNext()) {
+                        if (index != -1 && !cursor.isNull(index)) {
+                            existing.add(cursor.getString(index))
+                        }
+                    }
+                }
+        } catch (ignored: Exception) {}
+        if (name !in existing) return name
+        val base = name.substringBeforeLast('.', "").ifEmpty { name }
+        val ext = if (name.contains('.')) ".${name.substringAfterLast('.')}" else ""
         var counter = 1
-        while (f.exists()) {
-            f = File(dir, "$base ($counter)$ext")
-            counter++
-        }
-        return f
+        while ("$base ($counter)$ext" in existing) counter++
+        return "$base ($counter)$ext"
     }
 
     private fun uniqueTreeName(name: String, existing: Set<String>): String {
@@ -273,6 +321,8 @@ class LocalSendServer(
                             }
                         }
                     }
+                    // MediaStore 路径：写入完成后清除 IS_PENDING，使文件立即可见
+                    confirmMediaStoreWrite(fileItem)
                 }
 
                 fileItem.status = TransferStatus.Completed

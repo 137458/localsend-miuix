@@ -23,3 +23,7 @@
 - 消除子页面顶层多余的 PaddingValues 累加，使 TopAppBar 页面标题位置自然贴合格局。
 - 优化文件与媒体选择器 ActivityResult 契约及安全 URI 访问容错机制。
 - 在 MainActivity 提供 NavigationEventDispatcherOwner，修复 ManualIpDialog / 设备别名 / 发送文本等 WindowDialog 弹窗打开即闪退的问题。
+- 对齐官方将默认接收保存路径改为公共 Download/LocalSend 目录：改用 MediaStore（`IS_PENDING` + `RELATIVE_PATH`）写入，Android 10+ 无需存储权限，文件直接落盘到系统下载目录，彻底告别安卓 data 应用私有目录。
+- 发送页新增"正在传输"区域，与接收页共用 TransferSessionCard 组件实时展示发送进度条、已传/总量与速率。
+- 已结束（完成/失败/已取消）的传输会话自动从"正在传输"区移除并移入传输历史，不再残留。
+- 接收方拒绝传输后，发送端通过 Toast 明确提示"对方拒绝接收"，避免发送端无任何反馈。

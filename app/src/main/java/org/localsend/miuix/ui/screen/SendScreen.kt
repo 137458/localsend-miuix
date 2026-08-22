@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.ui.screen
+package org.localsend.miuix.ui.screen
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -70,6 +70,8 @@ fun SendScreen(
     val selectedFiles by manager.selectedFiles.collectAsState()
     val nearbyDevices by manager.nearbyDevices.collectAsState()
     val isScanning by manager.isScanning.collectAsState()
+    val activeSessions by manager.activeSessions.collectAsState()
+    val outgoingSessions = activeSessions.filter { !it.isIncoming }
 
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
@@ -256,6 +258,20 @@ fun SendScreen(
                                 }
                             }
                         }
+                    }
+                }
+
+                // Section 2.5: Active Outgoing Sessions (发送进度)
+                if (outgoingSessions.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        SmallTitle(text = "正在传输 (${outgoingSessions.count { it.status == org.localsend.miuix.model.TransferStatus.InProgress }})")
+                    }
+                    items(outgoingSessions, key = { it.sessionId }) { session ->
+                        org.localsend.miuix.ui.component.TransferSessionCard(
+                            session = session,
+                            onCancel = { manager.cancelTransfer(session.sessionId) }
+                        )
                     }
                 }
 

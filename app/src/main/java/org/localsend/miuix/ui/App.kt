@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +64,14 @@ fun App(manager: LocalSendManager) {
     val scope = rememberCoroutineScope()
     val settings by manager.settings.collectAsState()
     val pendingIncomingSession by manager.pendingIncomingSession.collectAsState()
+    val sessionMessage by manager.sessionMessage.collectAsState()
+
+    // 传输提示（如"对方拒绝接收"）以 Toast 呈现，显示后即消费
+    LaunchedEffect(sessionMessage) {
+        val msg = sessionMessage ?: return@LaunchedEffect
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        manager.consumeSessionMessage()
+    }
 
     // 1. Theme Configuration
     val colorSchemeMode = remember(settings.themeModeIndex) {

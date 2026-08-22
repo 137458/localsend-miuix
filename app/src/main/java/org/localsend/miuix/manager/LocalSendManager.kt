@@ -26,7 +26,6 @@ import org.localsend.miuix.network.DiscoveryService
 import org.localsend.miuix.network.LocalSendClient
 import org.localsend.miuix.network.LocalSendServer
 import org.localsend.miuix.network.NetworkUtils
-import java.io.File
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -35,12 +34,9 @@ class LocalSendManager(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val fingerprint = UUID.randomUUID().toString()
 
-    // 应用私有外部 Downloads 目录：免存储权限、所有 API 级别均可自由读写，
-    // 规避了作用域存储下直接写公共 Download 被拒导致"无法接收文件"的问题。
-    private val defaultDownloadDir: File by lazy {
-        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
-        if (!dir.exists()) dir.mkdirs()
-        dir
+    // 默认保存位置说明：公共 Download/LocalSend（通过 MediaStore 写入，Android 10+ 免存储权限）
+    private val defaultDownloadPath: String by lazy {
+        Environment.DIRECTORY_DOWNLOADS + "/LocalSend"
     }
 
     private val prefs = context.getSharedPreferences("localsend_settings", Context.MODE_PRIVATE)
@@ -61,7 +57,7 @@ class LocalSendManager(private val context: Context) {
             themeModeIndex = prefs.getInt(KEY_THEME, 0),
             downloadTreeUri = prefs.getString(KEY_TREE_URI, null),
             downloadDisplay = prefs.getString(KEY_DOWNLOAD_DISPLAY, null),
-            downloadPath = defaultDownloadDir.absolutePath
+            downloadPath = defaultDownloadPath
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -83,6 +79,10 @@ class LocalSendManager(private val context: Context) {
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
+    // 传输过程中的一次性提示（如"对方拒绝接收"），UI 读取后清空
+    private val _sessionMessage = MutableStateFlow<String?>(null)
+    val sessionMessage: StateFlow<String?> = _sessionMessage.asStateFlow()
 
     private val incomingApprovalDeferreds = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
 
@@ -139,16 +139,9 @@ class LocalSendManager(private val context: Context) {
         },
         onSessionUpdated = { session ->
             scope.launch {
-                _activeSessions.update { list ->
-                    val index = list.indexOfFirst { it.sessionId == session.sessionId }
-                    if (index >= 0) {
-                        list.toMutableList().apply { set(index, session) }
-                    } else {
-                        list + session
-                    }
-                }
-
-                if (session.status == TransferStatus.Completed || session.status == TransferStatus.Failed || session.status == TransferStatus.Canceled) {
+                // 进行中的会话写入正在传输区；已结束的会话移入历史并从活动列表移除
+                if (isTerminal(session.status)) {
+                    _activeSessions.update { list -> list.filterNot { it.sessionId == session.sessionId } }
                     addHistory(
                         TransferHistoryItem(
                             deviceAlias = session.device.alias,
@@ -160,6 +153,15 @@ class LocalSendManager(private val context: Context) {
                             fileNames = session.files.map { it.name }
                         )
                     )
+                } else {
+                    _activeSessions.update { list ->
+                        val index = list.indexOfFirst { it.sessionId == session.sessionId }
+                        if (index >= 0) {
+                            list.toMutableList().apply { set(index, session) }
+                        } else {
+                            list + session
+                        }
+                    }
                 }
             }
         }
@@ -245,6 +247,7 @@ class LocalSendManager(private val context: Context) {
             if (prepResult.isFailure) {
                 session.status = TransferStatus.Failed
                 session.errorMessage = prepResult.exceptionOrNull()?.message ?: "Handshake failed"
+                _sessionMessage.value = "对方拒绝接收：${session.errorMessage}"
                 updateSessionState(session)
                 return@launch
             }
@@ -292,16 +295,9 @@ class LocalSendManager(private val context: Context) {
 
     private fun updateSessionState(session: TransferSession) {
         scope.launch {
-            _activeSessions.update { list ->
-                val index = list.indexOfFirst { it.sessionId == session.sessionId }
-                if (index >= 0) {
-                    list.toMutableList().apply { set(index, session) }
-                } else {
-                    list + session
-                }
-            }
-
-            if (session.status == TransferStatus.Completed || session.status == TransferStatus.Failed || session.status == TransferStatus.Canceled) {
+            if (isTerminal(session.status)) {
+                // 已结束的会话：从活动列表移除并写入历史
+                _activeSessions.update { list -> list.filterNot { it.sessionId == session.sessionId } }
                 addHistory(
                     TransferHistoryItem(
                         deviceAlias = session.device.alias,
@@ -313,8 +309,26 @@ class LocalSendManager(private val context: Context) {
                         fileNames = session.files.map { it.name }
                     )
                 )
+            } else {
+                _activeSessions.update { list ->
+                    val index = list.indexOfFirst { it.sessionId == session.sessionId }
+                    if (index >= 0) {
+                        list.toMutableList().apply { set(index, session) }
+                    } else {
+                        list + session
+                    }
+                }
             }
         }
+    }
+
+    private fun isTerminal(status: TransferStatus): Boolean =
+        status == TransferStatus.Completed ||
+            status == TransferStatus.Failed ||
+            status == TransferStatus.Canceled
+
+    fun consumeSessionMessage() {
+        _sessionMessage.value = null
     }
 
     fun cancelTransfer(sessionId: String) {
@@ -348,7 +362,7 @@ class LocalSendManager(private val context: Context) {
         persistSettings(updated)
     }
 
-    /** 计算当前接收保存目标：优先使用用户通过 SAF 选择的自定义目录，否则使用默认目录。 */
+    /** 计算当前接收保存目标：优先使用用户通过 SAF 选择的自定义目录，否则写入公共 Download（MediaStore）。 */
     fun getSaveTarget(): SaveTarget {
         val tree = _settings.value.downloadTreeUri
         if (!tree.isNullOrEmpty()) {
@@ -356,7 +370,7 @@ class LocalSendManager(private val context: Context) {
                 return SaveTarget.UriTarget(Uri.parse(tree))
             } catch (ignored: Exception) {}
         }
-        return SaveTarget.FileTarget(defaultDownloadDir)
+        return SaveTarget.MediaStoreTarget
     }
 
     /** 用户通过 SAF 选择自定义保存目录后调用，持久化其访问权限与显示信息。 */

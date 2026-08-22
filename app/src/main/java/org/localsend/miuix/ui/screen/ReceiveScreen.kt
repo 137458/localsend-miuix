@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.ui.screen
+package org.localsend.miuix.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,11 +16,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Upload
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,15 +30,12 @@ import androidx.compose.ui.unit.dp
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferHistoryItem
-import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.network.NetworkUtils
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
@@ -124,7 +118,10 @@ fun ReceiveScreen(
                     SmallTitle(text = "正在传输 (${activeSessions.count { it.status == TransferStatus.InProgress }})")
                 }
                 items(activeSessions, key = { it.sessionId }) { session ->
-                    ActiveSessionCard(session = session, onCancel = { manager.cancelTransfer(session.sessionId) })
+                    org.localsend.miuix.ui.component.TransferSessionCard(
+                        session = session,
+                        onCancel = { manager.cancelTransfer(session.sessionId) }
+                    )
                 }
             }
 
@@ -169,70 +166,6 @@ fun ReceiveScreen(
                 items(transferHistory, key = { it.id }) { item ->
                     HistoryItemCard(item = item)
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActiveSessionCard(session: TransferSession, onCancel: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = if (session.isIncoming) Icons.Default.Download else Icons.Default.Upload,
-                        contentDescription = null,
-                        tint = MiuixTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = if (session.isIncoming) "来自: ${session.device.alias}" else "发送至: ${session.device.alias}",
-                            style = MiuixTheme.textStyles.headline1
-                        )
-                        Text(
-                            text = "${session.files.size} 个文件 • ${FileItem.formatFileSize(session.totalBytes)}",
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        )
-                    }
-                }
-                if (session.status == TransferStatus.InProgress) {
-                    IconButton(onClick = onCancel) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "取消")
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            LinearProgressIndicator(
-                progress = session.progress,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "${FileItem.formatFileSize(session.transferredBytes)} / ${FileItem.formatFileSize(session.totalBytes)}",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
-                Text(
-                    text = "${FileItem.formatFileSize(session.speed)}/s",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.primary
-                )
             }
         }
     }

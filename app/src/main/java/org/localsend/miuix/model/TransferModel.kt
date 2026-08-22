@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.model
+package org.localsend.miuix.model
 
 import android.net.Uri
 import kotlinx.serialization.Serializable
@@ -36,7 +36,7 @@ enum class TransferStatus {
 
 data class FileItem(
     val id: String = UUID.randomUUID().toString(),
-    val name: String,
+    var name: String,
     val size: Long,
     val uri: Uri? = null,
     val path: String? = null,
@@ -47,7 +47,9 @@ data class FileItem(
     var progress: Float = 0f,
     var bytesTransferred: Long = 0L,
     var speed: Long = 0L,
-    var error: String? = null
+    var error: String? = null,
+    // 通过 MediaStore 写入公共目录时，记录插入出的 Uri，用于完成后清除 IS_PENDING 标记
+    var mediaStoreUri: Uri? = null
 ) {
     fun toDto(): FileDto {
         return FileDto(
