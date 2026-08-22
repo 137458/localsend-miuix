@@ -1,5 +1,7 @@
-﻿package org.localsend.miuix.network
+package org.localsend.miuix.network
 
+import android.content.Context
+import androidx.documentfile.provider.DocumentFile
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -28,19 +30,22 @@ import org.localsend.miuix.model.FileDto
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.PrepareUploadRequestDto
 import org.localsend.miuix.model.PrepareUploadResponseDto
+import org.localsend.miuix.model.SaveTarget
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import java.io.File
 import java.io.FileOutputStream
+import java.io.OutputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 class LocalSendServer(
+    private val context: Context,
     private val scope: CoroutineScope,
     private val getPort: () -> Int,
     private val getLocalDevice: () -> Device,
     private val isQuickSave: () -> Boolean,
-    private val getDownloadDir: () -> File,
+    private val getSaveTarget: () -> SaveTarget,
     private val onDeviceDiscovered: (Device) -> Unit,
     private val onIncomingRequest: suspend (session: TransferSession) -> Boolean,
     private val onSessionUpdated: (TransferSession) -> Unit
@@ -49,6 +54,46 @@ class LocalSendServer(
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
     private val activeSessions = ConcurrentHashMap<String, TransferSession>()
     private val sessionTokens = ConcurrentHashMap<String, MutableMap<String, String>>() // sessionId -> (fileId -> token)
+
+    /** 根据保存目标打开文件写入流，兼容默认目录与 SAF 自定义目录。 */
+    private fun openSaveStream(fileItem: FileItem, target: SaveTarget): OutputStream = when (target) {
+        is SaveTarget.FileTarget -> {
+            val targetDir = target.file
+            if (!targetDir.exists()) targetDir.mkdirs()
+            FileOutputStream(uniqueFilePath(targetDir, fileItem.name))
+        }
+        is SaveTarget.UriTarget -> {
+            val parent = DocumentFile.fromTreeUri(context, target.treeUri)
+                ?: throw IllegalStateException("无法访问自定义保存目录")
+            val existing = parent.listFiles().mapNotNull { it.name }.toHashSet()
+            val uniqueName = uniqueTreeName(fileItem.name, existing)
+            val created = parent.createFile(fileItem.mimeType, uniqueName)
+                ?: throw IllegalStateException("无法在自定义保存目录中创建文件")
+            context.contentResolver.openOutputStream(created.uri)
+                ?: throw IllegalStateException("无法在自定义保存目录中创建文件")
+        }
+    }
+
+    private fun uniqueFilePath(dir: File, name: String): File {
+        var f = File(dir, name)
+        val base = f.nameWithoutExtension
+        val ext = f.extension.let { if (it.isNotEmpty()) ".$it" else "" }
+        var counter = 1
+        while (f.exists()) {
+            f = File(dir, "$base ($counter)$ext")
+            counter++
+        }
+        return f
+    }
+
+    private fun uniqueTreeName(name: String, existing: Set<String>): String {
+        if (name !in existing) return name
+        val base = name.substringBeforeLast('.', "").ifEmpty { name }
+        val ext = if (name.contains('.')) ".${name.substringAfterLast('.')}" else ""
+        var counter = 1
+        while ("$base ($counter)$ext" in existing) counter++
+        return "$base ($counter)$ext"
+    }
 
     fun start() {
         if (engine != null) return
@@ -196,29 +241,18 @@ class LocalSendServer(
                     return@post
                 }
 
-                val targetDir = getDownloadDir()
-                if (!targetDir.exists()) targetDir.mkdirs()
-
-                // Create destination file (avoid filename collision)
-                var destFile = File(targetDir, fileItem.name)
-                var counter = 1
-                val baseName = destFile.nameWithoutExtension
-                val ext = destFile.extension.let { if (it.isNotEmpty()) ".$it" else "" }
-                while (destFile.exists()) {
-                    destFile = File(targetDir, "$baseName ($counter)$ext")
-                    counter++
-                }
+                val saveTarget = getSaveTarget()
 
                 fileItem.status = TransferStatus.InProgress
                 fileItem.bytesTransferred = 0L
 
                 withContext(Dispatchers.IO) {
-                    val channel = call.receiveChannel()
-                    val buffer = ByteArray(64 * 1024)
-                    var lastTime = System.currentTimeMillis()
-                    var bytesSinceLast = 0L
+                    openSaveStream(fileItem, saveTarget).use { fos ->
+                        val channel = call.receiveChannel()
+                        val buffer = ByteArray(64 * 1024)
+                        var lastTime = System.currentTimeMillis()
+                        var bytesSinceLast = 0L
 
-                    FileOutputStream(destFile).use { fos ->
                         while (!channel.isClosedForRead) {
                             val read = channel.readAvailable(buffer, 0, buffer.size)
                             if (read <= 0) break

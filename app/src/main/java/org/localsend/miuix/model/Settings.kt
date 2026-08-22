@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.model
+package org.localsend.miuix.model
 
 import android.os.Build
 
@@ -7,6 +7,10 @@ data class AppSettings(
     val port: Int = 53317,
     val multicastGroup: String = "224.0.0.167",
     val downloadPath: String = "",
+    // SAF 目录树 Uri（用户自定义保存位置）。非空时优先使用该 Uri 作为保存目标
+    val downloadTreeUri: String? = null,
+    // 自定义保存目录的显示名（便于设置页展示，避免暴露原始 Uri）
+    val downloadDisplay: String? = null,
     val quickSave: Boolean = false,
     val autoFinish: Boolean = false,
     val useHttps: Boolean = false,

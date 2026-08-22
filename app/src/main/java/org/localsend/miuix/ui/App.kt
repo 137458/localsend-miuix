@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.ui
+package org.localsend.miuix.ui
 
 import android.content.ClipDescription
 import android.content.ClipboardManager
@@ -10,6 +10,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.documentfile.provider.DocumentFile
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -40,6 +41,7 @@ import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.IncomingTransferDialog
 import org.localsend.miuix.ui.component.LiquidGlassBottomBar
 import org.localsend.miuix.ui.component.ManualIpDialog
+import org.localsend.miuix.ui.component.PortDialog
 import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
 import org.localsend.miuix.ui.screen.ReceiveScreen
@@ -92,6 +94,7 @@ fun App(manager: LocalSendManager) {
     var showManualIpDialog by remember { mutableStateOf(false) }
     var showSendTextDialog by remember { mutableStateOf(false) }
     var showAddContentSheet by remember { mutableStateOf(false) }
+    var showPortDialog by remember { mutableStateOf(false) }
 
     // 5. Activity Result Launchers
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -160,6 +163,22 @@ fun App(manager: LocalSendManager) {
             }
             manager.addFiles(items)
             Toast.makeText(context, "已添加 ${items.size} 个媒体文件", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val directoryPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val display = try {
+                DocumentFile.fromTreeUri(context, uri)?.name
+                    ?: uri.lastPathSegment
+                    ?: "自定义目录"
+            } catch (e: Exception) {
+                uri.lastPathSegment ?: "自定义目录"
+            }
+            manager.setDownloadTree(uri, display)
+            Toast.makeText(context, "保存目录已设置为: $display", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -259,7 +278,9 @@ fun App(manager: LocalSendManager) {
                         2 -> SettingsScreen(
                             manager = manager,
                             contentPadding = pagePadding,
-                            onOpenRenameDialog = { showRenameDialog = true }
+                            onOpenRenameDialog = { showRenameDialog = true },
+                            onOpenPortDialog = { showPortDialog = true },
+                            onPickDirectory = { directoryPickerLauncher.launch(null) }
                         )
                     }
                 }
@@ -298,6 +319,16 @@ fun App(manager: LocalSendManager) {
                     )
                     manager.sendFilesTo(manualDevice)
                     Toast.makeText(context, "正在向 $targetIp 发起连接与传输", Toast.LENGTH_SHORT).show()
+                }
+            )
+
+            PortDialog(
+                show = showPortDialog,
+                initialPort = settings.port,
+                onDismissRequest = { showPortDialog = false },
+                onConfirm = { newPort ->
+                    manager.applyPortChange(newPort)
+                    Toast.makeText(context, "服务端口已更新为: $newPort", Toast.LENGTH_SHORT).show()
                 }
             )
 

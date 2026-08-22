@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.ui.screen
+package org.localsend.miuix.ui.screen
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +30,9 @@ import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 fun SettingsScreen(
     manager: LocalSendManager,
     contentPadding: PaddingValues,
-    onOpenRenameDialog: () -> Unit
+    onOpenRenameDialog: () -> Unit,
+    onOpenPortDialog: () -> Unit,
+    onPickDirectory: () -> Unit
 ) {
     val context = LocalContext.current
     val settings by manager.settings.collectAsState()
@@ -103,9 +105,7 @@ fun SettingsScreen(
                     ArrowPreference(
                         title = "端口号",
                         summary = settings.port.toString(),
-                        onClick = {
-                            Toast.makeText(context, "LocalSend 标准端口为 53317", Toast.LENGTH_SHORT).show()
-                        }
+                        onClick = onOpenPortDialog
                     )
                     SwitchPreference(
                         title = "启用 HTTPS 加密",
@@ -117,10 +117,8 @@ fun SettingsScreen(
                     )
                     ArrowPreference(
                         title = "保存目录",
-                        summary = settings.downloadPath,
-                        onClick = {
-                            Toast.makeText(context, "文件保存在内部 Download 目录", Toast.LENGTH_SHORT).show()
-                        }
+                        summary = settings.downloadDisplay ?: settings.downloadPath,
+                        onClick = onPickDirectory
                     )
                 }
             }

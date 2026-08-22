@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.ui.component
+package org.localsend.miuix.ui.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -79,6 +79,66 @@ fun RenameDeviceDialog(
                         val trimmed = name.trim()
                         if (trimmed.isNotEmpty()) {
                             onConfirm(trimmed)
+                            onDismissRequest()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("确定")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PortDialog(
+    show: Boolean,
+    initialPort: Int,
+    onDismissRequest: () -> Unit,
+    onConfirm: (Int) -> Unit
+) {
+    var port by remember(show, initialPort) { mutableStateOf(initialPort.toString()) }
+
+    WindowDialog(
+        show = show,
+        title = "修改服务端口",
+        onDismissRequest = onDismissRequest
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+        ) {
+            TextField(
+                value = port,
+                onValueChange = { newValue -> if (newValue.length <= 5) port = newValue },
+                label = "端口号 (1 - 65535)",
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = onDismissRequest,
+                    colors = ButtonDefaults.buttonColors(),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("取消")
+                }
+                Button(
+                    onClick = {
+                        val newPort = port.trim().toIntOrNull()
+                        if (newPort != null && newPort in 1..65535) {
+                            onConfirm(newPort)
                             onDismissRequest()
                         }
                     },

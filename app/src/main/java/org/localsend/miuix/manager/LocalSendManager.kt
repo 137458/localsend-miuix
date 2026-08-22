@@ -1,6 +1,8 @@
-﻿package org.localsend.miuix.manager
+package org.localsend.miuix.manager
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import kotlinx.coroutines.CompletableDeferred
@@ -16,6 +18,7 @@ import org.localsend.miuix.model.AppSettings
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.model.SaveTarget
 import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
@@ -32,17 +35,32 @@ class LocalSendManager(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val fingerprint = UUID.randomUUID().toString()
 
+    // 应用私有外部 Downloads 目录：免存储权限、所有 API 级别均可自由读写，
+    // 规避了作用域存储下直接写公共 Download 被拒导致"无法接收文件"的问题。
     private val defaultDownloadDir: File by lazy {
-        val pubDownload = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        if (pubDownload != null && (pubDownload.exists() || pubDownload.mkdirs())) {
-            pubDownload
-        } else {
-            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
-        }
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
+        if (!dir.exists()) dir.mkdirs()
+        dir
+    }
+
+    private val prefs = context.getSharedPreferences("localsend_settings", Context.MODE_PRIVATE)
+
+    // 从持久化恢复设置；别名首次生成后即固化，避免冷启动每次都随机更换。
+    private val initialAlias = prefs.getString(KEY_ALIAS, null) ?: run {
+        val generated = AppSettings.generateDefaultAlias()
+        prefs.edit().putString(KEY_ALIAS, generated).apply()
+        generated
     }
 
     private val _settings = MutableStateFlow(
         AppSettings(
+            alias = initialAlias,
+            port = prefs.getInt(KEY_PORT, 53317),
+            quickSave = prefs.getBoolean(KEY_QUICK_SAVE, false),
+            useHttps = prefs.getBoolean(KEY_USE_HTTPS, false),
+            themeModeIndex = prefs.getInt(KEY_THEME, 0),
+            downloadTreeUri = prefs.getString(KEY_TREE_URI, null),
+            downloadDisplay = prefs.getString(KEY_DOWNLOAD_DISPLAY, null),
             downloadPath = defaultDownloadDir.absolutePath
         )
     )
@@ -92,18 +110,12 @@ class LocalSendManager(private val context: Context) {
     )
 
     private val server = LocalSendServer(
+        context = context,
         scope = scope,
         getPort = { _settings.value.port },
         getLocalDevice = { getLocalDevice() },
         isQuickSave = { _settings.value.quickSave },
-        getDownloadDir = {
-            val path = _settings.value.downloadPath
-            if (path.isNotEmpty()) {
-                val f = File(path)
-                if (!f.exists()) f.mkdirs()
-                f
-            } else defaultDownloadDir
-        },
+        getSaveTarget = { getSaveTarget() },
         onDeviceDiscovered = { device ->
             scope.launch {
                 _nearbyDevices.update { list ->
@@ -331,6 +343,62 @@ class LocalSendManager(private val context: Context) {
     }
 
     fun updateSettings(transform: (AppSettings) -> AppSettings) {
-        _settings.update(transform)
+        val updated = transform(_settings.value)
+        _settings.value = updated
+        persistSettings(updated)
+    }
+
+    /** 计算当前接收保存目标：优先使用用户通过 SAF 选择的自定义目录，否则使用默认目录。 */
+    fun getSaveTarget(): SaveTarget {
+        val tree = _settings.value.downloadTreeUri
+        if (!tree.isNullOrEmpty()) {
+            try {
+                return SaveTarget.UriTarget(Uri.parse(tree))
+            } catch (ignored: Exception) {}
+        }
+        return SaveTarget.FileTarget(defaultDownloadDir)
+    }
+
+    /** 用户通过 SAF 选择自定义保存目录后调用，持久化其访问权限与显示信息。 */
+    fun setDownloadTree(uri: Uri, display: String) {
+        try {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        } catch (ignored: Exception) {}
+        updateSettings { it.copy(downloadTreeUri = uri.toString(), downloadDisplay = display, downloadPath = display) }
+    }
+
+    /** 修改服务端口并重启服务使新端口立即生效。 */
+    fun applyPortChange(newPort: Int) {
+        if (newPort == _settings.value.port) return
+        updateSettings { it.copy(port = newPort) }
+        scope.launch {
+            server.stop()
+            server.start()
+        }
+    }
+
+    private fun persistSettings(s: AppSettings) {
+        prefs.edit()
+            .putString(KEY_ALIAS, s.alias)
+            .putInt(KEY_PORT, s.port)
+            .putString(KEY_TREE_URI, s.downloadTreeUri)
+            .putString(KEY_DOWNLOAD_DISPLAY, s.downloadDisplay)
+            .putBoolean(KEY_QUICK_SAVE, s.quickSave)
+            .putBoolean(KEY_USE_HTTPS, s.useHttps)
+            .putInt(KEY_THEME, s.themeModeIndex)
+            .apply()
+    }
+
+    companion object {
+        private const val KEY_ALIAS = "alias"
+        private const val KEY_PORT = "port"
+        private const val KEY_QUICK_SAVE = "quick_save"
+        private const val KEY_USE_HTTPS = "use_https"
+        private const val KEY_THEME = "theme_mode_index"
+        private const val KEY_TREE_URI = "download_tree_uri"
+        private const val KEY_DOWNLOAD_DISPLAY = "download_display"
     }
 }
