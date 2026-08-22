@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.network
+package org.localsend.miuix.network
 
 import android.content.Context
 import io.ktor.client.HttpClient
@@ -25,12 +25,14 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.X509TrustManager
 
 class LocalSendClient(
     private val context: Context,
-    private val getLocalDevice: () -> Device
+    private val getLocalDevice: () -> Device,
+    private val getPin: () -> String?
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
 
@@ -61,6 +63,12 @@ class LocalSendClient(
         files: List<FileItem>
     ): Result<PrepareUploadResponseDto> = withContext(Dispatchers.IO) {
         try {
+            // 发送方按规范计算每个文件的 sha256（可选字段），供接收方校验
+            for (fileItem in files) {
+                if (fileItem.expectedSha256 == null) {
+                    fileItem.expectedSha256 = computeSha256(fileItem)
+                }
+            }
             val localDevice = getLocalDevice()
             val filesMap = files.associate { it.id to it.toDto() }
             val requestDto = PrepareUploadRequestDto(
@@ -68,7 +76,9 @@ class LocalSendClient(
                 files = filesMap
             )
 
-            val url = "${targetDevice.url}/api/localsend/v2/prepare-upload"
+            val urlBuilder = StringBuilder("${targetDevice.url}/api/localsend/v2/prepare-upload")
+            getPin()?.takeIf { it.isNotEmpty() }?.let { urlBuilder.append("?pin=").append(it) }
+            val url = urlBuilder.toString()
             val response = httpClient.post(url) {
                 contentType(ContentType.Application.Json)
                 setBody(requestDto)
@@ -79,11 +89,19 @@ class LocalSendClient(
                 Result.success(responseDto)
             } else {
                 val text = response.bodyAsText()
-                Result.failure(Exception("目标设备拒绝了接收请求: ${response.status} ($text)"))
+                Result.failure(Exception(prepareErrorText(response.status.value, text)))
             }
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    /** 将 prepare-upload 的错误码映射为用户可读的中文提示。 */
+    private fun prepareErrorText(code: Int, body: String): String = when (code) {
+        HttpStatusCode.Unauthorized.value -> "接收方要求输入正确的 PIN 码（401）"
+        HttpStatusCode.Conflict.value -> "对方正在处理其他传输会话，请稍后再试（409）"
+        HttpStatusCode.TooManyRequests.value -> "请求过于频繁，请稍后再试（429）"
+        else -> "对方拒绝了接收请求: $code ($body)"
     }
 
     suspend fun uploadFile(
@@ -149,7 +167,12 @@ class LocalSendClient(
                 onProgress(bytesWritten, 0L)
                 Result.success(Unit)
             } else {
-                Result.failure(Exception("Upload failed with HTTP $responseCode: ${connection.responseMessage}"))
+                val message = when (responseCode) {
+                    HttpURLConnection.HTTP_FORBIDDEN -> "上传被拒绝：令牌或来源地址无效（403）"
+                    422 -> "文件校验失败：SHA-256 不匹配（422）"
+                    else -> "上传失败: HTTP $responseCode"
+                }
+                Result.failure(Exception(message))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -170,6 +193,31 @@ class LocalSendClient(
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    /** 打开文件/URI/文本对应的输入流，供上传与哈希计算共用；不持有则返回 null。 */
+    private fun openSourceStream(fileItem: FileItem): InputStream? = when {
+        fileItem.uri != null -> context.contentResolver.openInputStream(fileItem.uri)
+        fileItem.path != null -> File(fileItem.path).inputStream()
+        fileItem.textContent != null -> fileItem.textContent.byteInputStream(Charsets.UTF_8)
+        else -> null
+    }
+
+    private fun computeSha256(fileItem: FileItem): String? {
+        return try {
+            val input = openSourceStream(fileItem) ?: return null
+            val digest = MessageDigest.getInstance("SHA-256")
+            val buffer = ByteArray(64 * 1024)
+            input.use {
+                var read: Int
+                while (it.read(buffer).also { r -> read = r } != -1) {
+                    digest.update(buffer, 0, read)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            null
         }
     }
 }

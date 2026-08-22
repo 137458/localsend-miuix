@@ -38,8 +38,10 @@ import org.localsend.miuix.model.SaveTarget
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import java.io.OutputStream
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 class LocalSendServer(
     private val context: Context,
@@ -48,6 +50,7 @@ class LocalSendServer(
     private val getLocalDevice: () -> Device,
     private val isQuickSave: () -> Boolean,
     private val getSaveTarget: () -> SaveTarget,
+    private val getPin: () -> String?,
     private val onDeviceDiscovered: (Device) -> Unit,
     private val onIncomingRequest: suspend (session: TransferSession) -> Boolean,
     private val onSessionUpdated: (TransferSession) -> Unit
@@ -56,6 +59,9 @@ class LocalSendServer(
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
     private val activeSessions = ConcurrentHashMap<String, TransferSession>()
     private val sessionTokens = ConcurrentHashMap<String, MutableMap<String, String>>() // sessionId -> (fileId -> token)
+
+    // 429 限流：按来源 IP 统计 prepare-upload 请求频率
+    private val requestHits = ConcurrentHashMap<String, MutableList<Long>>()
 
     /**
      * 打开文件写入流。默认走公共 Download（MediaStore），用户自定义时走 SAF 目录树。
@@ -143,6 +149,22 @@ class LocalSendServer(
         return "$base ($counter)$ext"
     }
 
+    /** 删除已写入的文件（用于 sha256 校验失败后的清理）。 */
+    private fun deleteSavedFile(fileItem: FileItem, target: SaveTarget) {
+        try {
+            when (target) {
+                is SaveTarget.MediaStoreTarget -> {
+                    val uri = fileItem.mediaStoreUri ?: return
+                    context.contentResolver.delete(uri, null, null)
+                }
+                is SaveTarget.UriTarget -> {
+                    val parent = DocumentFile.fromTreeUri(context, target.treeUri)
+                    parent?.findFile(fileItem.name)?.delete()
+                }
+            }
+        } catch (ignored: Exception) {}
+    }
+
     fun start() {
         if (engine != null) return
         val port = getPort()
@@ -172,6 +194,27 @@ class LocalSendServer(
         engine = null
         activeSessions.clear()
         sessionTokens.clear()
+        requestHits.clear()
+    }
+
+    /** 校验 PIN：未配置 PIN 视为放行；配置后要求查询参数 ?pin= 精确匹配，否则回 401。 */
+    private fun pinOk(pinFromRequest: String?): Boolean {
+        val required = getPin()
+        return required.isNullOrEmpty() || (required == pinFromRequest)
+    }
+
+    /** 429 限流：单 IP 在滑动窗口时间内 prepare-upload 请求过多时返回 true。 */
+    private fun tooFrequent(ip: String): Boolean {
+        val now = System.currentTimeMillis()
+        val windowMs = 1_000L
+        val maxHits = 10
+        val list = requestHits.computeIfAbsent(ip) { mutableListOf() }
+        synchronized(list) {
+            list.removeAll { now - it > windowMs }
+            if (list.size >= maxHits) return true
+            list.add(now)
+            return false
+        }
     }
 
     private fun Application.configureRouting() {
@@ -201,8 +244,25 @@ class LocalSendServer(
             }
 
             post("/api/localsend/v2/prepare-upload") {
-                val request = call.receive<PrepareUploadRequestDto>()
+                if (!pinOk(call.request.queryParameters["pin"])) {
+                    call.respond(HttpStatusCode.Unauthorized, "Request is unauthorized")
+                    return@post
+                }
                 val remoteIp = call.request.origin.remoteHost
+                if (tooFrequent(remoteIp)) {
+                    call.respond(HttpStatusCode.TooManyRequests, "Too many requests")
+                    return@post
+                }
+                // 409：同时只允许一个接收会话，被其他进行中会话占用时拒绝
+                if (activeSessions.isNotEmpty()) {
+                    call.respond(HttpStatusCode.Conflict, "Blocked by another session")
+                    return@post
+                }
+                val request = call.receive<PrepareUploadRequestDto>()
+                if (request.files.isEmpty()) {
+                    call.respond(HttpStatusCode.BadRequest, "Invalid body")
+                    return@post
+                }
                 val senderDevice = Device.fromDto(request.info, remoteIp)
                 onDeviceDiscovered(senderDevice)
 
@@ -214,6 +274,7 @@ class LocalSendServer(
                         size = dto.size,
                         mimeType = dto.fileType,
                         token = UUID.randomUUID().toString(),
+                        expectedSha256 = dto.sha256,
                         status = TransferStatus.WaitingApproval
                     )
                 }
@@ -278,8 +339,11 @@ class LocalSendServer(
                 }
 
                 val expectedToken = sessionTokens[sessionId]?.get(fileId)
-                if (token != null && expectedToken != null && token != expectedToken) {
-                    call.respond(HttpStatusCode.Forbidden, "Invalid file token")
+                // 403：令牌缺失/错误，或来源 IP 与会话所属设备不一致均拒绝
+                if (token == null || expectedToken == null || token != expectedToken ||
+                    call.request.origin.remoteHost != session.device.ip
+                ) {
+                    call.respond(HttpStatusCode.Forbidden, "Invalid token or IP address")
                     return@post
                 }
 
@@ -294,7 +358,12 @@ class LocalSendServer(
                 fileItem.status = TransferStatus.InProgress
                 fileItem.bytesTransferred = 0L
 
-                withContext(Dispatchers.IO) {
+                val checksum = withContext(Dispatchers.IO) {
+                    var digest: MessageDigest? = if (fileItem.expectedSha256 != null) {
+                        MessageDigest.getInstance("SHA-256")
+                    } else {
+                        null
+                    }
                     openSaveStream(fileItem, saveTarget).use { fos ->
                         val channel = call.receiveChannel()
                         val buffer = ByteArray(64 * 1024)
@@ -305,6 +374,7 @@ class LocalSendServer(
                             val read = channel.readAvailable(buffer, 0, buffer.size)
                             if (read <= 0) break
                             fos.write(buffer, 0, read)
+                            digest?.update(buffer, 0, read)
                             fileItem.bytesTransferred += read
                             session.transferredBytes += read
                             bytesSinceLast += read
@@ -323,6 +393,17 @@ class LocalSendServer(
                     }
                     // MediaStore 路径：写入完成后清除 IS_PENDING，使文件立即可见
                     confirmMediaStoreWrite(fileItem)
+                    digest?.digest()?.joinToString("") { "%02x".format(it) }
+                }
+
+                // 发送方声明了 sha256 且校验失败：删除已写入文件并按规范回 422
+                if (fileItem.expectedSha256 != null && fileItem.expectedSha256 != checksum) {
+                    deleteSavedFile(fileItem, saveTarget)
+                    fileItem.status = TransferStatus.Failed
+                    fileItem.progress = 0f
+                    onSessionUpdated(session)
+                    call.respond(HttpStatusCode.UnprocessableEntity, "CHECKSUM_MISMATCH")
+                    return@post
                 }
 
                 fileItem.status = TransferStatus.Completed

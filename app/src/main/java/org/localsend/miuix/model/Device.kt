@@ -26,7 +26,7 @@ data class DeviceDto(
     val fingerprint: String,
     val port: Int = 53317,
     val protocol: String = "http",
-    val download: Boolean = true,
+    val download: Boolean = false,
     val announce: Boolean? = null
 )
 
@@ -38,7 +38,7 @@ data class Device(
     val fingerprint: String,
     val port: Int = 53317,
     val protocol: String = "http",
-    val download: Boolean = true,
+    val download: Boolean = false,
     val ip: String,
     val lastSeen: Long = System.currentTimeMillis()
 ) {

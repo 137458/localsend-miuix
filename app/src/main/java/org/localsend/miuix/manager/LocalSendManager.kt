@@ -54,6 +54,7 @@ class LocalSendManager(private val context: Context) {
             port = prefs.getInt(KEY_PORT, 53317),
             quickSave = prefs.getBoolean(KEY_QUICK_SAVE, false),
             useHttps = prefs.getBoolean(KEY_USE_HTTPS, false),
+            pin = prefs.getString(KEY_PIN, null),
             themeModeIndex = prefs.getInt(KEY_THEME, 0),
             downloadTreeUri = prefs.getString(KEY_TREE_URI, null),
             downloadDisplay = prefs.getString(KEY_DOWNLOAD_DISPLAY, null),
@@ -106,7 +107,8 @@ class LocalSendManager(private val context: Context) {
 
     private val client = LocalSendClient(
         context = context,
-        getLocalDevice = { getLocalDevice() }
+        getLocalDevice = { getLocalDevice() },
+        getPin = { _settings.value.pin }
     )
 
     private val server = LocalSendServer(
@@ -116,6 +118,7 @@ class LocalSendManager(private val context: Context) {
         getLocalDevice = { getLocalDevice() },
         isQuickSave = { _settings.value.quickSave },
         getSaveTarget = { getSaveTarget() },
+        getPin = { _settings.value.pin },
         onDeviceDiscovered = { device ->
             scope.launch {
                 _nearbyDevices.update { list ->
@@ -187,7 +190,7 @@ class LocalSendManager(private val context: Context) {
             fingerprint = fingerprint,
             port = _settings.value.port,
             protocol = if (_settings.value.useHttps) "https" else "http",
-            download = true,
+            download = false,
             ip = primaryIp
         )
     }
@@ -402,6 +405,7 @@ class LocalSendManager(private val context: Context) {
             .putString(KEY_DOWNLOAD_DISPLAY, s.downloadDisplay)
             .putBoolean(KEY_QUICK_SAVE, s.quickSave)
             .putBoolean(KEY_USE_HTTPS, s.useHttps)
+            .putString(KEY_PIN, s.pin)
             .putInt(KEY_THEME, s.themeModeIndex)
             .apply()
     }
@@ -411,6 +415,7 @@ class LocalSendManager(private val context: Context) {
         private const val KEY_PORT = "port"
         private const val KEY_QUICK_SAVE = "quick_save"
         private const val KEY_USE_HTTPS = "use_https"
+        private const val KEY_PIN = "pin"
         private const val KEY_THEME = "theme_mode_index"
         private const val KEY_TREE_URI = "download_tree_uri"
         private const val KEY_DOWNLOAD_DISPLAY = "download_display"

@@ -43,6 +43,8 @@ data class FileItem(
     val textContent: String? = null,
     val mimeType: String = "application/octet-stream",
     val token: String? = null,
+    // 发送方在 prepare-upload 中声明的 sha256（可选）；接收方写入后校验，不匹配则回 422
+    var expectedSha256: String? = null,
     var status: TransferStatus = TransferStatus.WaitingApproval,
     var progress: Float = 0f,
     var bytesTransferred: Long = 0L,
@@ -56,7 +58,8 @@ data class FileItem(
             id = id,
             fileName = name,
             size = size,
-            fileType = mimeType
+            fileType = mimeType,
+            sha256 = expectedSha256
         )
     }
 
