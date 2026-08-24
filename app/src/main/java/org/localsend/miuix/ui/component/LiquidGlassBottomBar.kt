@@ -372,20 +372,6 @@ fun LiquidGlassBottomBar(
                         .layerBackdrop(tabsBackdrop)
                         .fillMaxSize()
                         .graphicsLayer { translationX = panelOffset }
-                        .drawBackdrop(
-                            backdrop = backdrop,
-                            shape = { pillShape },
-                            effects = {
-                                vibrancy()
-                                blur(4.dp.toPx(), 4.dp.toPx())
-                                lens(
-                                    refractionHeight = 20.dp.toPx(),
-                                    refractionAmount = 20.dp.toPx(),
-                                )
-                            },
-                            onDrawSurface = { drawRect(containerColor) },
-                        )
-                        .then(interactiveHighlight?.modifier ?: Modifier)
                         .padding(3.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     content = tabsContent,

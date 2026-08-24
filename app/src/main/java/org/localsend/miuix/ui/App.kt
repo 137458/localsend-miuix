@@ -251,7 +251,13 @@ fun App(manager: LocalSendManager) {
                                 items = navigationItems,
                                 selectedIndex = { pagerState.currentPage },
                                 onSelected = { index ->
-                                    scope.launch { pagerState.animateScrollToPage(index) }
+                                    scope.launch {
+                                        if (kotlin.math.abs(pagerState.currentPage - index) > 1) {
+                                            pagerState.scrollToPage(index)
+                                        } else {
+                                            pagerState.animateScrollToPage(index)
+                                        }
+                                    }
                                 },
                                 backdrop = backdrop,
                                 badge = { index ->
@@ -270,6 +276,7 @@ fun App(manager: LocalSendManager) {
                     ) {
                         HorizontalPager(
                             state = pagerState,
+                            beyondViewportPageCount = 2,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
                             val pagePadding = PaddingValues(
