@@ -28,7 +28,9 @@ import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveChannel
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondOutputStream
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -364,19 +366,21 @@ class LocalSendServer(
                     call.respond(HttpStatusCode.NotFound, "File source unavailable")
                     return@get
                 }
-                call.respond(
-                    object : OutgoingContent.ByteArrayContent() {
-                        override val contentType: ContentType? =
-                            ContentType.parse(file.mimeType.ifEmpty { "application/octet-stream" })
-                        override val contentLength: Long? = file.size
-                        override val headers: Headers = headersOf(
-                            HttpHeaders.ContentDisposition,
-                            "inline; filename=\"${file.name.replace("\"", "")}\""
-                        )
-                        override fun bytes(): ByteArray = input.readBytes()
-                    }
+                call.response.header(
+                    HttpHeaders.ContentDisposition,
+                    "inline; filename=\"${file.name.replace("\"", "")}\""
                 )
-                input.close()
+                val contentType = ContentType.parse(file.mimeType.ifEmpty { "application/octet-stream" })
+                call.respondOutputStream(contentType = contentType, status = HttpStatusCode.OK) {
+                    input.use { src ->
+                        val buffer = ByteArray(128 * 1024)
+                        var bytesRead: Int
+                        while (src.read(buffer).also { bytesRead = it } != -1) {
+                            write(buffer, 0, bytesRead)
+                        }
+                        flush()
+                    }
+                }
             }
 
             get("/api/localsend/v2/info") {
@@ -524,9 +528,9 @@ class LocalSendServer(
                     } else {
                         null
                     }
-                    openSaveStream(fileItem, saveTarget).use { fos ->
+                    openSaveStream(fileItem, saveTarget).buffered(128 * 1024).use { fos ->
                         val channel = call.receiveChannel()
-                        val buffer = ByteArray(64 * 1024)
+                        val buffer = ByteArray(128 * 1024)
                         var lastTime = System.currentTimeMillis()
                         var bytesSinceLast = 0L
 
@@ -553,6 +557,7 @@ class LocalSendServer(
                                 onSessionUpdated(session)
                             }
                         }
+                        fos.flush()
                     }
                     // MediaStore 路径：写入完成后清除 IS_PENDING，使文件立即可见
                     confirmMediaStoreWrite(fileItem)

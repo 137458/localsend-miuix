@@ -71,8 +71,8 @@ fun SendScreen(
     val nearbyDevices by manager.nearbyDevices.collectAsState()
     val isScanning by manager.isScanning.collectAsState()
     val activeSessions by manager.activeSessions.collectAsState()
-    val outgoingSessions = activeSessions.filter { !it.isIncoming }
-    val totalSelectedSize = selectedFiles.sumOf { it.size }
+    val outgoingSessions = remember(activeSessions) { activeSessions.filter { !it.isIncoming } }
+    val totalSelectedSize = remember(selectedFiles) { selectedFiles.sumOf { it.size } }
 
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
@@ -178,39 +178,41 @@ fun SendScreen(
                                 Spacer(modifier = Modifier.height(12.dp))
 
                                 selectedFiles.forEach { file ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = AppIcons.getFileIcon(file.mimeType, file.name),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(24.dp),
-                                            tint = MiuixTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = file.name,
-                                                style = MiuixTheme.textStyles.body1,
-                                                maxLines = 1
-                                            )
-                                            Text(
-                                                text = file.formattedSize,
-                                                style = MiuixTheme.textStyles.footnote1,
-                                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                            )
-                                        }
-                                        IconButton(
-                                            onClick = { manager.removeFile(file.id) }
+                                    androidx.compose.runtime.key(file.id) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.Delete,
-                                                contentDescription = "删除",
-                                                tint = MiuixTheme.colorScheme.error
+                                                imageVector = AppIcons.getFileIcon(file.mimeType, file.name),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(24.dp),
+                                                tint = MiuixTheme.colorScheme.primary
                                             )
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = file.name,
+                                                    style = MiuixTheme.textStyles.body1,
+                                                    maxLines = 1
+                                                )
+                                                Text(
+                                                    text = file.formattedSize,
+                                                    style = MiuixTheme.textStyles.footnote1,
+                                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = { manager.removeFile(file.id) }
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "删除",
+                                                    tint = MiuixTheme.colorScheme.error
+                                                )
+                                            }
                                         }
                                     }
                                 }

@@ -65,7 +65,7 @@ fun ReceiveScreen(
     val context = LocalContext.current
     val settings by manager.settings.collectAsState()
     val activeSessions by manager.activeSessions.collectAsState()
-    val incomingSessions = activeSessions.filter { it.isIncoming }
+    val incomingSessions = remember(activeSessions) { activeSessions.filter { it.isIncoming } }
     val shares by manager.shares.collectAsState()
     val selectedFiles by manager.selectedFiles.collectAsState()
 

@@ -29,6 +29,7 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.MulticastSocket
+import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.X509TrustManager
 
 class DiscoveryService(
@@ -38,6 +39,7 @@ class DiscoveryService(
     private val onDeviceDiscovered: (Device) -> Unit
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
+    private val scanDispatcher = Dispatchers.IO.limitedParallelism(32)
     private var multicastJob: Job? = null
     private var periodicBroadcastJob: Job? = null
     private var scanJob: Job? = null
@@ -220,12 +222,12 @@ class DiscoveryService(
 
     fun scanSubnet(onScanProgress: ((current: Int, total: Int) -> Unit)? = null) {
         scanJob?.cancel()
-        scanJob = scope.launch(Dispatchers.IO) {
+        scanJob = scope.launch(scanDispatcher) {
             val baseIp = NetworkUtils.getSubnetBaseIp() ?: return@launch
             val localIps = NetworkUtils.getLocalIpAddresses()
             val localDevice = getLocalDevice()
             val total = 254
-            var current = 0
+            val current = AtomicInteger(0)
 
             val deferreds = (1..total).map { i ->
                 async {
@@ -253,10 +255,8 @@ class DiscoveryService(
                             }
                         }
                     }
-                    synchronized(this@DiscoveryService) {
-                        current++
-                        onScanProgress?.invoke(current, total)
-                    }
+                    val progress = current.incrementAndGet()
+                    onScanProgress?.invoke(progress, total)
                 }
             }
             deferreds.awaitAll()

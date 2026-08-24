@@ -240,7 +240,9 @@ fun TransferSessionCard(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         session.files.forEach { file ->
-                            FileDetailItem(file = file)
+                            androidx.compose.runtime.key(file.id) {
+                                FileDetailItem(file = file)
+                            }
                         }
                     }
                 }

@@ -133,7 +133,7 @@ private fun HistoryItemCard(item: TransferHistoryItem) {
         statusInfo(status = item.status, primaryColor = primary)
     }
     val timeText = remember(item.timestamp) {
-        SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(item.timestamp))
+        formatHistoryTimestamp(item.timestamp)
     }
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -189,6 +189,14 @@ private fun HistoryItemCard(item: TransferHistoryItem) {
 }
 
 private data class StatusInfo(val label: String, val color: Color)
+
+private val dateFormatThreadLocal = ThreadLocal.withInitial {
+    SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+}
+
+private fun formatHistoryTimestamp(timestamp: Long): String {
+    return (dateFormatThreadLocal.get() ?: SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())).format(Date(timestamp))
+}
 
 private fun statusInfo(status: TransferStatus, primaryColor: Color): StatusInfo = when (status) {
     TransferStatus.Completed -> StatusInfo("已完成", Color(0xFF16A34A))

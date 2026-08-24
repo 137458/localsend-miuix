@@ -115,13 +115,8 @@ class LocalSendClient(
         var inputStream: InputStream? = null
         var connection: HttpURLConnection? = null
         try {
-            // Open input stream from content URI or File path or textContent
-            inputStream = when {
-                fileItem.uri != null -> context.contentResolver.openInputStream(fileItem.uri)
-                fileItem.path != null -> File(fileItem.path).inputStream()
-                fileItem.textContent != null -> fileItem.textContent.byteInputStream(Charsets.UTF_8)
-                else -> throw IllegalArgumentException("No source available for ${fileItem.name}")
-            } ?: throw IllegalStateException("Cannot open input stream for ${fileItem.name}")
+            inputStream = openSourceStream(fileItem)?.buffered(128 * 1024)
+                ?: throw IllegalStateException("Cannot open input stream for ${fileItem.name}")
 
             val uploadUrlStr = "${targetDevice.url}/api/localsend/v2/upload?sessionId=$sessionId&fileId=${fileItem.id}&token=$token"
             val uploadUrl = URL(uploadUrlStr)
@@ -134,7 +129,7 @@ class LocalSendClient(
                 }
                 requestMethod = "POST"
                 doOutput = true
-                setChunkedStreamingMode(64 * 1024)
+                setChunkedStreamingMode(128 * 1024)
                 connectTimeout = 15000
                 readTimeout = 120000
                 setRequestProperty("Content-Type", "application/octet-stream")
@@ -142,8 +137,8 @@ class LocalSendClient(
 
             // 注意：openConnection() 是惰性的，真正的 TLS 握手发生在获取 outputStream/读取响应时，
             // 因此 fingerprint 的 pin 必须保持到整个上传结束，直到 finally 才 unpin。
-            val outputStream: OutputStream = connection.outputStream
-            val buffer = ByteArray(64 * 1024)
+            val outputStream: OutputStream = connection.outputStream.buffered(128 * 1024)
+            val buffer = ByteArray(128 * 1024)
             var bytesWritten = 0L
             var lastTime = System.currentTimeMillis()
             var bytesSinceLast = 0L
@@ -216,9 +211,9 @@ class LocalSendClient(
 
     private fun computeSha256(fileItem: FileItem): String? {
         return try {
-            val input = openSourceStream(fileItem) ?: return null
+            val input = openSourceStream(fileItem)?.buffered(128 * 1024) ?: return null
             val digest = MessageDigest.getInstance("SHA-256")
-            val buffer = ByteArray(64 * 1024)
+            val buffer = ByteArray(128 * 1024)
             input.use {
                 var read: Int
                 while (it.read(buffer).also { r -> read = r } != -1) {
