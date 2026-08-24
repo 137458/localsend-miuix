@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.ui.component
+package org.localsend.miuix.ui.component
 
 import android.os.Build
 import androidx.compose.animation.core.Animatable
@@ -29,7 +29,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -147,8 +146,6 @@ fun LiquidGlassBottomBar(
         }
     }
 
-    var currentIndex by remember(selectedIndex) { mutableIntStateOf(selectedIndex()) }
-
     class DampedDragAnimationHolder {
         var instance: DampedDragAnimation? = null
     }
@@ -179,8 +176,8 @@ fun LiquidGlassBottomBar(
             onDragStarted = {},
             onDragStopped = {
                 val targetIndex = targetValue.fastRoundToInt().fastCoerceIn(0, tabsCount - 1)
-                currentIndex = targetIndex
                 animateToValue(targetIndex.toFloat())
+                onSelected(targetIndex)
                 animationScope.launch {
                     offsetAnimation.animateTo(0f, spring(1f, 300f, 0.5f))
                 }
@@ -200,15 +197,8 @@ fun LiquidGlassBottomBar(
     }
 
     LaunchedEffect(selectedIndex) {
-        snapshotFlow { selectedIndex() }.collectLatest {
-            currentIndex = it
-            dampedDragAnimation.animateToValue(it.toFloat())
-        }
-    }
-    LaunchedEffect(dampedDragAnimation) {
-        snapshotFlow { currentIndex }.drop(1).collectLatest { index ->
+        snapshotFlow { selectedIndex() }.collectLatest { index ->
             dampedDragAnimation.animateToValue(index.toFloat())
-            onSelected(index)
         }
     }
 
@@ -246,7 +236,6 @@ fun LiquidGlassBottomBar(
                         indication = null,
                         role = Role.Tab,
                         onClick = {
-                            currentIndex = index
                             onSelected(index)
                         },
                     )
