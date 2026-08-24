@@ -545,6 +545,9 @@ class LocalSendServer(
                                 val currentSpeed = (bytesSinceLast * 1000) / delta
                                 fileItem.speed = currentSpeed
                                 session.speed = currentSpeed
+                                if (fileItem.size > 0) {
+                                    fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
+                                }
                                 bytesSinceLast = 0
                                 lastTime = now
                                 onSessionUpdated(session)
@@ -568,6 +571,7 @@ class LocalSendServer(
 
                 fileItem.status = TransferStatus.Completed
                 fileItem.progress = 1f
+                fileItem.bytesTransferred = fileItem.size
 
                 // Check if all files in session completed
                 if (session.files.all { it.status == TransferStatus.Completed }) {

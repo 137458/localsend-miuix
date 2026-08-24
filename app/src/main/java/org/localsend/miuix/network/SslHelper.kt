@@ -4,7 +4,9 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
@@ -49,11 +51,17 @@ object SslHelper {
  *
  * 与官方 LocalSend 对齐（协议 §2）：通过 register/announce 先获知对端
  * 声明的 fingerprint（HTTPS 模式下即其证书指纹），随后建立 TLS 时校验服务端证书指纹
- * 与其声明一致，杜绝中间人。宿主连接前调用 [pin] 登记对端指纹。
+ * 与其声明一致，杜绝中间人。
+ *
+ * 采用归一化（去除冒号/空格并转小写）与引用计数管理，防止多请求或多文件传输时发生 unpin 竞态。
  */
 object FingerprintTrust {
 
-    private val allowed = ConcurrentHashMap<String, Boolean>()
+    private val pinCounts = ConcurrentHashMap<String, AtomicInteger>()
+    private val trustedSet = ConcurrentHashMap.newKeySet<String>()
+
+    fun normalize(fp: String): String =
+        fp.replace(":", "").replace(" ", "").lowercase(Locale.ROOT).trim()
 
     private fun sha256(cert: X509Certificate): String =
         MessageDigest.getInstance("SHA-256").digest(cert.encoded)
@@ -64,9 +72,11 @@ object FingerprintTrust {
         override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
         override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
             if (chain.isNullOrEmpty()) throw CertificateException("Empty certificate chain")
-            val fingerprint = sha256(chain[0])
-            if (allowed[fingerprint] != true) {
-                throw CertificateException("Untrusted server certificate fingerprint: $fingerprint")
+            val certFp = normalize(sha256(chain[0]))
+            val count = pinCounts[certFp]?.get() ?: 0
+            val isTrusted = count > 0 || trustedSet.contains(certFp)
+            if (!isTrusted) {
+                throw CertificateException("Untrusted server certificate fingerprint: $certFp")
             }
         }
         override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
@@ -82,17 +92,34 @@ object FingerprintTrust {
         pinnedSslContext.socketFactory
     }
 
-    /** 登记对端证书指纹，使后续指向该服务的 TLS 连接通过校验。 */
+    /** 登记对端证书指纹（引用计数 +1），使指向该服务的 TLS 连接通过校验。 */
     fun pin(fingerprint: String) {
-        if (fingerprint.isNotBlank()) allowed[fingerprint] = true
+        val norm = normalize(fingerprint)
+        if (norm.isNotEmpty()) {
+            pinCounts.computeIfAbsent(norm) { AtomicInteger(0) }.incrementAndGet()
+        }
     }
 
-    /** 会话结束后解除某个指纹的信任。 */
+    /** 会话/请求结束后解除某个指纹的信任（引用计数 -1）。 */
     fun unpin(fingerprint: String) {
-        allowed.remove(fingerprint)
+        val norm = normalize(fingerprint)
+        if (norm.isNotEmpty()) {
+            pinCounts.computeIfPresent(norm) { _, counter ->
+                if (counter.decrementAndGet() <= 0) null else counter
+            }
+        }
+    }
+
+    /** 持久信任某个已发现设备的指纹（如通过局域网多播/广播已认证设备）。 */
+    fun trust(fingerprint: String) {
+        val norm = normalize(fingerprint)
+        if (norm.isNotEmpty()) {
+            trustedSet.add(norm)
+        }
     }
 
     fun clear() {
-        allowed.clear()
+        pinCounts.clear()
+        trustedSet.clear()
     }
 }

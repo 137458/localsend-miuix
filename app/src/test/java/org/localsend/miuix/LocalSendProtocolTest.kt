@@ -80,4 +80,40 @@ class LocalSendProtocolTest {
         assertEquals("1.5 MB", FileItem.formatFileSize((1.5 * 1024 * 1024).toLong()))
         assertEquals("2.0 GB", FileItem.formatFileSize((2L * 1024 * 1024 * 1024)))
     }
+
+    @Test
+    fun testTransferSessionMetrics() {
+        val file1 = FileItem(id = "1", name = "file1.txt", size = 1000, status = org.localsend.miuix.model.TransferStatus.Completed, bytesTransferred = 1000)
+        val file2 = FileItem(id = "2", name = "file2.mp4", size = 4000, status = org.localsend.miuix.model.TransferStatus.InProgress, bytesTransferred = 1000)
+        val device = Device(alias = "Test", fingerprint = "fp123", ip = "192.168.1.5")
+        val session = org.localsend.miuix.model.TransferSession(
+            sessionId = "sess-1",
+            device = device,
+            isIncoming = false,
+            files = listOf(file1, file2),
+            totalBytes = 5000,
+            transferredBytes = 2000,
+            speed = 1000,
+            status = org.localsend.miuix.model.TransferStatus.InProgress
+        )
+
+        assertEquals(40, session.progressPercent)
+        assertEquals(1, session.currentFileIndex)
+        assertEquals("file2.mp4", session.currentFile?.name)
+        assertEquals("剩余约 3秒", session.remainingTimeFormatted)
+    }
+
+    @Test
+    fun testFingerprintNormalization() {
+        val rawFp = "AA:BB:CC:DD:EE:FF:11:22"
+        val normalized = org.localsend.miuix.network.FingerprintTrust.normalize(rawFp)
+        assertEquals("aabbccddeeff1122", normalized)
+    }
+
+    @Test
+    fun testShareSessionDownloadLink() {
+        val share = org.localsend.miuix.model.ShareSession(files = emptyList())
+        assertEquals("http://192.168.1.10:53317", share.downloadLink("http", "192.168.1.10", 53317))
+        assertEquals("https://192.168.1.10:53317", share.downloadLink("https", "192.168.1.10", 53317))
+    }
 }

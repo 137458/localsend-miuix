@@ -45,8 +45,8 @@ data class ShareSession(
     val createdAt: Long = System.currentTimeMillis(),
     val files: List<FileItem>
 ) {
-    /** 接收方浏览器访问的入口地址（协议 §5.1）。恒用 http，端口取端口号。 */
-    fun downloadLink(ip: String, port: Int): String = "http://$ip:$port"
+    /** 接收方浏览器访问的入口地址（协议 §5.1）。根据服务协议动态决定 http/https，端口取端口号。 */
+    fun downloadLink(protocol: String = "http", ip: String, port: Int): String = "$protocol://$ip:$port"
 }
 
 enum class TransferStatus {
@@ -119,6 +119,9 @@ data class TransferSession(
     val progress: Float
         get() = if (totalBytes > 0) (transferredBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
 
+    val progressPercent: Int
+        get() = (progress * 100).toInt()
+
     val formattedSpeed: String
         get() = "${FileItem.formatFileSize(speed)}/s"
 
@@ -127,6 +130,31 @@ data class TransferSession(
 
     val formattedTransferredSize: String
         get() = FileItem.formatFileSize(transferredBytes)
+
+    val currentFileIndex: Int
+        get() {
+            val inProgressIndex = files.indexOfFirst { it.status == TransferStatus.InProgress }
+            if (inProgressIndex >= 0) return inProgressIndex
+            val lastCompleted = files.indexOfLast { it.status == TransferStatus.Completed }
+            return if (lastCompleted >= 0) lastCompleted else 0
+        }
+
+    val currentFile: FileItem?
+        get() = files.firstOrNull { it.status == TransferStatus.InProgress } ?: files.getOrNull(currentFileIndex)
+
+    val remainingTimeFormatted: String
+        get() {
+            if (status != TransferStatus.InProgress) return ""
+            if (speed <= 0 || totalBytes <= 0) return "计算中..."
+            val remainingBytes = (totalBytes - transferredBytes).coerceAtLeast(0L)
+            if (remainingBytes == 0L) return "即将完成"
+            val seconds = remainingBytes / speed
+            return when {
+                seconds < 60 -> "剩余约 ${seconds}秒"
+                seconds < 3600 -> "剩余约 ${seconds / 60}分${seconds % 60}秒"
+                else -> "剩余约 ${seconds / 3600}小时${(seconds % 3600) / 60}分"
+            }
+        }
 }
 
 data class TransferHistoryItem(

@@ -4,6 +4,7 @@ import android.content.Context
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension
+import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
@@ -58,7 +59,7 @@ object TlsStore {
 
         val dn = X500Name("CN=LocalSend")
         val now = Date()
-        val notAfter = Date(now.time + 365L * 24 * 60 * 60 * 1000)
+        val notAfter = Date(now.time + 10L * 365 * 24 * 60 * 60 * 1000)
         val builder = JcaX509v3CertificateBuilder(
             /* issuer = */ dn,
             /* serial = */ BigInteger.valueOf(System.currentTimeMillis()),
@@ -68,6 +69,11 @@ object TlsStore {
             keyPair.public
         )
         builder.addExtension(Extension.basicConstraints, true, BasicConstraints(true))
+        builder.addExtension(
+            Extension.keyUsage,
+            true,
+            KeyUsage(KeyUsage.digitalSignature or KeyUsage.keyEncipherment or KeyUsage.dataEncipherment)
+        )
         val signer = JcaContentSignerBuilder("SHA256withRSA").build(keyPair.private)
         val cert: X509Certificate = JcaX509CertificateConverter().getCertificate(builder.build(signer))
         cert.checkValidity()
@@ -83,6 +89,8 @@ object TlsStore {
         cachedFingerprint?.let { return it }
         val cert = loadKeyStore(context).getCertificate(KEY_ALIAS)
         val digest = MessageDigest.getInstance("SHA-256").digest(cert.encoded)
-        return digest.joinToString("") { "%02x".format(it) }.also { cachedFingerprint = it }
+        return FingerprintTrust.normalize(
+            digest.joinToString("") { "%02x".format(it) }
+        ).also { cachedFingerprint = it }
     }
 }

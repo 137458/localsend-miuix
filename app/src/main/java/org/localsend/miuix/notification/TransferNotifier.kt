@@ -79,16 +79,20 @@ object TransferNotifier {
     fun updateProgress(context: Context, session: TransferSession) {
         if (!isAllowed(context)) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val percent = if (session.totalBytes > 0) {
-            ((session.transferredBytes * 100) / session.totalBytes).toInt()
-        } else 0
+        val speedText = if (session.speed > 0) " · ${session.formattedSpeed}" else ""
+        val currentFileName = session.currentFile?.name
         val builder = notif(context)
             .setContentTitle("正在接收 ${session.device.alias} 的文件")
-            .setContentText("${percent}% · ${session.formattedTransferredSize} / ${session.formattedTotalSize}")
+            .setContentText("${session.progressPercent}% · ${session.formattedTransferredSize} / ${session.formattedTotalSize}$speedText")
+            .apply {
+                if (!currentFileName.isNullOrEmpty()) {
+                    setSubText(currentFileName)
+                }
+            }
             .setSmallIcon(R.drawable.ic_stat_receive)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOnlyAlertOnce(true)
-            .setProgress(100, percent, session.totalBytes <= 0)
+            .setProgress(100, session.progressPercent, session.totalBytes <= 0)
         nm.notify(NOTIF_ID_PROGRESS, builder.build())
     }
 

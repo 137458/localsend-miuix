@@ -36,6 +36,7 @@ import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.network.NetworkUtils
 import org.localsend.miuix.ui.component.AppIcons
+import org.localsend.miuix.ui.component.TransferSessionCard
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -130,14 +131,14 @@ fun ReceiveScreen(
                 }
             }
 
-            // Section 1.5: Incoming Transfer Progress（设备名称下方加进度条）
+            // Section 1.5: Incoming Transfer Progress（使用统一的高质感 TransferSessionCard）
             if (incomingSessions.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
                     SmallTitle(text = "正在接收 (${incomingSessions.count { it.status == TransferStatus.InProgress }})")
                 }
                 items(incomingSessions, key = { it.sessionId }) { session ->
-                    IncomingProgressCard(
+                    TransferSessionCard(
                         session = session,
                         onCancel = { manager.cancelTransfer(session.sessionId) }
                     )
@@ -182,7 +183,7 @@ fun ReceiveScreen(
                         // 用 firstOrNull 防御，避免未来引入多共享时抛 NoSuchElementException
                         val session = shares.firstOrNull() ?: return@Card
                         val device = manager.getLocalDevice()
-                        val link = session.downloadLink(device.ip, device.port)
+                        val link = session.downloadLink(device.protocol, device.ip, device.port)
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "收件人浏览器打开以下地址即可下载",
@@ -239,80 +240,6 @@ fun ReceiveScreen(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-/**
- * 精简的接收进度卡片：设备名称下方直接附进度条，对齐原版 LocalSend 的展示方式。
- */
-@Composable
-private fun IncomingProgressCard(
-    session: org.localsend.miuix.model.TransferSession,
-    onCancel: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = null,
-                        tint = MiuixTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = session.device.alias,
-                            style = MiuixTheme.textStyles.headline1
-                        )
-                        Text(
-                            text = "${session.files.size} 个文件 • ${FileItem.formatFileSize(session.totalBytes)}",
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        )
-                    }
-                }
-                if (session.status == TransferStatus.InProgress) {
-                    IconButton(onClick = onCancel) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "取消",
-                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            LinearProgressIndicator(
-                progress = session.progress,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "${FileItem.formatFileSize(session.transferredBytes)} / ${FileItem.formatFileSize(session.totalBytes)}",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
-                Text(
-                    text = "${FileItem.formatFileSize(session.speed)}/s",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.primary
-                )
             }
         }
     }

@@ -24,6 +24,7 @@ import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.network.DiscoveryService
+import org.localsend.miuix.network.FingerprintTrust
 import org.localsend.miuix.network.LocalSendClient
 import org.localsend.miuix.network.LocalSendServer
 import org.localsend.miuix.network.NetworkUtils
@@ -232,6 +233,9 @@ class LocalSendManager(private val context: Context) {
      * 避免同一设备因更换 IP / HTTPS↔HTTP 指纹变化而在列表中残留成多个同名条目。
      */
     private fun upsertDevice(device: Device) {
+        if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
+            FingerprintTrust.trust(device.fingerprint)
+        }
         scope.launch {
             _nearbyDevices.update { current ->
                 val now = System.currentTimeMillis()
@@ -309,6 +313,9 @@ class LocalSendManager(private val context: Context) {
                 ) { bytesWritten, speed ->
                     fileItem.bytesTransferred = bytesWritten
                     fileItem.speed = speed
+                    if (fileItem.size > 0) {
+                        fileItem.progress = (bytesWritten.toFloat() / fileItem.size).coerceIn(0f, 1f)
+                    }
                     session.transferredBytes = filesToSend.sumOf { it.bytesTransferred }
                     session.speed = speed
                     updateSessionState(session)
@@ -317,6 +324,7 @@ class LocalSendManager(private val context: Context) {
                 if (uploadResult.isSuccess) {
                     fileItem.status = TransferStatus.Completed
                     fileItem.progress = 1f
+                    fileItem.bytesTransferred = fileItem.size
                 } else {
                     fileItem.status = TransferStatus.Failed
                     fileItem.error = uploadResult.exceptionOrNull()?.message

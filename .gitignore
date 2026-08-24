@@ -1,4 +1,4 @@
-﻿*.iml
+*.iml
 .gradle
 /local.properties
 /.idea/
@@ -9,3 +9,4 @@
 .cxx
 local.properties
 **/build/
+.kotlin/
