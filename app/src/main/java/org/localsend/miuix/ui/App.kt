@@ -10,7 +10,6 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.documentfile.provider.DocumentFile
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -33,7 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.activity.compose.BackHandler
+import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.launch
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.FileItem
@@ -44,6 +43,7 @@ import org.localsend.miuix.ui.component.LiquidGlassBottomBar
 import org.localsend.miuix.ui.component.PortDialog
 import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
+import org.localsend.miuix.ui.navigation.AppRoute
 import org.localsend.miuix.ui.screen.HistoryScreen
 import org.localsend.miuix.ui.screen.ReceiveScreen
 import org.localsend.miuix.ui.screen.SendScreen
@@ -54,6 +54,10 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.nav.core.NavDisplay
+import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
+import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
+import top.yukonga.miuix.kmp.nav.transition.NavTransitions
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
@@ -103,7 +107,6 @@ fun App(manager: LocalSendManager) {
     var showSendTextDialog by remember { mutableStateOf(false) }
     var showAddContentSheet by remember { mutableStateOf(false) }
     var showPortDialog by remember { mutableStateOf(false) }
-    var showHistory by remember { mutableStateOf(false) }
 
     // 5. Activity Result Launchers
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -227,144 +230,155 @@ fun App(manager: LocalSendManager) {
         val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val bottomBarTotalPadding = 80.dp + navBarBottomPadding
 
-        Scaffold(
-            bottomBar = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp + navBarBottomPadding, start = 24.dp, end = 24.dp),
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    LiquidGlassBottomBar(
-                        items = navigationItems,
-                        selectedIndex = { pagerState.currentPage },
-                        onSelected = { index ->
-                            scope.launch { pagerState.animateScrollToPage(index) }
-                        },
-                        backdrop = backdrop,
-                        badge = { index ->
-                            if (index == 0 && pendingIncomingSession != null) {
-                                { Badge { Text("1") } }
-                            } else null
+        // 6. miuix-nav 根导航栈管理
+        val backStack = rememberNavBackStack<AppRoute>(AppRoute.Main)
+
+        NavDisplay(
+            backStack = backStack,
+            onBack = { backStack.removeLastOrNull() },
+            transition = NavTransitions.MiuixDefault
+        ) {
+            entry<AppRoute.Main> {
+                Scaffold(
+                    bottomBar = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp + navBarBottomPadding, start = 24.dp, end = 24.dp),
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            LiquidGlassBottomBar(
+                                items = navigationItems,
+                                selectedIndex = { pagerState.currentPage },
+                                onSelected = { index ->
+                                    scope.launch { pagerState.animateScrollToPage(index) }
+                                },
+                                backdrop = backdrop,
+                                badge = { index ->
+                                    if (index == 0 && pendingIncomingSession != null) {
+                                        { Badge { Text("1") } }
+                                    } else null
+                                }
+                            )
                         }
-                    )
-                }
-            }
-        ) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .layerBackdrop(backdrop)
-            ) {
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxSize()
-                ) { page ->
-                    val pagePadding = PaddingValues(
-                        top = innerPadding.calculateTopPadding(),
-                        bottom = bottomBarTotalPadding
-                    )
-                    when (page) {
-                        0 -> ReceiveScreen(
-                            manager = manager,
-                            contentPadding = pagePadding,
-                            onOpenRenameDialog = { showRenameDialog = true },
-                            onOpenHistory = { showHistory = true }
-                        )
-                        1 -> SendScreen(
-                            manager = manager,
-                            contentPadding = pagePadding,
-                            onOpenAddSheet = { showAddContentSheet = true },
-                            onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
-                            onPickMedia = {
-                                mediaPickerLauncher.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                    }
+                ) { innerPadding ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .layerBackdrop(backdrop)
+                    ) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize()
+                        ) { page ->
+                            val pagePadding = PaddingValues(
+                                top = innerPadding.calculateTopPadding(),
+                                bottom = bottomBarTotalPadding
+                            )
+                            when (page) {
+                                0 -> ReceiveScreen(
+                                    manager = manager,
+                                    contentPadding = pagePadding,
+                                    onOpenRenameDialog = { showRenameDialog = true },
+                                    onOpenHistory = { backStack.add(AppRoute.History) }
                                 )
-                            },
-                            onSendText = { showSendTextDialog = true },
-                            onPasteClipboard = pickClipboard
-                        )
-                        2 -> SettingsScreen(
-                            manager = manager,
-                            contentPadding = pagePadding,
-                            onOpenRenameDialog = { showRenameDialog = true },
-                            onOpenPortDialog = { showPortDialog = true },
-                            onPickDirectory = { directoryPickerLauncher.launch(null) }
-                        )
+                                1 -> SendScreen(
+                                    manager = manager,
+                                    contentPadding = pagePadding,
+                                    onOpenAddSheet = { showAddContentSheet = true },
+                                    onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
+                                    onPickMedia = {
+                                        mediaPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                                        )
+                                    },
+                                    onSendText = { showSendTextDialog = true },
+                                    onPasteClipboard = pickClipboard
+                                )
+                                2 -> SettingsScreen(
+                                    manager = manager,
+                                    contentPadding = pagePadding,
+                                    onOpenRenameDialog = { showRenameDialog = true },
+                                    onOpenPortDialog = { showPortDialog = true },
+                                    onPickDirectory = { directoryPickerLauncher.launch(null) }
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            // Global Overlay Dialogs & BottomSheets
-            IncomingTransferDialog(
-                session = pendingIncomingSession,
-                onAccept = {
-                    pendingIncomingSession?.let { manager.acceptIncomingTransfer(it.sessionId) }
-                },
-                onDecline = {
-                    pendingIncomingSession?.let { manager.declineIncomingTransfer(it.sessionId) }
-                }
-            )
-
-            RenameDeviceDialog(
-                show = showRenameDialog,
-                initialName = settings.alias,
-                onDismissRequest = { showRenameDialog = false },
-                onConfirm = { newAlias ->
-                    manager.updateSettings { it.copy(alias = newAlias) }
-                    Toast.makeText(context, "设备名称已更新为: $newAlias", Toast.LENGTH_SHORT).show()
-                }
-            )
-
-            PortDialog(
-                show = showPortDialog,
-                initialPort = settings.port,
-                onDismissRequest = { showPortDialog = false },
-                onConfirm = { newPort ->
-                    manager.applyPortChange(newPort)
-                    Toast.makeText(context, "服务端口已更新为: $newPort", Toast.LENGTH_SHORT).show()
-                }
-            )
-
-            SendTextDialog(
-                show = showSendTextDialog,
-                onDismissRequest = { showSendTextDialog = false },
-                onConfirm = { text ->
-                    val bytes = text.toByteArray(Charsets.UTF_8)
-                    val item = FileItem(
-                        name = "text_${System.currentTimeMillis()}.txt",
-                        size = bytes.size.toLong(),
-                        textContent = text,
-                        mimeType = "text/plain"
-                    )
-                    manager.addFiles(listOf(item))
-                    Toast.makeText(context, "已添加纯文本内容", Toast.LENGTH_SHORT).show()
-                }
-            )
-
-            AddContentBottomSheet(
-                show = showAddContentSheet,
-                onDismissRequest = { showAddContentSheet = false },
-                onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
-                onPickMedia = {
-                    mediaPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                    )
-                },
-                onSendText = { showSendTextDialog = true },
-                onPasteClipboard = pickClipboard
-            )
-
-            // 独立传输历史页（接收页右上角图标进入，覆盖底层页面）
-            if (showHistory) {
-                // 历史页存在时，系统返回先关闭历史页而非退出应用
-                BackHandler { showHistory = false }
+            // 独立传输历史页（通过 miuix-nav 连续深度推进展示，支持左滑边缘返回手势）
+            entry<AppRoute.History>(
+                swipeDismiss = NavSwipeDirection.LeftToRight
+            ) {
                 HistoryScreen(
                     manager = manager,
                     contentPadding = PaddingValues(bottom = bottomBarTotalPadding),
-                    onBack = { showHistory = false }
+                    onBack = { backStack.removeLastOrNull() }
                 )
             }
         }
+
+        // Global Overlay Dialogs & BottomSheets
+        IncomingTransferDialog(
+            session = pendingIncomingSession,
+            onAccept = {
+                pendingIncomingSession?.let { manager.acceptIncomingTransfer(it.sessionId) }
+            },
+            onDecline = {
+                pendingIncomingSession?.let { manager.declineIncomingTransfer(it.sessionId) }
+            }
+        )
+
+        RenameDeviceDialog(
+            show = showRenameDialog,
+            initialName = settings.alias,
+            onDismissRequest = { showRenameDialog = false },
+            onConfirm = { newAlias ->
+                manager.updateSettings { it.copy(alias = newAlias) }
+                Toast.makeText(context, "设备名称已更新为: $newAlias", Toast.LENGTH_SHORT).show()
+            }
+        )
+
+        PortDialog(
+            show = showPortDialog,
+            initialPort = settings.port,
+            onDismissRequest = { showPortDialog = false },
+            onConfirm = { newPort ->
+                manager.applyPortChange(newPort)
+                Toast.makeText(context, "服务端口已更新为: $newPort", Toast.LENGTH_SHORT).show()
+            }
+        )
+
+        SendTextDialog(
+            show = showSendTextDialog,
+            onDismissRequest = { showSendTextDialog = false },
+            onConfirm = { text ->
+                val bytes = text.toByteArray(Charsets.UTF_8)
+                val item = FileItem(
+                    name = "text_${System.currentTimeMillis()}.txt",
+                    size = bytes.size.toLong(),
+                    textContent = text,
+                    mimeType = "text/plain"
+                )
+                manager.addFiles(listOf(item))
+                Toast.makeText(context, "已添加纯文本内容", Toast.LENGTH_SHORT).show()
+            }
+        )
+
+        AddContentBottomSheet(
+            show = showAddContentSheet,
+            onDismissRequest = { showAddContentSheet = false },
+            onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
+            onPickMedia = {
+                mediaPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                )
+            },
+            onSendText = { showSendTextDialog = true },
+            onPasteClipboard = pickClipboard
+        )
     }
 }

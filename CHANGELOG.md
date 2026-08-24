@@ -7,6 +7,8 @@
 ## [未发布]
 
 ### 新增特性与交互优化
+- 接入官方 `miuix-nav` 导航架构：定义可序列化路由体系 `AppRoute`，使用 `NavDisplay` 与 `rememberNavBackStack` 管理全局页面路由与生命周期；传输历史页全面支持 HyperOS 原生连续深度转场动画（Continuous-Depth Transitions）与边缘左滑返回手势（Swipe Dismiss）。
+- 升级 Miuix 组件库依赖至 `0.9.4-rc01`，工程统一适配 JVM 21 编译构建规范。
 - 重构传输进度交互体验：全面优化 `TransferSessionCard`，新增当前正在传输文件的名称与序号指示、明确的传输百分比、动态预估剩余时间 (ETA) 及可折叠展开的文件明细清单（支持单个文件的独立状态、大小与进度展示）；接收页与发送页统一复用高质感传输进度卡片。
 - 完整复刻 LocalSend v2.2 局域网传输协议与网络引擎（UDP 多播广播发现、局域网子网并发扫描、自签名 TLS/HTTPS 互通与 Ktor 异步 HTTP 服务端与客户端）。
 - 实现 Web Share（Download API，协议 §5）：可将选中文件共享为局域网链接，接收方浏览器打开即可预览并逐个下载，无需安装应用；链接协议自动适配当前服务端配置（HTTP / HTTPS）。

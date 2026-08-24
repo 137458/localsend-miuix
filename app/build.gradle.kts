@@ -32,8 +32,14 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        }
     }
 
     buildFeatures {
@@ -77,12 +83,14 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Miuix (HyperOS Compose UI Library & Blur Engine)
-    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.3")
-    implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.3")
-    implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.9.3")
-    implementation("top.yukonga.miuix.kmp:miuix-squircle-android:0.9.3")
-    implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
+    // Miuix (HyperOS Compose UI Library, Nav & Blur Engine)
+    val miuixVersion = "0.9.4-rc01"
+    implementation("top.yukonga.miuix.kmp:miuix-ui-android:$miuixVersion")
+    implementation("top.yukonga.miuix.kmp:miuix-preference-android:$miuixVersion")
+    implementation("top.yukonga.miuix.kmp:miuix-icons-android:$miuixVersion")
+    implementation("top.yukonga.miuix.kmp:miuix-squircle-android:$miuixVersion")
+    implementation("top.yukonga.miuix.kmp:miuix-blur-android:$miuixVersion")
+    implementation("top.yukonga.miuix.kmp:miuix-nav-android:$miuixVersion")
 
     // Kotlinx Coroutines & Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
