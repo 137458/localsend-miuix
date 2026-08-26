@@ -357,6 +357,17 @@ fun App(manager: LocalSendManager) {
             onAccept = {
                 pendingIncomingSession?.let { manager.acceptIncomingTransfer(it.sessionId) }
             },
+            onAcceptAndCopy = {
+                pendingIncomingSession?.let { session ->
+                    val text = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent
+                    if (!text.isNullOrEmpty()) {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", text))
+                        Toast.makeText(context, "已复制文本到剪贴板", Toast.LENGTH_SHORT).show()
+                    }
+                    manager.acceptIncomingTransfer(session.sessionId)
+                }
+            },
             onDecline = {
                 pendingIncomingSession?.let { manager.declineIncomingTransfer(it.sessionId) }
             }

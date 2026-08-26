@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -438,6 +440,7 @@ fun CertFingerprintDialog(
 fun IncomingTransferDialog(
     session: TransferSession?,
     onAccept: () -> Unit,
+    onAcceptAndCopy: () -> Unit,
     onDecline: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -459,7 +462,7 @@ fun IncomingTransferDialog(
                 )
 
                 if (session.isTextMessage) {
-                    val previewText = session.singleTextMessageContent ?: "纯文本消息"
+                    val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: "纯文本消息"
                     Text(
                         text = "文本内容 (${previewText.length} 字符)",
                         style = MiuixTheme.textStyles.footnote1,
@@ -473,22 +476,44 @@ fun IncomingTransferDialog(
                             Text(
                                 text = previewText,
                                 style = MiuixTheme.textStyles.body1,
-                                maxLines = 6
+                                maxLines = 8
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                    Button(
-                        onClick = {
-                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", previewText))
-                        },
-                        colors = ButtonDefaults.buttonColors(),
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("📋 复制到剪贴板")
+                        Button(
+                            onClick = onDecline,
+                            colors = ButtonDefaults.buttonColors(),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("拒绝")
+                        }
+                        Button(
+                            onClick = onAccept,
+                            colors = ButtonDefaults.buttonColors(),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("关闭")
+                        }
+                        Button(
+                            onClick = onAcceptAndCopy,
+                            colors = ButtonDefaults.buttonColorsPrimary(),
+                            modifier = Modifier.weight(1.4f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("复制并关闭")
+                        }
                     }
                 } else {
                     Text(
@@ -536,27 +561,27 @@ fun IncomingTransferDialog(
                             }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Button(
-                        onClick = onDecline,
-                        colors = ButtonDefaults.buttonColors(),
-                        modifier = Modifier.weight(1f)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("拒绝")
-                    }
-                    Button(
-                        onClick = onAccept,
-                        colors = ButtonDefaults.buttonColorsPrimary(),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("接收")
+                        Button(
+                            onClick = onDecline,
+                            colors = ButtonDefaults.buttonColors(),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("拒绝")
+                        }
+                        Button(
+                            onClick = onAccept,
+                            colors = ButtonDefaults.buttonColorsPrimary(),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("接收")
+                        }
                     }
                 }
             }
