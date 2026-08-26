@@ -15,7 +15,7 @@
 - 系统级通知与预测性返回适配：通知系统支持独立会话 ID 隔离、文本消息内容预览及点击拉起应用，开启系统预测性返回手势。
 - 接入官方 `miuix-nav` 导航架构：定义可序列化路由体系 `AppRoute`，使用 `NavDisplay` 与 `rememberNavBackStack` 管理全局页面路由与生命周期；传输历史页全面支持 HyperOS 原生连续深度转场动画（Continuous-Depth Transitions）与边缘左滑返回手势（Swipe Dismiss）。
 - 升级 Miuix 组件库依赖至 `0.9.4-rc01`，工程统一适配 JVM 21 编译构建规范。
-- 深度参考官方 `compose-miuix-ui` 示例与 `InstallerX-Revived` 标准实现重构液态玻璃悬浮底栏（Liquid Glass Bottom Bar）：移除此前生硬的 210~240dp 硬编码宽度限制，升级为标准 64dp 高度与两侧 24dp 边距的响应式自适应布局；对齐 11sp/13sp 规范排版、24dp 透镜折射率、10dp 阴影半径与 56dp 滑块高度，大幅提升单手盲操触达与视觉舒展度。
+- 深度参考 `InstallerX-Revived` 标准实现重构液态玻璃悬浮底栏（Liquid Glass Bottom Bar）：采用 `IntrinsicSize.Min` 结合 `defaultMinSize(minWidth = 76.dp)` 动态固有宽度计算，形成 236dp 黄金比例悬浮胶囊；对齐 56dp 底栏高度、48dp 内部滑块、11sp/13sp 规范排版、24dp 透镜折射率与 10dp 阴影半径，兼具紧凑精致的胶囊视觉与舒适的单手触达体验。
 - 引入 iOS / HyperOS 液态玻璃（Liquid Glass）悬浮导航栏：集成 GPU 实时 RuntimeShader 折射透镜、色散色差、内阴影及物理阻尼滑动动画。
 
 ### 性能优化

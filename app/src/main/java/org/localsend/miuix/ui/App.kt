@@ -243,7 +243,7 @@ fun App(manager: LocalSendManager) {
         }
 
         val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val bottomBarTotalPadding = 88.dp + navBarBottomPadding
+        val bottomBarTotalPadding = 80.dp + navBarBottomPadding
 
         // 6. miuix-nav 根导航栈管理
         val backStack = rememberNavBackStack<AppRoute>(AppRoute.Main)
@@ -264,7 +264,7 @@ fun App(manager: LocalSendManager) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 12.dp + navBarBottomPadding, start = 24.dp, end = 24.dp),
+                                .padding(bottom = 12.dp + navBarBottomPadding),
                             contentAlignment = Alignment.BottomCenter
                         ) {
                             LiquidGlassBottomBar(
