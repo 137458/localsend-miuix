@@ -412,12 +412,11 @@ fun LiquidGlassBottomBar(
                             },
                             onDrawSurface = {
                                 val progress = dampedDragAnimation.pressProgress
-                                // 保证胶囊指示器始终有稳固优雅的高光底板，移动与静止时永不消失
-                                drawRect(primaryColor.copy(alpha = 0.12f + 0.08f * progress))
                                 drawRect(
-                                    color = if (!isInDark) Color.Black.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.08f),
+                                    color = if (!isInDark) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.10f),
                                     alpha = 1f - progress,
                                 )
+                                drawRect(Color.Black.copy(alpha = 0.03f * progress))
                             },
                         )
                         .innerShadow(shape = pillShape) {
