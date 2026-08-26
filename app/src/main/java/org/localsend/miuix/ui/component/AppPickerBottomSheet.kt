@@ -47,15 +47,13 @@ fun AppPickerBottomSheet(
     var searchQuery by remember { mutableStateOf("") }
     var showSystemApps by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
-    val allApps = remember { mutableStateListOf<AppInfoItem>() }
+    var allApps by remember { mutableStateOf<List<AppInfoItem>>(emptyList()) }
     val selectedPackages = remember { mutableStateListOf<String>() }
 
     LaunchedEffect(show) {
         if (show) {
             isLoading = true
-            val apps = manager.getInstalledApps()
-            allApps.clear()
-            allApps.addAll(apps)
+            allApps = manager.getInstalledApps()
             selectedPackages.clear()
             isLoading = false
         }

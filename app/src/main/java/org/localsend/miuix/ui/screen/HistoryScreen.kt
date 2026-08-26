@@ -49,6 +49,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -61,44 +62,43 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun HistoryScreen(
     manager: LocalSendManager,
-    contentPadding: PaddingValues,
     onBack: () -> Unit
 ) {
     val history by manager.transferHistory.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
     var selectedItem by remember { mutableStateOf<TransferHistoryItem?>(null) }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        TopAppBar(
-            title = "传输历史",
-            scrollBehavior = scrollBehavior,
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                }
-            },
-            actions = {
-                if (history.isNotEmpty()) {
-                    IconButton(onClick = { manager.clearHistory() }) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "清空历史",
-                            tint = MiuixTheme.colorScheme.error
-                        )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = "传输历史",
+                scrollBehavior = scrollBehavior,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                },
+                actions = {
+                    if (history.isNotEmpty()) {
+                        IconButton(onClick = { manager.clearHistory() }) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "清空历史",
+                                tint = MiuixTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
-            }
-        )
-
+            )
+        }
+    ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
-                top = 8.dp,
-                bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                top = innerPadding.calculateTopPadding() + 8.dp,
+                bottom = innerPadding.calculateBottomPadding() + 16.dp,
                 start = 12.dp,
                 end = 12.dp
             ),

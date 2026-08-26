@@ -521,23 +521,31 @@ class LocalSendManager(private val context: Context) {
     /** 提取本机已安装的应用 (APK) 列表。 */
     suspend fun getInstalledApps(): List<AppInfoItem> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
-        val packages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(0))
+        val apps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
         } else {
-            pm.getInstalledPackages(0)
+            pm.getInstalledApplications(0)
         }
-        packages.mapNotNull { pkg ->
+        apps.mapNotNull { appInfo ->
             try {
-                val appInfo = pkg.applicationInfo ?: return@mapNotNull null
                 val label = pm.getApplicationLabel(appInfo).toString()
                 val sourceDir = appInfo.sourceDir ?: return@mapNotNull null
                 val file = File(sourceDir)
                 if (!file.exists()) return@mapNotNull null
                 val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                val pkgInfo = try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        pm.getPackageInfo(appInfo.packageName, PackageManager.PackageInfoFlags.of(0))
+                    } else {
+                        pm.getPackageInfo(appInfo.packageName, 0)
+                    }
+                } catch (e: Exception) {
+                    null
+                }
                 AppInfoItem(
                     label = label,
-                    packageName = pkg.packageName,
-                    versionName = pkg.versionName ?: "1.0",
+                    packageName = appInfo.packageName,
+                    versionName = pkgInfo?.versionName ?: "1.0",
                     sourceDir = sourceDir,
                     apkSize = file.length(),
                     isSystemApp = isSystem
