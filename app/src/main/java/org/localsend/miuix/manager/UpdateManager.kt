@@ -89,7 +89,7 @@ class UpdateManager(private val context: Context) {
             }
 
             if (!response.status.isSuccess()) {
-                return@withContext Result.failure(Exception("GitHub API ÇëÇóÊ§°Ü: HTTP ${response.status.value}"))
+                return@withContext Result.failure(Exception("GitHub API è¯·æ±‚å¤±è´¥: HTTP ${response.status.value}"))
             }
 
             val bodyText = response.bodyAsText()
@@ -123,7 +123,7 @@ class UpdateManager(private val context: Context) {
     }
 
     /**
-     * °æ±¾ºÅ±È½Ï£ºv1 > v2 ·µ»Ø 1£¬v1 < v2 ·µ»Ø -1£¬ÏàµÈ·µ»Ø 0
+     * ç‰ˆæœ¬å·æ¯”è¾ƒï¼šv1 > v2 è¿”å›ž 1ï¼Œv1 < v2 è¿”å›ž -1ï¼Œç›¸ç­‰è¿”å›ž 0
      */
     fun compareVersions(v1: String, v2: String): Int {
         val parts1 = v1.split(".", "-", "_").mapNotNull { it.toIntOrNull() }
@@ -208,4 +208,4 @@ class UpdateManager(private val context: Context) {
             context.startActivity(intent)
         } catch (_: Exception) {}
     }
-}
+}
