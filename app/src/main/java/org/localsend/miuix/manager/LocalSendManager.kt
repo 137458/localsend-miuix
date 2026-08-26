@@ -23,11 +23,16 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -213,6 +218,7 @@ class LocalSendManager(private val context: Context) {
         scope.launch(Dispatchers.IO) {
             server.start()
             discoveryService.start()
+            preloadInstalledApps()
         }
     }
 
@@ -572,42 +578,86 @@ class LocalSendManager(private val context: Context) {
         persistSettings(updated)
     }
 
-    /** 提取本机已安装的应用 (APK) 列表。 */
-    suspend fun getInstalledApps(): List<AppInfoItem> = withContext(Dispatchers.IO) {
-        val pm = context.packageManager
-        val apps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
-        } else {
-            pm.getInstalledApplications(0)
-        }
-        apps.mapNotNull { appInfo ->
+    private var cachedInstalledApps: List<AppInfoItem>? = null
+    private val installedAppsMutex = Mutex()
+
+    /** 异步在后台预热本机应用列表缓存，避免首次打开弹窗时等待。 */
+    fun preloadInstalledApps() {
+        scope.launch(Dispatchers.IO) {
             try {
-                val label = pm.getApplicationLabel(appInfo).toString()
-                val sourceDir = appInfo.sourceDir ?: return@mapNotNull null
-                val file = File(sourceDir)
-                if (!file.exists()) return@mapNotNull null
-                val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                val pkgInfo = try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        pm.getPackageInfo(appInfo.packageName, PackageManager.PackageInfoFlags.of(0))
-                    } else {
-                        pm.getPackageInfo(appInfo.packageName, 0)
-                    }
-                } catch (e: Exception) {
-                    null
-                }
-                AppInfoItem(
-                    label = label,
-                    packageName = appInfo.packageName,
-                    versionName = pkgInfo?.versionName ?: "1.0",
-                    sourceDir = sourceDir,
-                    apkSize = file.length(),
-                    isSystemApp = isSystem
-                )
-            } catch (e: Exception) {
-                null
+                getInstalledApps(forceRefresh = false)
+            } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * 提取本机已安装的应用 (APK) 列表。
+     * - 支持二级内存缓存（forceRefresh = false 时 0ms 秒开）
+     * - 单次 IPC 批量获取 PackageInfo，消除数百次跨进程 Binder 往返
+     * - 结合 CPU 核心数进行协程分块并发解析 (loadLabel 与 apkSize)
+     */
+    suspend fun getInstalledApps(forceRefresh: Boolean = false): List<AppInfoItem> = withContext(Dispatchers.IO) {
+        if (!forceRefresh) {
+            cachedInstalledApps?.let { return@withContext it }
+        }
+        installedAppsMutex.withLock {
+            if (!forceRefresh) {
+                cachedInstalledApps?.let { return@withLock it }
             }
-        }.sortedWith(compareBy({ it.isSystemApp }, { it.label.lowercase() }))
+            val loaded = loadInstalledAppsInternal()
+            cachedInstalledApps = loaded
+            loaded
+        }
+    }
+
+    private suspend fun loadInstalledAppsInternal(): List<AppInfoItem> = coroutineScope {
+        val pm = context.packageManager
+        val packages = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(0))
+            } else {
+                pm.getInstalledPackages(0)
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+
+        if (packages.isEmpty()) return@coroutineScope emptyList()
+
+        val availableCores = Runtime.getRuntime().availableProcessors().coerceAtLeast(2)
+        val chunkSize = (packages.size / availableCores).coerceAtLeast(16)
+
+        packages.chunked(chunkSize).map { chunk ->
+            async(Dispatchers.IO) {
+                chunk.mapNotNull { pkgInfo ->
+                    try {
+                        val appInfo = pkgInfo.applicationInfo ?: return@mapNotNull null
+                        val sourceDir = appInfo.sourceDir ?: return@mapNotNull null
+                        val file = File(sourceDir)
+                        val size = file.length()
+                        if (size <= 0L) return@mapNotNull null
+
+                        val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                        val label = try {
+                            appInfo.loadLabel(pm).toString()
+                        } catch (_: Exception) {
+                            pkgInfo.packageName
+                        }.ifBlank { pkgInfo.packageName }
+
+                        AppInfoItem(
+                            label = label,
+                            packageName = pkgInfo.packageName,
+                            versionName = pkgInfo.versionName ?: "1.0",
+                            sourceDir = sourceDir,
+                            apkSize = size,
+                            isSystemApp = isSystem
+                        )
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+            }
+        }.awaitAll().flatten().sortedWith(compareBy({ it.isSystemApp }, { it.label.lowercase() }))
     }
 
     /** 将选中的已安装应用作为 APK 文件添加到待发送列表。 */

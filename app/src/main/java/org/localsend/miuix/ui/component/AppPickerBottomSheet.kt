@@ -24,10 +24,9 @@ import androidx.compose.material.icons.filled.Android
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.localsend.miuix.manager.AppInfoItem
 import org.localsend.miuix.manager.LocalSendManager
@@ -56,7 +56,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 private object AppIconCache {
-    private val cache = object : LruCache<String, ImageBitmap>(256) {}
+    private val cache = object : LruCache<String, ImageBitmap>(512) {}
     fun get(packageName: String): ImageBitmap? = cache.get(packageName)
     fun put(packageName: String, bitmap: ImageBitmap) {
         cache.put(packageName, bitmap)
@@ -69,19 +69,26 @@ private fun AppIconImage(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val iconBitmap by produceState<ImageBitmap?>(initialValue = AppIconCache.get(packageName), key1 = packageName) {
-        if (value == null) {
-            val bitmap = withContext(Dispatchers.IO) {
-                try {
-                    val pm = context.packageManager
-                    val drawable = pm.getApplicationIcon(packageName)
-                    val bmp = drawable.toBitmap(width = 96, height = 96, config = Bitmap.Config.ARGB_8888)
-                    bmp.asImageBitmap().also { AppIconCache.put(packageName, it) }
-                } catch (e: Exception) {
-                    null
+    var iconBitmap by remember(packageName) { mutableStateOf(AppIconCache.get(packageName)) }
+
+    LaunchedEffect(packageName) {
+        if (iconBitmap == null) {
+            val cached = AppIconCache.get(packageName)
+            if (cached != null) {
+                iconBitmap = cached
+            } else {
+                val bitmap = withContext(Dispatchers.IO) {
+                    try {
+                        val pm = context.packageManager
+                        val drawable = pm.getApplicationIcon(packageName)
+                        val bmp = drawable.toBitmap(width = 96, height = 96, config = Bitmap.Config.ARGB_8888)
+                        bmp.asImageBitmap().also { AppIconCache.put(packageName, it) }
+                    } catch (e: Exception) {
+                        null
+                    }
                 }
+                iconBitmap = bitmap
             }
-            value = bitmap
         }
     }
 
@@ -114,17 +121,21 @@ fun AppPickerBottomSheet(
     onDismissRequest: () -> Unit,
     manager: LocalSendManager
 ) {
+    val coroutineScope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
     var showSystemApps by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(true) }
+    var isLoading by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var allApps by remember { mutableStateOf<List<AppInfoItem>>(emptyList()) }
-    val selectedPackages = remember { mutableStateListOf<String>() }
+    var selectedPackages by remember { mutableStateOf(emptySet<String>()) }
 
     LaunchedEffect(show) {
         if (show) {
-            isLoading = true
-            allApps = manager.getInstalledApps()
-            selectedPackages.clear()
+            if (allApps.isEmpty()) {
+                isLoading = true
+            }
+            allApps = manager.getInstalledApps(forceRefresh = false)
+            selectedPackages = emptySet()
             isLoading = false
         }
     }
@@ -137,6 +148,8 @@ fun AppPickerBottomSheet(
                     app.packageName.contains(searchQuery, ignoreCase = true))
         }
     }
+
+    val isAllFilteredSelected = filteredApps.isNotEmpty() && filteredApps.all { selectedPackages.contains(it.packageName) }
 
     WindowBottomSheet(
         show = show,
@@ -180,16 +193,56 @@ fun AppPickerBottomSheet(
                     )
                 }
 
-                Text(
-                    text = "已选 ${selectedPackages.size} 项 / 共 ${filteredApps.size} 个",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "已选 ${selectedPackages.size} 项 / 共 ${filteredApps.size} 个",
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isRefreshing) "刷新中..." else "刷新",
+                        style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
+                        color = if (isRefreshing) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable(enabled = !isRefreshing) {
+                                coroutineScope.launch {
+                                    isRefreshing = true
+                                    allApps = manager.getInstalledApps(forceRefresh = true)
+                                    isRefreshing = false
+                                }
+                            }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            if (filteredApps.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Text(
+                        text = if (isAllFilteredSelected) "取消全选" else "全选当前",
+                        style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
+                        color = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable {
+                                selectedPackages = if (isAllFilteredSelected) {
+                                    selectedPackages - filteredApps.map { it.packageName }.toSet()
+                                } else {
+                                    selectedPackages + filteredApps.map { it.packageName }
+                                }
+                            }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+            }
 
-            if (isLoading) {
+            Spacer(modifier = Modifier.height(6.dp))
+
+            if (isLoading || isRefreshing) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -218,16 +271,20 @@ fun AppPickerBottomSheet(
                         .heightIn(max = 380.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(filteredApps, key = { it.packageName }) { app ->
+                    items(
+                        items = filteredApps,
+                        key = { it.packageName },
+                        contentType = { "app_info_card" }
+                    ) { app ->
                         val isSelected = selectedPackages.contains(app.packageName)
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    if (isSelected) {
-                                        selectedPackages.remove(app.packageName)
+                                    selectedPackages = if (isSelected) {
+                                        selectedPackages - app.packageName
                                     } else {
-                                        selectedPackages.add(app.packageName)
+                                        selectedPackages + app.packageName
                                     }
                                 }
                         ) {
@@ -240,8 +297,11 @@ fun AppPickerBottomSheet(
                                 Checkbox(
                                     state = androidx.compose.ui.state.ToggleableState(isSelected),
                                     onClick = {
-                                        if (isSelected) selectedPackages.remove(app.packageName)
-                                        else selectedPackages.add(app.packageName)
+                                        selectedPackages = if (isSelected) {
+                                            selectedPackages - app.packageName
+                                        } else {
+                                            selectedPackages + app.packageName
+                                        }
                                     }
                                 )
 
