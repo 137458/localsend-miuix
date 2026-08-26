@@ -49,6 +49,7 @@ data class ShareSession(
     fun downloadLink(protocol: String = "http", ip: String, port: Int): String = "$protocol://$ip:$port"
 }
 
+@Serializable
 enum class TransferStatus {
     WaitingApproval,
     InProgress,
@@ -167,14 +168,33 @@ data class TransferSession(
         }
 }
 
+@Serializable
 data class HistoryFileEntry(
     val name: String,
     val size: Long,
-    val uri: Uri? = null,
+    val uriString: String? = null,
     val path: String? = null,
     val mimeType: String = "application/octet-stream"
-)
+) {
+    val uri: Uri?
+        get() = uriString?.let { Uri.parse(it) }
 
+    constructor(
+        name: String,
+        size: Long,
+        uri: Uri?,
+        path: String?,
+        mimeType: String = "application/octet-stream"
+    ) : this(
+        name = name,
+        size = size,
+        uriString = uri?.toString(),
+        path = path,
+        mimeType = mimeType
+    )
+}
+
+@Serializable
 data class TransferHistoryItem(
     val id: String = UUID.randomUUID().toString(),
     val deviceAlias: String,

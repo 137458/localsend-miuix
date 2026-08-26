@@ -242,20 +242,20 @@ fun LiquidGlassBottomBar(
                     )
                     .fillMaxHeight()
                     .weight(1f)
-                    .defaultMinSize(minWidth = 76.dp)
+                    .defaultMinSize(minWidth = 78.dp)
                     .graphicsLayer {
                         val s = tabScale()
                         scaleX = s
                         scaleY = s
                     },
-                verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
+                verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 val currentBadge = badge(index)
                 if (currentBadge != null) {
                     Box {
                         Icon(
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(24.dp),
                             imageVector = item.icon,
                             contentDescription = null,
                             tint = activeColor
@@ -266,7 +266,7 @@ fun LiquidGlassBottomBar(
                     }
                 } else {
                     Icon(
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(24.dp),
                         imageVector = item.icon,
                         contentDescription = null,
                         tint = activeColor
@@ -289,7 +289,7 @@ fun LiquidGlassBottomBar(
     Box(
         modifier = modifier
             .width(IntrinsicSize.Min)
-            .height(56.dp),
+            .height(62.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         // 1. Base Layer
@@ -354,7 +354,7 @@ fun LiquidGlassBottomBar(
                         }
                     )
                     .then(if (isLiquidGlassMode && interactiveHighlight != null) interactiveHighlight.modifier else Modifier)
-                    .height(56.dp)
+                    .height(62.dp)
                     .padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 content = tabsContent,
@@ -376,7 +376,7 @@ fun LiquidGlassBottomBar(
                         .layerBackdrop(tabsBackdrop)
                         .fillMaxHeight()
                         .graphicsLayer { translationX = panelOffset }
-                        .height(56.dp)
+                        .height(62.dp)
                         .padding(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     content = tabsContent,
@@ -433,7 +433,7 @@ fun LiquidGlassBottomBar(
                                 alpha = dampedDragAnimation.pressProgress,
                             )
                         }
-                        .height(48.dp)
+                        .height(54.dp)
                         .width(tabWidthDp)
                 )
             } else {
@@ -447,7 +447,7 @@ fun LiquidGlassBottomBar(
                         .then(dampedDragAnimation.modifier)
                         .clip(pillShape)
                         .background(primaryColor.copy(alpha = 0.15f), pillShape)
-                        .height(48.dp)
+                        .height(54.dp)
                         .width(tabWidthDp),
                     contentAlignment = Alignment.CenterStart
                 ) {
@@ -457,7 +457,7 @@ fun LiquidGlassBottomBar(
                                 .clearAndSetSemantics {}
                                 .wrapContentWidth(align = Alignment.Start, unbounded = true)
                                 .requiredWidth(with(density) { (totalWidthPx - 8.dp.toPx()).toDp() })
-                                .height(48.dp)
+                                .height(54.dp)
                                 .graphicsLayer {
                                     val progressOffset = dampedDragAnimation.value * tabWidthPx
                                     translationX = if (isLtr) -progressOffset else progressOffset

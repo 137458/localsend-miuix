@@ -20,7 +20,8 @@ LocalSend Miuix 是基于 Xiaomi HyperOS 设计风格与 Miuix KMP 现代化组�
 - **完善的交互与控制**：
   - 快速保存模式（无需确认自动接收信任传输）。
   - 实时传输进度、传输速度（MB/s）与剩余时间监控。
-  - 传输历史记录归档与一键清理。
+  - 传输历史记录安全本地 JSON 持久化（重启/更新后永不丢失）与一键清理。
+  - 软件在线检测更新系统：支持 GitHub Releases 检查、更新日志展示与 APK 应用内流式下载安装。
   - 沉浸式色彩主题模式切换（跟随系统、浅色、深色、莫奈跟随系统、莫奈浅色、莫奈深色）。
 
 ---
@@ -32,8 +33,9 @@ LocalSend Miuix 是基于 Xiaomi HyperOS 设计风格与 Miuix KMP 现代化组�
 | 主架构 Shell | `MiuixTheme`, `ThemeController`, `NavDisplay`, `Scaffold`, `LiquidGlassBottomBar`, `Badge` | 动态主题控制、miuix-nav 官方路由调度、全局独立窗口级弹窗宿主、悬浮底栏切换 |
 | 接收 (Receive) | `TopAppBar`, `Card`, `SmallTitle`, `LinearProgressIndicator`, `Button` | 本机名称/IP/端口展示、实时传输进度、Web Share 分享链接，点击右上角图标进入传输历史路由 |
 | 发送 (Send) | `TopAppBar`, `MiuixScrollBehavior`, `PullToRefresh`, `Card`, `SmallTitle`, `Button`, `IconButton` | 快速选择入口、下拉刷新局域网设备、附近设备列表、待发送内容清单（选择内容后显示） |
-| 设置 (Settings) | `TopAppBar`, `Card`, `SmallTitle`, `ArrowPreference`, `SwitchPreference`, `WindowDropdownPreference` | 设备别名、快速保存、服务端口与多播地址、主题色彩模式切换 |
+| 设置 (Settings) | `TopAppBar`, `Card`, `SmallTitle`, `ArrowPreference`, `SwitchPreference`, `WindowDropdownPreference` | 设备别名、快速保存、服务端口与多播地址、主题色彩模式切换、检查更新入口 |
 | 传输历史 (History) | `TopAppBar`, `Card`, `SmallTitle`, `Icon`, `IconButton` | 独立路由页面，支持原生连续深度进退转场与边缘左滑返回手势 |
+| 软件更新 (Update) | `TopAppBar`, `Card`, `SmallTitle`, `LinearProgressIndicator`, `Button`, `TextButton` | 检查最新版本、展示 Release 说明、在线下载并安装 APK 更新 |
 | 弹窗交互 (Overlays) | `WindowDialog`, `WindowBottomSheet`, `TextField`, `ButtonDefaults` | 设备名称修改、手动 IP 发送输入、文本消息发送、传输请求接收/拒绝、发送内容选择菜单 |
 
 ---

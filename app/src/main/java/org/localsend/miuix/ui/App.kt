@@ -50,6 +50,7 @@ import org.localsend.miuix.ui.screen.HistoryScreen
 import org.localsend.miuix.ui.screen.ReceiveScreen
 import org.localsend.miuix.ui.screen.SendScreen
 import org.localsend.miuix.ui.screen.SettingsScreen
+import org.localsend.miuix.ui.screen.UpdateScreen
 import top.yukonga.miuix.kmp.basic.Badge
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -243,7 +244,7 @@ fun App(manager: LocalSendManager) {
         }
 
         val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val bottomBarTotalPadding = 80.dp + navBarBottomPadding
+        val bottomBarTotalPadding = 84.dp + navBarBottomPadding
 
         // 6. miuix-nav 根导航栈管理
         val backStack = rememberNavBackStack<AppRoute>(AppRoute.Main)
@@ -332,7 +333,8 @@ fun App(manager: LocalSendManager) {
                                     contentPadding = pagePadding,
                                     onOpenRenameDialog = { showRenameDialog = true },
                                     onOpenPortDialog = { showPortDialog = true },
-                                    onPickDirectory = { directoryPickerLauncher.launch(null) }
+                                    onPickDirectory = { directoryPickerLauncher.launch(null) },
+                                    onNavigateToUpdate = { backStack.add(AppRoute.Update) }
                                 )
                             }
                         }
@@ -346,6 +348,15 @@ fun App(manager: LocalSendManager) {
             ) {
                 HistoryScreen(
                     manager = manager,
+                    onBack = { backStack.removeLastOrNull() }
+                )
+            }
+
+            // 独立软件更新页（通过 miuix-nav 连续深度推进展示，支持左滑边缘返回手势）
+            entry<AppRoute.Update>(
+                swipeDismiss = NavSwipeDirection.LeftToRight
+            ) {
+                UpdateScreen(
                     onBack = { backStack.removeLastOrNull() }
                 )
             }

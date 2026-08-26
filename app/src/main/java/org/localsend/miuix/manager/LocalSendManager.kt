@@ -29,6 +29,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.localsend.miuix.model.AppSettings
 import org.localsend.miuix.model.Device
@@ -108,13 +110,46 @@ class LocalSendManager(private val context: Context) {
     private val _selectedFiles = MutableStateFlow<List<FileItem>>(emptyList())
     val selectedFiles: StateFlow<List<FileItem>> = _selectedFiles.asStateFlow()
 
+    private val historyFile = File(context.filesDir, "transfer_history.json")
+    private val historyJson = Json { ignoreUnknownKeys = true; prettyPrint = false }
+
+    private fun loadPersistedHistory(): List<TransferHistoryItem> {
+        return try {
+            if (historyFile.exists()) {
+                val content = historyFile.readText()
+                if (content.isNotBlank()) {
+                    historyJson.decodeFromString<List<TransferHistoryItem>>(content)
+                } else emptyList()
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun persistHistory(items: List<TransferHistoryItem>) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val tempFile = File(context.filesDir, "transfer_history.json.tmp")
+                tempFile.writeText(historyJson.encodeToString(items))
+                if (!tempFile.renameTo(historyFile)) {
+                    tempFile.copyTo(historyFile, overwrite = true)
+                    tempFile.delete()
+                }
+            } catch (e: Exception) {
+                // Ignore file write error
+            }
+        }
+    }
+
     private val _pendingIncomingSession = MutableStateFlow<TransferSession?>(null)
     val pendingIncomingSession: StateFlow<TransferSession?> = _pendingIncomingSession.asStateFlow()
 
     private val _activeSessions = MutableStateFlow<List<TransferSession>>(emptyList())
     val activeSessions: StateFlow<List<TransferSession>> = _activeSessions.asStateFlow()
 
-    private val _transferHistory = MutableStateFlow<List<TransferHistoryItem>>(emptyList())
+    private val _transferHistory = MutableStateFlow<List<TransferHistoryItem>>(loadPersistedHistory())
     val transferHistory: StateFlow<List<TransferHistoryItem>> = _transferHistory.asStateFlow()
 
     private val _isScanning = MutableStateFlow(false)
@@ -500,15 +535,24 @@ class LocalSendManager(private val context: Context) {
     }
 
     private fun addHistory(item: TransferHistoryItem) {
-        _transferHistory.update { listOf(item) + it }
+        _transferHistory.update { current ->
+            val updated = (listOf(item) + current).take(200)
+            persistHistory(updated)
+            updated
+        }
     }
 
     fun clearHistory() {
         _transferHistory.value = emptyList()
+        persistHistory(emptyList())
     }
 
     fun deleteHistoryItem(id: String) {
-        _transferHistory.update { it.filterNot { item -> item.id == id } }
+        _transferHistory.update { current ->
+            val updated = current.filterNot { item -> item.id == id }
+            persistHistory(updated)
+            updated
+        }
     }
 
     fun updateSettings(transform: (AppSettings) -> AppSettings) {

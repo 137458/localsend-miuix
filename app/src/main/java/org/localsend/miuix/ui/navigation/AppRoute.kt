@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.ui.navigation
+package org.localsend.miuix.ui.navigation
 
 import kotlinx.serialization.Serializable
 import top.yukonga.miuix.kmp.nav.core.NavKey
@@ -21,4 +21,10 @@ sealed interface AppRoute : NavKey {
      */
     @Serializable
     data object History : AppRoute
+
+    /**
+     * 软件更新页：检查最新版本、展示 Release 说明、下载并安装 APK。
+     */
+    @Serializable
+    data object Update : AppRoute
 }

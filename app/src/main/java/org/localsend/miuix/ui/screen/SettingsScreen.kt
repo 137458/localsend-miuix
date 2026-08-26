@@ -37,7 +37,8 @@ fun SettingsScreen(
     contentPadding: PaddingValues,
     onOpenRenameDialog: () -> Unit,
     onOpenPortDialog: () -> Unit,
-    onPickDirectory: () -> Unit
+    onPickDirectory: () -> Unit,
+    onNavigateToUpdate: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val settings by manager.settings.collectAsState()
@@ -207,10 +208,23 @@ fun SettingsScreen(
                 SmallTitle(text = "关于")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ArrowPreference(
-                        title = "LocalSend Miuix",
-                        summary = "版本 2.1.0 (基于 Miuix 0.9.4 & HyperOS 视觉规范)",
+                        title = "检查更新",
+                        summary = "当前版本 v${org.localsend.miuix.BuildConfig.VERSION_NAME} (点击检查新版本)",
+                        onClick = onNavigateToUpdate
+                    )
+                    ArrowPreference(
+                        title = "GitHub 开源主页",
+                        summary = "https://github.com/137458/localsend-miuix",
                         onClick = {
-                            Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
+                            try {
+                                val intent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://github.com/137458/localsend-miuix")
+                                ).apply {
+                                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
                         }
                     )
                     ArrowPreference(
