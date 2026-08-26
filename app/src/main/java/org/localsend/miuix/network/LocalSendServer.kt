@@ -183,6 +183,14 @@ class LocalSendServer(
         } catch (ignored: Exception) {}
     }
 
+    fun isRunning(): Boolean = engine != null
+
+    fun ensureStarted() {
+        if (engine == null) {
+            start()
+        }
+    }
+
     fun start() {
         if (engine != null) return
         val port = getPort()
@@ -269,31 +277,9 @@ class LocalSendServer(
         .replace("'", "&#39;")
 
     private fun buildWebShareHtml(alias: String, session: ShareSession?): String {
-        if (session == null || session.files.isEmpty()) {
-            return """
-                <!DOCTYPE html>
-                <html lang="zh-CN">
-                <head>
-                    <meta charset="utf-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>LocalSend - Web Share</title>
-                    <style>
-                        :root { --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --text-sec: #86868b; --primary: #0071e3; }
-                        @media (prefers-color-scheme: dark) { :root { --bg: #000000; --card: #1c1c1e; --text: #f5f5f7; --text-sec: #86868b; --primary: #2997ff; } }
-                        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px 16px; display: flex; justify-content: center; }
-                        .container { max-width: 600px; width: 100%; }
-                        .card { background: var(--card); border-radius: 18px; padding: 32px 24px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
-                    </style>
-                </head>
-                <body>
-                    <div class="container"><div class="card"><h2>当前没有正在共享的文件</h2><p style="color:var(--text-sec)">发送端已停止共享或未添加内容</p></div></div>
-                </body>
-                </html>
-            """.trimIndent()
-        }
-
-        val textItems = session.files.filter { it.isTextMessage && !it.textContent.isNullOrEmpty() }
-        val binaryFiles = session.files.filterNot { it.isTextMessage && !it.textContent.isNullOrEmpty() }
+        val hasSessionFiles = session != null && session.files.isNotEmpty()
+        val textItems = session?.files?.filter { it.isTextMessage && !it.textContent.isNullOrEmpty() } ?: emptyList()
+        val binaryFiles = session?.files?.filterNot { it.isTextMessage && !it.textContent.isNullOrEmpty() } ?: emptyList()
 
         val textSectionHtml = if (textItems.isNotEmpty()) {
             val textCards = textItems.joinToString("") { textItem ->
@@ -301,27 +287,51 @@ class LocalSendServer(
                 """
                 <div class="text-card">
                     <pre class="text-content" id="text-${textItem.id}">$escapedText</pre>
-                    <button class="btn btn-secondary" onclick="copyText('text-${textItem.id}')">📋 复制文本</button>
+                    <button class="btn btn-sec" onclick="copyText('text-${textItem.id}')">📋 复制文本</button>
                 </div>
                 """.trimIndent()
             }
-            """<h3 class="section-title">💬 共享文本</h3>$textCards"""
+            """
+            <div class="section-card">
+                <div class="section-header">
+                    <span class="section-title">💬 共享文本</span>
+                    <span class="section-tag">${textItems.size} 条</span>
+                </div>
+                $textCards
+            </div>
+            """.trimIndent()
         } else ""
 
         val fileListHtml = if (binaryFiles.isNotEmpty()) {
             val rows = binaryFiles.joinToString("") { file ->
-                val downloadUrl = "/api/localsend/v2/download?sessionId=${session.sessionId}&fileId=${file.id}"
+                val downloadUrl = "/api/localsend/v2/download?sessionId=${session?.sessionId}&fileId=${file.id}"
                 """
-                <div class="file-row">
-                    <div class="file-info">
+                <div class="file-item">
+                    <div class="file-details">
                         <span class="file-name">${escapeHtml(file.name)}</span>
-                        <span class="file-size">${file.formattedSize}</span>
+                        <span class="file-meta">${file.formattedSize}</span>
                     </div>
                     <a class="btn btn-primary" href="$downloadUrl" download="${escapeHtml(file.name)}">⬇️ 下载</a>
                 </div>
                 """.trimIndent()
             }
-            """<h3 class="section-title">📦 共享文件 (${binaryFiles.size})</h3><div class="file-list">$rows</div>"""
+            """
+            <div class="section-card">
+                <div class="section-header">
+                    <span class="section-title">📦 共享文件</span>
+                    <span class="section-tag">${binaryFiles.size} 个</span>
+                </div>
+                <div class="file-list">$rows</div>
+            </div>
+            """.trimIndent()
+        } else ""
+
+        val noShareHint = if (!hasSessionFiles) {
+            """
+            <div class="empty-hint">
+                <p>当前发送端未添加共享内容，但您可以直接向手机上传文件 👇</p>
+            </div>
+            """.trimIndent()
         } else ""
 
         return """
@@ -329,52 +339,526 @@ class LocalSendServer(
             <html lang="zh-CN">
             <head>
                 <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>${escapeHtml(alias)} 分享的内容 - LocalSend</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                <title>${escapeHtml(alias)} - LocalSend 局域网快传</title>
                 <style>
-                    :root { --bg: #f4f4f6; --card: #ffffff; --text: #1a1a1c; --text-sec: #808084; --primary: #007aff; --primary-hover: #0062cc; --btn-sec: #e5e5ea; --btn-sec-text: #1a1a1c; --border: #e5e5ea; }
-                    @media (prefers-color-scheme: dark) { :root { --bg: #121214; --card: #1c1c1e; --text: #f2f2f7; --text-sec: #8e8e93; --primary: #0a84ff; --primary-hover: #0071e3; --btn-sec: #2c2c2e; --btn-sec-text: #f2f2f7; --border: #38383a; } }
-                    * { box-sizing: border-box; }
-                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px 16px; display: flex; justify-content: center; }
-                    .container { max-width: 580px; width: 100%; }
-                    .header { text-align: center; margin-bottom: 24px; }
-                    .header h1 { font-size: 22px; font-weight: 700; margin: 0 0 6px 0; }
-                    .header p { font-size: 14px; color: var(--text-sec); margin: 0; }
-                    .section-title { font-size: 15px; font-weight: 600; color: var(--text-sec); margin: 20px 8px 8px 8px; }
-                    .text-card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
-                    .text-content { font-family: inherit; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; margin: 0 0 12px 0; max-height: 240px; overflow-y: auto; }
-                    .file-list { background: var(--card); border-radius: 16px; overflow: hidden; border: 1px solid var(--border); }
-                    .file-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
-                    .file-row:last-child { border-bottom: none; }
-                    .file-info { display: flex; flex-direction: column; max-width: 70%; }
-                    .file-name { font-size: 15px; font-weight: 500; word-break: break-all; }
-                    .file-size { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
-                    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; transition: background 0.2s; }
+                    :root {
+                        --bg: #f4f5f8;
+                        --card-bg: #ffffff;
+                        --text-main: #111827;
+                        --text-sub: #6b7280;
+                        --primary: #007aff;
+                        --primary-hover: #0062cc;
+                        --primary-light: rgba(0, 122, 255, 0.08);
+                        --border: #e5e7eb;
+                        --card-border: rgba(0, 0, 0, 0.06);
+                        --success: #34c759;
+                        --danger: #ff3b30;
+                        --radius-lg: 20px;
+                        --radius-md: 12px;
+                        --radius-sm: 8px;
+                        --shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+                    }
+                    @media (prefers-color-scheme: dark) {
+                        :root {
+                            --bg: #0e0f12;
+                            --card-bg: #18191e;
+                            --text-main: #f3f4f6;
+                            --text-sub: #9ca3af;
+                            --primary: #0a84ff;
+                            --primary-hover: #0071e3;
+                            --primary-light: rgba(10, 132, 255, 0.15);
+                            --border: #262833;
+                            --card-border: rgba(255, 255, 255, 0.08);
+                            --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+                        }
+                    }
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+                        background: var(--bg);
+                        color: var(--text-main);
+                        min-height: 100vh;
+                        padding: 24px 16px 48px 16px;
+                        display: flex;
+                        justify-content: center;
+                    }
+                    .container { max-width: 580px; width: 100%; display: flex; flex-direction: column; gap: 16px; }
+                    .header-card {
+                        background: var(--card-bg);
+                        border-radius: var(--radius-lg);
+                        padding: 24px 20px;
+                        text-align: center;
+                        border: 1px solid var(--card-border);
+                        box-shadow: var(--shadow);
+                    }
+                    .device-badge {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        padding: 4px 12px;
+                        background: var(--primary-light);
+                        color: var(--primary);
+                        font-size: 13px;
+                        font-weight: 600;
+                        border-radius: 20px;
+                        margin-bottom: 8px;
+                    }
+                    .header-title { font-size: 20px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+                    .header-sub { font-size: 13px; color: var(--text-sub); }
+                    .empty-hint { text-align: center; padding: 12px; font-size: 13px; color: var(--text-sub); }
+                    .section-card {
+                        background: var(--card-bg);
+                        border-radius: var(--radius-lg);
+                        padding: 18px;
+                        border: 1px solid var(--card-border);
+                        box-shadow: var(--shadow);
+                    }
+                    .section-header {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        margin-bottom: 12px;
+                        padding: 0 4px;
+                    }
+                    .section-title {
+                        font-size: 15px;
+                        font-weight: 600;
+                        color: var(--text-main);
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    .section-tag {
+                        font-size: 12px;
+                        background: var(--primary-light);
+                        color: var(--primary);
+                        padding: 2px 8px;
+                        border-radius: 10px;
+                        font-weight: 500;
+                    }
+                    .text-card { margin-bottom: 10px; }
+                    .text-card:last-child { margin-bottom: 0; }
+                    .text-content {
+                        background: var(--bg);
+                        border: 1px solid var(--border);
+                        border-radius: var(--radius-md);
+                        padding: 12px;
+                        font-family: inherit;
+                        font-size: 14px;
+                        line-height: 1.5;
+                        white-space: pre-wrap;
+                        word-break: break-word;
+                        max-height: 180px;
+                        overflow-y: auto;
+                        margin-bottom: 8px;
+                    }
+                    .file-list { display: flex; flex-direction: column; gap: 8px; }
+                    .file-item {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 12px 14px;
+                        background: var(--bg);
+                        border-radius: var(--radius-md);
+                        border: 1px solid var(--border);
+                    }
+                    .file-details { display: flex; flex-direction: column; max-width: 70%; }
+                    .file-name { font-size: 14px; font-weight: 500; word-break: break-all; color: var(--text-main); }
+                    .file-meta { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+                    .btn {
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 8px 16px;
+                        border-radius: var(--radius-sm);
+                        font-size: 13px;
+                        font-weight: 600;
+                        text-decoration: none;
+                        border: none;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                    }
                     .btn-primary { background: var(--primary); color: #fff; }
-                    .btn-primary:hover { background: var(--primary-hover); }
-                    .btn-secondary { background: var(--btn-sec); color: var(--btn-sec-text); width: 100%; }
-                    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 10px 20px; border-radius: 24px; font-size: 14px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+                    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+                    .btn-sec { background: var(--bg); color: var(--text-main); border: 1px solid var(--border); width: 100%; padding: 8px; }
+                    .btn-sec:hover { background: var(--border); }
+                    .upload-dropzone {
+                        border: 2px dashed var(--primary);
+                        background: var(--primary-light);
+                        border-radius: var(--radius-md);
+                        padding: 26px 16px;
+                        text-align: center;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        user-select: none;
+                    }
+                    .upload-dropzone:hover {
+                        border-color: var(--primary-hover);
+                        background: rgba(0, 122, 255, 0.14);
+                    }
+                    .dropzone-icon { font-size: 32px; margin-bottom: 6px; }
+                    .dropzone-text { font-size: 14px; font-weight: 600; color: var(--primary); margin-bottom: 4px; }
+                    .dropzone-hint { font-size: 12px; color: var(--text-sub); }
+                    .upload-status-box {
+                        display: none;
+                        margin-top: 12px;
+                        padding: 12px;
+                        background: var(--bg);
+                        border-radius: var(--radius-md);
+                        border: 1px solid var(--border);
+                    }
+                    .progress-bar-wrap {
+                        width: 100%;
+                        height: 6px;
+                        background: var(--border);
+                        border-radius: 3px;
+                        overflow: hidden;
+                        margin: 8px 0;
+                    }
+                    .progress-bar {
+                        height: 100%;
+                        width: 0%;
+                        background: var(--primary);
+                        border-radius: 3px;
+                        transition: width 0.2s ease;
+                    }
+                    .status-row {
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 12px;
+                        color: var(--text-sub);
+                    }
+                    .drag-overlay {
+                        position: fixed;
+                        top: 0; left: 0; right: 0; bottom: 0;
+                        background: rgba(0, 122, 255, 0.88);
+                        backdrop-filter: blur(10px);
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        color: #fff;
+                        z-index: 9999;
+                        opacity: 0;
+                        pointer-events: none;
+                        transition: opacity 0.2s ease;
+                    }
+                    .drag-overlay.active { opacity: 1; pointer-events: all; }
+                    .drag-overlay-icon { font-size: 64px; margin-bottom: 12px; }
+                    .drag-overlay-title { font-size: 22px; font-weight: 700; }
+                    .toast {
+                        position: fixed;
+                        bottom: 28px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background: rgba(20, 20, 24, 0.92);
+                        backdrop-filter: blur(12px);
+                        color: #fff;
+                        padding: 10px 20px;
+                        border-radius: 30px;
+                        font-size: 13px;
+                        font-weight: 500;
+                        box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+                        opacity: 0;
+                        transition: opacity 0.25s ease;
+                        pointer-events: none;
+                        z-index: 10000;
+                    }
                 </style>
             </head>
             <body>
                 <div class="container">
-                    <div class="header">
-                        <h1>📱 ${escapeHtml(alias)}</h1>
-                        <p>通过局域网直接向您分享内容</p>
+                    <div class="header-card">
+                        <div class="device-badge">📱 局域网在线</div>
+                        <div class="header-title">${escapeHtml(alias)}</div>
+                        <div class="header-sub">通过局域网高速安全传输，无需外网连接</div>
                     </div>
+                    $noShareHint
                     $textSectionHtml
                     $fileListHtml
+                    <div class="section-card">
+                        <div class="section-header">
+                            <span class="section-title">📤 上传文件到手机</span>
+                            <span class="section-tag">双向快传</span>
+                        </div>
+                        <div class="upload-dropzone" id="uploadDropzone">
+                            <div class="dropzone-icon">📁</div>
+                            <div class="dropzone-text">点击选择文件 或 拖拽文件到此处</div>
+                            <div class="dropzone-hint">支持任意格式文件与多文件同时上传</div>
+                        </div>
+                        <input type="file" id="fileInput" multiple style="display:none">
+                        <div class="upload-status-box" id="uploadStatusBox">
+                            <div class="status-row">
+                                <span id="uploadStatusTitle" style="font-weight:600; color:var(--text-main)">准备上传...</span>
+                                <span id="uploadStatusPercent">0%</span>
+                            </div>
+                            <div class="progress-bar-wrap">
+                                <div class="progress-bar" id="uploadProgressBar"></div>
+                            </div>
+                            <div class="status-row">
+                                <span id="uploadDetail">等待中...</span>
+                                <span id="uploadCount">0/0</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
+                <div class="drag-overlay" id="dragOverlay">
+                    <div class="drag-overlay-icon">📥</div>
+                    <div class="drag-overlay-title">松开鼠标即可上传至手机</div>
+                </div>
+
                 <div id="toast" class="toast">已复制到剪贴板</div>
+
                 <script>
+                    function showToast(msg) {
+                        var t = document.getElementById('toast');
+                        t.innerText = msg;
+                        t.style.opacity = '1';
+                        setTimeout(function() { t.style.opacity = '0'; }, 2000);
+                    }
+
                     function copyText(id) {
-                        const el = document.getElementById(id);
+                        var el = document.getElementById(id);
                         if (!el) return;
-                        navigator.clipboard.writeText(el.innerText).then(() => {
-                            const toast = document.getElementById('toast');
-                            toast.style.opacity = '1';
-                            setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+                        navigator.clipboard.writeText(el.innerText).then(function() {
+                            showToast('已复制到剪贴板');
+                        }).catch(function() {
+                            showToast('复制失败，请手动选择复制');
                         });
+                    }
+
+                    function formatSize(bytes) {
+                        if (bytes < 1024) return bytes + ' B';
+                        var i = Math.floor(Math.log(bytes) / Math.log(1024));
+                        var sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                        return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+                    }
+
+                    var isUploading = false;
+                    var dragDepth = 0;
+                    var currentPin = null;
+
+                    function getFingerprint() {
+                        var fp = sessionStorage.getItem('localsend_web_fp');
+                        if (!fp) {
+                            fp = 'web-' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+                            sessionStorage.setItem('localsend_web_fp', fp);
+                        }
+                        return fp;
+                    }
+
+                    var dropzone = document.getElementById('uploadDropzone');
+                    var fileInput = document.getElementById('fileInput');
+                    var statusBox = document.getElementById('uploadStatusBox');
+                    var statusTitle = document.getElementById('uploadStatusTitle');
+                    var statusPercent = document.getElementById('uploadStatusPercent');
+                    var progressBar = document.getElementById('uploadProgressBar');
+                    var detailText = document.getElementById('uploadDetail');
+                    var countText = document.getElementById('uploadCount');
+                    var overlay = document.getElementById('dragOverlay');
+
+                    dropzone.onclick = function() {
+                        if (!isUploading) fileInput.click();
+                    };
+
+                    fileInput.onchange = function() {
+                        if (fileInput.files && fileInput.files.length > 0) {
+                            startUpload(fileInput.files);
+                            fileInput.value = '';
+                        }
+                    };
+
+                    window.addEventListener('dragenter', function(e) {
+                        if (!e.dataTransfer || !e.dataTransfer.types || e.dataTransfer.types.indexOf('Files') === -1) return;
+                        e.preventDefault();
+                        dragDepth++;
+                        if (!isUploading) overlay.classList.add('active');
+                    });
+
+                    window.addEventListener('dragover', function(e) {
+                        if (!e.dataTransfer || !e.dataTransfer.types || e.dataTransfer.types.indexOf('Files') === -1) return;
+                        e.preventDefault();
+                        if (isUploading) e.dataTransfer.dropEffect = 'none';
+                    });
+
+                    window.addEventListener('dragleave', function(e) {
+                        dragDepth--;
+                        if (dragDepth <= 0) {
+                            dragDepth = 0;
+                            overlay.classList.remove('active');
+                        }
+                    });
+
+                    window.addEventListener('drop', function(e) {
+                        e.preventDefault();
+                        dragDepth = 0;
+                        overlay.classList.remove('active');
+                        if (isUploading) return;
+                        var dt = e.dataTransfer;
+                        var files = [];
+                        if (dt && dt.items) {
+                            for (var i = 0; i < dt.items.length; i++) {
+                                var item = dt.items[i];
+                                if (item.webkitGetAsEntry && item.webkitGetAsEntry().isDirectory) continue;
+                                var f = item.getAsFile();
+                                if (f) files.push(f);
+                            }
+                        } else if (dt && dt.files) {
+                            for (var j = 0; j < dt.files.length; j++) files.push(dt.files[j]);
+                        }
+                        if (files.length > 0) startUpload(files);
+                    });
+
+                    function startUpload(fileList) {
+                        isUploading = true;
+                        statusBox.style.display = 'block';
+                        statusTitle.innerText = '正在等待手机端确认...';
+                        statusTitle.style.color = 'var(--text-main)';
+                        statusPercent.innerText = '0%';
+                        progressBar.style.width = '0%';
+                        detailText.innerText = '请在手机上点击同意接收';
+                        countText.innerText = '0/' + fileList.length;
+
+                        var filesMap = {};
+                        var fileBlobs = {};
+                        for (var i = 0; i < fileList.length; i++) {
+                            var f = fileList[i];
+                            var id = 'web-f-' + i + '-' + Date.now();
+                            filesMap[id] = {
+                                id: id,
+                                fileName: f.name,
+                                size: f.size,
+                                fileType: f.type || 'application/octet-stream'
+                            };
+                            fileBlobs[id] = f;
+                        }
+
+                        var requestBody = {
+                            info: {
+                                alias: '浏览器 Web 端',
+                                version: '2.1',
+                                deviceModel: navigator.userAgent.indexOf('Mac') !== -1 ? 'Mac Browser' : (navigator.userAgent.indexOf('Windows') !== -1 ? 'PC Browser' : 'Web Client'),
+                                deviceType: 'web',
+                                fingerprint: getFingerprint(),
+                                port: 0,
+                                protocol: location.protocol.replace(':', ''),
+                                download: false
+                            },
+                            files: filesMap
+                        };
+
+                        executePrepare(requestBody, fileBlobs, fileList.length, true);
+                    }
+
+                    function executePrepare(reqBody, fileBlobs, totalCount, isFirst) {
+                        var url = '/api/localsend/v2/prepare-upload';
+                        if (currentPin) url += '?pin=' + encodeURIComponent(currentPin);
+
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('POST', url, true);
+                        xhr.setRequestHeader('Content-Type', 'application/json');
+                        xhr.onload = function() {
+                            if (xhr.status === 200) {
+                                try {
+                                    var res = JSON.parse(xhr.responseText);
+                                    uploadAllFiles(res.sessionId, res.files, fileBlobs, totalCount);
+                                } catch(e) {
+                                    finishError('解析响应失败');
+                                }
+                            } else if (xhr.status === 401) {
+                                var pinPrompt = prompt(isFirst ? '该设备启用了 PIN 码保护，请输入 PIN 码：' : 'PIN 码错误，请重新输入：');
+                                if (!pinPrompt) {
+                                    finishError('未提供 PIN 码，上传已终止');
+                                    return;
+                                }
+                                currentPin = pinPrompt;
+                                executePrepare(reqBody, fileBlobs, totalCount, false);
+                            } else if (xhr.status === 403) {
+                                finishError('手机端拒绝了此次接收请求');
+                            } else if (xhr.status === 409) {
+                                finishError('手机端正在处理其他传输，请稍后再试');
+                            } else if (xhr.status === 429) {
+                                finishError('请求过于频繁，请稍后再试');
+                            } else {
+                                finishError('上传握手失败 (HTTP ' + xhr.status + ')');
+                            }
+                        };
+                        xhr.onerror = function() {
+                            finishError('网络连接失败，请检查局域网连接');
+                        };
+                        xhr.send(JSON.stringify(reqBody));
+                    }
+
+                    function uploadAllFiles(sessionId, tokens, fileBlobs, totalCount) {
+                        var fileIds = Object.keys(tokens);
+                        var completed = 0;
+
+                        function uploadNext(index) {
+                            if (index >= fileIds.length) {
+                                statusTitle.innerText = '✅ 上传完成！';
+                                statusTitle.style.color = 'var(--success)';
+                                statusPercent.innerText = '100%';
+                                progressBar.style.width = '100%';
+                                detailText.innerText = '所有文件已成功保存到手机';
+                                countText.innerText = totalCount + '/' + totalCount;
+                                showToast('所有文件已成功传输至手机');
+                                setTimeout(function() {
+                                    isUploading = false;
+                                    statusBox.style.display = 'none';
+                                }, 3500);
+                                return;
+                            }
+
+                            var fId = fileIds[index];
+                            var blob = fileBlobs[fId];
+                            var token = tokens[fId];
+                            statusTitle.innerText = '正在上传: ' + blob.name;
+                            countText.innerText = (index + 1) + '/' + totalCount;
+
+                            var uploadUrl = '/api/localsend/v2/upload?sessionId=' + encodeURIComponent(sessionId) +
+                                '&fileId=' + encodeURIComponent(fId) +
+                                '&token=' + encodeURIComponent(token);
+
+                            var xhr = new XMLHttpRequest();
+                            xhr.open('POST', uploadUrl, true);
+                            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+
+                            xhr.upload.onprogress = function(e) {
+                                if (e.lengthComputable) {
+                                    var percent = Math.round((e.loaded / e.total) * 100);
+                                    statusPercent.innerText = percent + '%';
+                                    progressBar.style.width = percent + '%';
+                                    detailText.innerText = formatSize(e.loaded) + ' / ' + formatSize(e.total);
+                                }
+                            };
+
+                            xhr.onload = function() {
+                                if (xhr.status === 200 || xhr.status === 204) {
+                                    completed++;
+                                    uploadNext(index + 1);
+                                } else {
+                                    finishError('上传文件 ' + blob.name + ' 失败 (HTTP ' + xhr.status + ')');
+                                }
+                            };
+
+                            xhr.onerror = function() {
+                                finishError('上传文件 ' + blob.name + ' 时网络中断');
+                            };
+
+                            xhr.send(blob);
+                        }
+
+                        uploadNext(0);
+                    }
+
+                    function finishError(msg) {
+                        isUploading = false;
+                        statusTitle.innerText = '❌ 上传失败';
+                        statusTitle.style.color = 'var(--danger)';
+                        detailText.innerText = msg;
+                        showToast(msg);
                     }
                 </script>
             </body>

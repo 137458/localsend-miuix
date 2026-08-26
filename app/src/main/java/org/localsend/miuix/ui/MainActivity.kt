@@ -28,16 +28,27 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 
         // 接收文件需要系统通知，Android 13+ 需运行时授予 POST_NOTIFICATIONS 权限
         TransferNotifier.ensure(applicationContext)
+        val permissionsToRequest = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED
             ) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                    REQUEST_NOTIFICATION
-                )
+                permissionsToRequest.add(android.Manifest.permission.POST_NOTIFICATIONS)
             }
+        }
+        // Android 17+ (API 37+) 局域网访问与多播发现前瞻性运行时权限
+        if (Build.VERSION.SDK_INT >= 37) {
+            val localNetworkPerm = "android.permission.ACCESS_LOCAL_NETWORK"
+            if (checkSelfPermission(localNetworkPerm) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(localNetworkPerm)
+            }
+        }
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(
+                this,
+                permissionsToRequest.toTypedArray(),
+                REQUEST_PERMISSIONS
+            )
         }
 
         manager = LocalSendManager(applicationContext)
@@ -50,6 +61,13 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::manager.isInitialized) {
+            manager.onResume()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         eventDispatcher.dispose()
@@ -57,6 +75,6 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     }
 
     companion object {
-        private const val REQUEST_NOTIFICATION = 100
+        private const val REQUEST_PERMISSIONS = 100
     }
 }

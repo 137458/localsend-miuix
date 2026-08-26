@@ -47,6 +47,7 @@ class DiscoveryService(
 
     private val httpClient by lazy {
         HttpClient(CIO) {
+            followRedirects = false
             engine {
                 https {
                     trustManager = SslHelper.trustAllCerts[0] as X509TrustManager
@@ -70,6 +71,16 @@ class DiscoveryService(
         scanSubnet()
     }
 
+    fun ensureStarted() {
+        acquireLocks()
+        if (multicastJob?.isActive != true) {
+            startMulticastListener()
+        }
+        if (periodicBroadcastJob?.isActive != true) {
+            startPeriodicBroadcast()
+        }
+    }
+
     fun stop() {
         multicastJob?.cancel()
         periodicBroadcastJob?.cancel()
@@ -83,7 +94,7 @@ class DiscoveryService(
     private fun acquireLocks() {
         try {
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            if (wifiManager != null) {
+            if (wifiManager != null && multicastLock == null) {
                 multicastLock = wifiManager.createMulticastLock("LocalSendMiuixMulticastLock").apply {
                     setReferenceCounted(true)
                     acquire()
@@ -106,65 +117,72 @@ class DiscoveryService(
     }
 
     private fun startMulticastListener() {
+        multicastJob?.cancel()
         multicastJob = scope.launch(Dispatchers.IO) {
-            var socket: MulticastSocket? = null
-            try {
-                val group = InetAddress.getByName("224.0.0.167")
-                socket = MulticastSocket(null).apply {
-                    reuseAddress = true
-                    bind(InetSocketAddress(53317))
-                    joinGroup(group)
-                    soTimeout = 3000
-                }
-
-                val buffer = ByteArray(65535)
-                while (isActive) {
-                    try {
-                        val packet = DatagramPacket(buffer, buffer.size)
-                        socket.receive(packet)
-                        val text = String(packet.data, packet.offset, packet.length, Charsets.UTF_8)
-                        val senderIp = packet.address.hostAddress ?: continue
-
-                        // Ignore our own broadcast
-                        val localDevice = getLocalDevice()
-                        if (NetworkUtils.getLocalIpAddresses().contains(senderIp)) {
-                            continue
-                        }
-
-                        try {
-                            val dto = json.decodeFromString<DeviceDto>(text)
-                            if (dto.fingerprint != localDevice.fingerprint) {
-                                val device = Device.fromDto(dto, senderIp)
-                                if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
-                                    FingerprintTrust.trust(device.fingerprint)
-                                }
-                                onDeviceDiscovered(device)
-
-                                // If it is an announcement, send back direct register response
-                                if (dto.announce == true) {
-                                    sendDirectResponse(device)
-                                }
-                            }
-                        } catch (e: Exception) {
-                            // Ignored malformed packets
-                        }
-                    } catch (e: java.net.SocketTimeoutException) {
-                        // Regular timeout to check isActive
-                    } catch (e: Exception) {
-                        if (!isActive) break
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
+            while (isActive) {
+                var socket: MulticastSocket? = null
                 try {
-                    socket?.close()
-                } catch (ignored: Exception) {}
+                    val group = InetAddress.getByName("224.0.0.167")
+                    socket = MulticastSocket(null).apply {
+                        reuseAddress = true
+                        bind(InetSocketAddress(53317))
+                        joinGroup(group)
+                        soTimeout = 3000
+                    }
+
+                    val buffer = ByteArray(65535)
+                    while (isActive) {
+                        try {
+                            val packet = DatagramPacket(buffer, buffer.size)
+                            socket.receive(packet)
+                            val text = String(packet.data, packet.offset, packet.length, Charsets.UTF_8)
+                            val senderIp = packet.address.hostAddress ?: continue
+
+                            // Ignore our own broadcast
+                            val localDevice = getLocalDevice()
+                            if (NetworkUtils.getLocalIpAddresses().contains(senderIp)) {
+                                continue
+                            }
+
+                            try {
+                                val dto = json.decodeFromString<DeviceDto>(text)
+                                if (dto.fingerprint != localDevice.fingerprint) {
+                                    val device = Device.fromDto(dto, senderIp)
+                                    if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
+                                        FingerprintTrust.trust(device.fingerprint)
+                                    }
+                                    onDeviceDiscovered(device)
+
+                                    // If it is an announcement, send back direct register response
+                                    if (dto.announce == true) {
+                                        sendDirectResponse(device)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                // Ignored malformed packets
+                            }
+                        } catch (e: java.net.SocketTimeoutException) {
+                            // Regular timeout to check isActive
+                        } catch (e: Exception) {
+                            if (!isActive) break
+                            throw e
+                        }
+                    }
+                } catch (e: Exception) {
+                    if (isActive) {
+                        delay(2000)
+                    }
+                } finally {
+                    try {
+                        socket?.close()
+                    } catch (ignored: Exception) {}
+                }
             }
         }
     }
 
     private fun startPeriodicBroadcast() {
+        periodicBroadcastJob?.cancel()
         periodicBroadcastJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
                 sendAnnouncement()
@@ -209,14 +227,19 @@ class DiscoveryService(
 
     private fun sendDirectResponse(targetDevice: Device) {
         scope.launch(Dispatchers.IO) {
-            try {
-                val url = "${targetDevice.url}/api/localsend/v2/register"
-                val localDevice = getLocalDevice()
-                httpClient.post(url) {
-                    contentType(ContentType.Application.Json)
-                    setBody(localDevice.toDto())
-                }
-            } catch (ignored: Exception) {}
+            val localDevice = getLocalDevice()
+            for (route in listOf("/api/localsend/v2/register", "/api/localsend/v1/register")) {
+                try {
+                    val url = "${targetDevice.url}$route"
+                    val response = httpClient.post(url) {
+                        contentType(ContentType.Application.Json)
+                        setBody(localDevice.toDto())
+                    }
+                    if (response.status == io.ktor.http.HttpStatusCode.OK) {
+                        break
+                    }
+                } catch (ignored: Exception) {}
+            }
         }
     }
 
@@ -237,21 +260,24 @@ class DiscoveryService(
                         var found = false
                         for (proto in listOf("https", "http")) {
                             if (found) break
-                            try {
-                                val url = "$proto://$targetIp:53317/api/localsend/v2/info"
-                                val response = httpClient.get(url)
-                                val dto = response.body<DeviceDto>()
-                                if (dto.fingerprint != localDevice.fingerprint) {
-                                    val device = Device.fromDto(dto, targetIp)
-                                    if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
-                                        FingerprintTrust.trust(device.fingerprint)
+                            for (route in listOf("/api/localsend/v2/info", "/api/localsend/v1/info")) {
+                                if (found) break
+                                try {
+                                    val url = "$proto://$targetIp:53317$route"
+                                    val response = httpClient.get(url)
+                                    val dto = response.body<DeviceDto>()
+                                    if (dto.fingerprint != localDevice.fingerprint) {
+                                        val device = Device.fromDto(dto, targetIp)
+                                        if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
+                                            FingerprintTrust.trust(device.fingerprint)
+                                        }
+                                        onDeviceDiscovered(device)
+                                        sendDirectResponse(device)
+                                        found = true
                                     }
-                                    onDeviceDiscovered(device)
-                                    sendDirectResponse(device)
-                                    found = true
+                                } catch (ignored: Exception) {
+                                    // Target not responding on this proto/route
                                 }
-                            } catch (ignored: Exception) {
-                                // Target not responding on this proto
                             }
                         }
                     }

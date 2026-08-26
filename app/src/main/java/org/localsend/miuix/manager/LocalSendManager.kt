@@ -213,6 +213,12 @@ class LocalSendManager(private val context: Context) {
         discoveryService.start()
     }
 
+    fun onResume() {
+        server.ensureStarted()
+        discoveryService.ensureStarted()
+        discoveryService.sendAnnouncement()
+    }
+
     fun stop() {
         discoveryService.stop()
         server.stop()

@@ -37,6 +37,7 @@ class LocalSendClient(
 
     private val httpClient by lazy {
         HttpClient(CIO) {
+            followRedirects = false
             engine {
                 https {
                     // HTTPS 模式：仅信任已通过 FingerprintTrust.pin() 登记了证书指纹的对端
@@ -129,6 +130,8 @@ class LocalSendClient(
                 }
                 requestMethod = "POST"
                 doOutput = true
+                useCaches = false
+                instanceFollowRedirects = false
                 setChunkedStreamingMode(128 * 1024)
                 connectTimeout = 15000
                 readTimeout = 120000
