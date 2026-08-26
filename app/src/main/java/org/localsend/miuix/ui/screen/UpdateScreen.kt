@@ -105,9 +105,9 @@ fun UpdateScreen(
             isChecking = false
             result.onSuccess { info ->
                 releaseInfo = info
-                if (info.hasUpdate && userInitiated) {
+                if (info.hasUpdate) {
                     showDialog = true
-                } else if (!info.hasUpdate && userInitiated) {
+                } else if (userInitiated) {
                     Toast.makeText(context, "已是最新版本 (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
                 }
             }.onFailure { error ->

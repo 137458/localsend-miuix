@@ -34,8 +34,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.localsend.miuix.manager.LocalSendManager
+import org.localsend.miuix.manager.UpdateCheckResult
+import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.ui.component.AddContentBottomSheet
 import org.localsend.miuix.ui.component.AppIcons
@@ -45,6 +48,7 @@ import org.localsend.miuix.ui.component.LiquidGlassBottomBar
 import org.localsend.miuix.ui.component.PortDialog
 import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
+import org.localsend.miuix.ui.component.UpdateDialog
 import org.localsend.miuix.ui.navigation.AppRoute
 import org.localsend.miuix.ui.screen.HistoryScreen
 import org.localsend.miuix.ui.screen.ReceiveScreen
@@ -122,7 +126,24 @@ fun App(manager: LocalSendManager) {
     var showWebShareDialog by remember { mutableStateOf(false) }
     var showManualIpDialog by remember { mutableStateOf(false) }
 
-    // 5. Activity Result Launchers
+    // 5. Version Update Check State
+    val updateManager = remember { UpdateManager(context) }
+    var availableUpdate by remember { mutableStateOf<UpdateCheckResult?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        scope.launch(Dispatchers.IO) {
+            val result = updateManager.checkForUpdate()
+            result.onSuccess { info ->
+                if (info.hasUpdate) {
+                    availableUpdate = info
+                    showUpdateDialog = true
+                }
+            }
+        }
+    }
+
+    // 6. Activity Result Launchers
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris: List<Uri>? ->
@@ -463,5 +484,16 @@ fun App(manager: LocalSendManager) {
                 Toast.makeText(context, "正在连接 $ip:$port 发送内容...", Toast.LENGTH_SHORT).show()
             }
         )
+
+        if (availableUpdate != null) {
+            UpdateDialog(
+                show = showUpdateDialog,
+                releaseInfo = availableUpdate!!,
+                onDismiss = { showUpdateDialog = false },
+                onUpdate = { url ->
+                    updateManager.openInBrowser(context, url)
+                }
+            )
+        }
     }
 }
