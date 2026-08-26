@@ -35,7 +35,7 @@ LocalSend Miuix 是基于 Xiaomi HyperOS 设计风格与 Miuix KMP 现代化组�
 | 发送 (Send) | `TopAppBar`, `MiuixScrollBehavior`, `PullToRefresh`, `Card`, `SmallTitle`, `Button`, `IconButton` | 快速选择入口、下拉刷新局域网设备、附近设备列表、待发送内容清单（选择内容后显示） |
 | 设置 (Settings) | `TopAppBar`, `Card`, `SmallTitle`, `ArrowPreference`, `SwitchPreference`, `WindowDropdownPreference` | 设备别名、快速保存、服务端口与多播地址、主题色彩模式切换、检查更新入口 |
 | 传输历史 (History) | `TopAppBar`, `Card`, `SmallTitle`, `Icon`, `IconButton` | 独立路由页面，支持原生连续深度进退转场与边缘左滑返回手势 |
-| 软件更新 (Update) | `HyperOSFlowingGlowBackground`, `MiuixMarkdown`, `Card`, `SmallTitle`, `LinearProgressIndicator`, `Button` | HyperOS 动态流光弥散背景、Markdown 富文本更新日志渲染、底部常驻操作栏与 APK 流式下载安装 |
+| 软件更新 (Update) | `SmallTopAppBar`, `BgEffectBackground`, `MarkdownText`, `UpdateDialog`, `Card`, `SmallTitle`, `BasicComponent`, `Switch` | 完整对齐 pixez-flutter-MIUIX 规范，集成 HyperOS 2/3 原生 GPU RuntimeShader 动态流光背景、Markdown 富文本更新日志、官方 UpdateDialog 弹窗与设置通道 |
 | 弹窗交互 (Overlays) | `WindowDialog`, `WindowBottomSheet`, `TextField`, `ButtonDefaults` | 设备名称修改、手动 IP 发送输入、文本消息发送、传输请求接收/拒绝、发送内容选择菜单 |
 
 ---

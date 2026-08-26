@@ -1,13 +1,8 @@
 package org.localsend.miuix.ui.screen
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,666 +12,483 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.OpenInBrowser
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.RocketLaunch
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import org.localsend.miuix.BuildConfig
 import org.localsend.miuix.manager.UpdateCheckResult
-import org.localsend.miuix.manager.UpdateDownloadState
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.FileItem
-import org.localsend.miuix.ui.component.HyperOSFlowingGlowBackground
-import org.localsend.miuix.ui.component.MiuixMarkdown
-import top.yukonga.miuix.kmp.basic.Button
+import org.localsend.miuix.ui.component.MarkdownText
+import org.localsend.miuix.ui.component.UpdateDialog
+import org.localsend.miuix.ui.effect.BgEffectBackground
+import org.localsend.miuix.ui.effect.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import java.io.File
 
 /**
- * HyperOS 澎湃风格沉浸式系统更新页面
- *
- * 核心特性：
- * 1. 顶部全景动态流光弥散背景（HyperOSFlowingGlowBackground），自适应深色/浅色模式
- * 2. 澎湃风格大版本号展示与呼吸发光徽章
- * 3. 完整的 Markdown 富文本更新日志渲染（MiuixMarkdown）
- * 4. 底部常驻悬浮操作栏（Sticky Bottom Action Bar），下载/安装/重试状态无缝流转
+ * 官方 Miuix / HyperOS 视觉规范系统与应用更新页。
+ * 对齐 pixez-flutter-MIUIX 架构与全套动效实现。
  */
 @Composable
 fun UpdateScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val coroutineScope = rememberCoroutineScope()
     val updateManager = remember { UpdateManager(context) }
-    val isDark = isSystemInDarkTheme()
+    val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val lazyListState = rememberLazyListState()
 
+    var releaseInfo by remember { mutableStateOf<UpdateCheckResult?>(null) }
     var isChecking by remember { mutableStateOf(false) }
-    var checkResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var downloadState by remember { mutableStateOf<UpdateDownloadState>(UpdateDownloadState.Idle) }
+    var showDialog by remember { mutableStateOf(false) }
+    var isOs3Effect by remember { mutableStateOf(true) }
 
-    fun doCheckUpdate() {
+    var ignoredVersion by remember { mutableStateOf<String?>(null) }
+    var autoCheckUpdate by remember { mutableStateOf(true) }
+
+    var isDownloading by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableFloatStateOf(0f) }
+    var downloadedBytes by remember { mutableLongStateOf(0L) }
+    var totalBytes by remember { mutableLongStateOf(0L) }
+    var downloadedFile by remember { mutableStateOf<File?>(null) }
+
+    val hasNew = releaseInfo?.hasUpdate == true
+
+    fun doCheck(userInitiated: Boolean = false) {
         if (isChecking) return
         isChecking = true
-        errorMessage = null
-        scope.launch {
+        coroutineScope.launch {
             val result = updateManager.checkForUpdate()
             isChecking = false
             result.onSuccess { info ->
-                checkResult = info
+                releaseInfo = info
+                if (info.hasUpdate && userInitiated) {
+                    showDialog = true
+                } else if (!info.hasUpdate && userInitiated) {
+                    Toast.makeText(context, "已是最新版本 (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
+                }
             }.onFailure { error ->
-                errorMessage = error.localizedMessage ?: "检查更新失败"
-                Toast.makeText(context, "检查更新失败: ${error.localizedMessage}", Toast.LENGTH_SHORT).show()
+                val message = error.localizedMessage ?: "检查更新失败"
+                if (userInitiated) {
+                    Toast.makeText(context, "检查更新失败: $message", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
 
     LaunchedEffect(Unit) {
-        doCheckUpdate()
+        doCheck(userInitiated = false)
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 1. 澎湃风格全景流光弥散背景
-        HyperOSFlowingGlowBackground(
-            modifier = Modifier.fillMaxSize(),
-            isDark = isDark
-        )
+    val scrollProgress by remember {
+        derivedStateOf {
+            when {
+                lazyListState.firstVisibleItemIndex > 0 -> 1f
+                else -> {
+                    val spacer = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "logoSpacer" }
+                    if (spacer != null && spacer.size > 0) {
+                        (lazyListState.firstVisibleItemScrollOffset.toFloat() / spacer.size).coerceIn(0f, 1f)
+                    } else {
+                        0f
+                    }
+                }
+            }
+        }
+    }
 
-        // 2. 页面主体内容（可滚动）
-        LazyColumn(
+    val density = LocalDensity.current
+    var logoHeightDp by remember { mutableStateOf(240.dp) }
+
+    Scaffold(
+        topBar = {
+            val barColor = if (scrollProgress == 1f) MiuixTheme.colorScheme.surface else Color.Transparent
+            val titleColor = MiuixTheme.colorScheme.onSurface.copy(
+                alpha = ((scrollProgress - 0.35f) / 0.65f).coerceIn(0f, 1f),
+            )
+            SmallTopAppBar(
+                title = "软件更新",
+                scrollBehavior = topAppBarScrollBehavior,
+                color = barColor,
+                titleColor = titleColor,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回",
+                        )
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        BgEffectBackground(
+            dynamicBackground = isRuntimeShaderSupported(),
+            isOs3Effect = isOs3Effect,
+            isFullSize = true,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = 80.dp,
-                bottom = 120.dp // 为底部常驻操作栏预留空间
-            ),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            alpha = { 1f - scrollProgress },
         ) {
-            // (1) 顶部大图标与版本信息展示区
-            item {
-                Column(
+            // ── 顶部官方规范 Hero 视觉 ──
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = innerPadding.calculateTopPadding() + 24.dp)
+                    .onSizeChanged { size ->
+                        with(density) { logoHeightDp = size.height.toDp() }
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .size(88.dp)
+                        .graphicsLayer {
+                            val iconProgress = ((scrollProgress - 0.35f) / 0.15f).coerceIn(0f, 1f)
+                            clip = true
+                            shape = RoundedCornerShape(24.dp)
+                            alpha = 1 - iconProgress
+                            scaleX = 1 - (iconProgress * 0.05f)
+                            scaleY = 1 - (iconProgress * 0.05f)
+                        }
+                        .background(MiuixTheme.colorScheme.surfaceVariant),
                 ) {
-                    // HyperOS 风格发光应用图标徽章
+                    Icon(
+                        imageVector = Icons.Default.SystemUpdate,
+                        contentDescription = "LocalSend",
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "LocalSend Miuix",
+                    style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
+                    color = MiuixTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .graphicsLayer {
+                            val nameProgress = ((scrollProgress - 0.20f) / 0.15f).coerceIn(0f, 1f)
+                            alpha = 1 - nameProgress
+                            scaleX = 1 - (nameProgress * 0.05f)
+                            scaleY = 1 - (nameProgress * 0.05f)
+                        },
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                if (isChecking) {
+                    Text(
+                        text = "正在检查更新...",
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                val verProgress = ((scrollProgress - 0.05f) / 0.15f).coerceIn(0f, 1f)
+                                alpha = 1 - verProgress
+                            },
+                    )
+                } else if (hasNew) {
+                    Text(
+                        text = "发现新版本 ${releaseInfo?.latestVersion} (当前 v${BuildConfig.VERSION_NAME})",
+                        color = MiuixTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                val verProgress = ((scrollProgress - 0.05f) / 0.15f).coerceIn(0f, 1f)
+                                alpha = 1 - verProgress
+                            },
+                    )
+                } else {
+                    Text(
+                        text = "已是最新版本 (v${BuildConfig.VERSION_NAME})",
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                val verProgress = ((scrollProgress - 0.05f) / 0.15f).coerceIn(0f, 1f)
+                                alpha = 1 - verProgress
+                            },
+                    )
+                }
+            }
+
+            // ── 滚动内容列表 ──
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = innerPadding.calculateTopPadding(),
+                    bottom = innerPadding.calculateBottomPadding() + 24.dp,
+                ),
+            ) {
+                item(key = "logoSpacer") {
                     Box(
                         modifier = Modifier
-                            .size(80.dp)
-                            .shadow(
-                                elevation = if (isDark) 16.dp else 8.dp,
-                                shape = RoundedCornerShape(22.dp),
-                                spotColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.5f)
-                            )
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.15f))
-                            .border(
-                                width = 1.dp,
-                                color = MiuixTheme.colorScheme.primary.copy(alpha = 0.35f),
-                                shape = RoundedCornerShape(22.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SystemUpdate,
-                            contentDescription = null,
-                            tint = MiuixTheme.colorScheme.primary,
-                            modifier = Modifier.size(42.dp)
-                        )
-                    }
-
-                    Text(
-                        text = "LocalSend Miuix",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MiuixTheme.colorScheme.onSurface
-                    )
-
-                    // 状态提示与版本 Badge
-                    AnimatedContent(
-                        targetState = Triple(isChecking, checkResult, errorMessage),
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
-                        label = "UpdateStatusAnim"
-                    ) { (checking, result, error) ->
-                        when {
-                            checking -> {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    LinearProgressIndicator(modifier = Modifier.width(140.dp))
-                                    Text(
-                                        text = "正在检查最新版本...",
-                                        fontSize = 12.sp,
-                                        color = MiuixTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                            result != null && result.hasUpdate -> {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.18f))
-                                        .border(
-                                            width = 1.dp,
-                                            color = MiuixTheme.colorScheme.primary.copy(alpha = 0.4f),
-                                            shape = CircleShape
-                                        )
-                                        .padding(horizontal = 14.dp, vertical = 5.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(6.dp)
-                                                .clip(CircleShape)
-                                                .background(MiuixTheme.colorScheme.primary)
-                                        )
-                                        Text(
-                                            text = "发现新版本 ${result.latestVersion}",
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MiuixTheme.colorScheme.primary
-                                        )
-                                    }
-                                }
-                            }
-                            result != null && !result.hasUpdate -> {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF4CAF50).copy(alpha = 0.15f))
-                                        .border(
-                                            width = 1.dp,
-                                            color = Color(0xFF4CAF50).copy(alpha = 0.35f),
-                                            shape = CircleShape
-                                        )
-                                        .padding(horizontal = 14.dp, vertical = 5.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = null,
-                                            tint = Color(0xFF4CAF50),
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Text(
-                                            text = "已是最新版本 (v${BuildConfig.VERSION_NAME})",
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF4CAF50)
-                                        )
-                                    }
-                                }
-                            }
-                            error != null -> {
-                                Text(
-                                    text = error,
-                                    fontSize = 12.sp,
-                                    color = MiuixTheme.colorScheme.error
-                                )
-                            }
-                            else -> {
-                                Text(
-                                    text = "当前版本: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
-                                    fontSize = 12.5.sp,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // (2) 新版本详情与更新日志（若有新版本）
-            if (checkResult != null && checkResult!!.hasUpdate) {
-                val info = checkResult!!
-
-                // 基本信息卡片
-                item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            if (info.releaseTitle.isNotBlank()) {
-                                Text(
-                                    text = info.releaseTitle,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MiuixTheme.colorScheme.onSurface
-                                )
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (info.publishedAt.isNotBlank()) {
-                                    Text(
-                                        text = "发布日期: ${info.publishedAt}",
-                                        fontSize = 12.sp,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                    )
-                                }
-                                if (info.apkSize > 0) {
-                                    Text(
-                                        text = "安装包: ${FileItem.formatFileSize(info.apkSize)}",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MiuixTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Markdown 更新日志卡片
-                if (info.changelog.isNotBlank()) {
-                    item {
-                        SmallTitle(text = "更新日志")
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp)
-                            ) {
-                                MiuixMarkdown(
-                                    markdown = info.changelog.trim(),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                    }
-                }
-            } else if (checkResult != null && !checkResult!!.hasUpdate) {
-                // (3) 已是最新版本时的信息卡片
-                item {
-                    SmallTitle(text = "当前版本特性")
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            FeatureRow(
-                                icon = Icons.Default.Speed,
-                                title = "局域网全速传输",
-                                desc = "基于原生 Ktor 与 Okio 高性能传输引擎，极速互传"
-                            )
-                            FeatureRow(
-                                icon = Icons.Default.Security,
-                                title = "端到端安全加密",
-                                desc = "TLS/HTTPS 证书安全加密，保护传输私密性"
-                            )
-                            FeatureRow(
-                                icon = Icons.Default.RocketLaunch,
-                                title = "HyperOS 澎湃沉浸设计",
-                                desc = "液态玻璃悬浮底栏与 Miuix 超椭圆无缝融合"
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 3. 顶部透明沉浸式导航栏
-        TopBar(
-            onBack = onBack,
-            onRefresh = { doCheckUpdate() },
-            isChecking = isChecking
-        )
-
-        // 4. 底部常驻悬浮操作栏（Sticky Bottom Action Bar）
-        BottomActionBar(
-            modifier = Modifier.align(Alignment.BottomCenter),
-            checkResult = checkResult,
-            isChecking = isChecking,
-            downloadState = downloadState,
-            onCheckUpdate = { doCheckUpdate() },
-            onDownload = { url, size ->
-                downloadState = UpdateDownloadState.Downloading(0f, 0L, size)
-                scope.launch {
-                    val dlResult = updateManager.downloadApk(url) { progress, current, total ->
-                        downloadState = UpdateDownloadState.Downloading(progress, current, total)
-                    }
-                    dlResult.onSuccess { apkFile ->
-                        downloadState = UpdateDownloadState.Completed(apkFile)
-                        updateManager.installApk(context, apkFile)
-                    }.onFailure { error ->
-                        downloadState = UpdateDownloadState.Error(error.localizedMessage ?: "下载失败")
-                        Toast.makeText(context, "下载失败: ${error.localizedMessage}", Toast.LENGTH_LONG).show()
-                    }
-                }
-            },
-            onInstall = { file -> updateManager.installApk(context, file) },
-            onRetryDownload = { downloadState = UpdateDownloadState.Idle },
-            onOpenBrowser = { url -> updateManager.openInBrowser(context, url) }
-        )
-    }
-}
-
-/**
- * 顶部透明沉浸式导航栏
- */
-@Composable
-private fun TopBar(
-    onBack: () -> Unit,
-    onRefresh: () -> Unit,
-    isChecking: Boolean
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onBack) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "返回",
-                tint = MiuixTheme.colorScheme.onSurface
-            )
-        }
-        Text(
-            text = "软件更新",
-            fontSize = 17.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MiuixTheme.colorScheme.onSurface
-        )
-        IconButton(
-            onClick = onRefresh,
-            enabled = !isChecking
-        ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "重新检查",
-                tint = MiuixTheme.colorScheme.onSurface
-            )
-        }
-    }
-}
-
-/**
- * 底部常驻操作栏（Sticky Bottom Action Bar）
- */
-@Composable
-private fun BottomActionBar(
-    modifier: Modifier = Modifier,
-    checkResult: UpdateCheckResult?,
-    isChecking: Boolean,
-    downloadState: UpdateDownloadState,
-    onCheckUpdate: () -> Unit,
-    onDownload: (url: String, size: Long) -> Unit,
-    onInstall: (java.io.File) -> Unit,
-    onRetryDownload: () -> Unit,
-    onOpenBrowser: (url: String) -> Unit
-) {
-    val isDark = isSystemInDarkTheme()
-    val bgColor = if (isDark) {
-        Color(0xFF1B1D22).copy(alpha = 0.92f)
-    } else {
-        MiuixTheme.colorScheme.surface.copy(alpha = 0.95f)
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 12.dp,
-                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                spotColor = Color.Black.copy(alpha = 0.2f)
-            )
-            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-            .background(bgColor)
-            .border(
-                width = 0.5.dp,
-                color = MiuixTheme.colorScheme.dividerLine.copy(alpha = 0.25f),
-                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-            )
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            when {
-                // 1. 下载中状态
-                downloadState is UpdateDownloadState.Downloading -> {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "正在下载更新包...",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MiuixTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "${(downloadState.progress * 100).toInt()}%",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MiuixTheme.colorScheme.primary
-                            )
-                        }
-                        LinearProgressIndicator(
-                            progress = downloadState.progress,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            text = "${FileItem.formatFileSize(downloadState.downloadedBytes)} / ${FileItem.formatFileSize(downloadState.totalBytes)}",
-                            fontSize = 11.5.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        )
-                    }
-                }
-
-                // 2. 下载完成状态
-                downloadState is UpdateDownloadState.Completed -> {
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColorsPrimary(),
-                        onClick = { onInstall(downloadState.file) }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SystemUpdate,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "立即安装更新")
-                    }
-                }
-
-                // 3. 下载出错状态
-                downloadState is UpdateDownloadState.Error -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "下载失败: ${downloadState.message}",
-                            fontSize = 12.sp,
-                            color = MiuixTheme.colorScheme.error,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Button(
-                            colors = ButtonDefaults.buttonColorsPrimary(),
-                            onClick = onRetryDownload
-                        ) {
-                            Text(text = "重试")
-                        }
-                    }
-                }
-
-                // 4. 有新版本且处于空闲状态
-                checkResult != null && checkResult.hasUpdate -> {
-                    val info = checkResult
-                    val downloadUrl = info.downloadUrl
-
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColorsPrimary(),
-                        onClick = {
-                            if (downloadUrl != null) {
-                                onDownload(downloadUrl, info.apkSize)
-                            } else {
-                                onOpenBrowser(info.releaseUrl)
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = if (downloadUrl != null) Icons.Default.Download else Icons.Default.OpenInBrowser,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (downloadUrl != null) {
-                                if (info.apkSize > 0) "立即下载更新 (${FileItem.formatFileSize(info.apkSize)})" else "立即下载更新"
-                            } else {
-                                "前往 GitHub 下载"
-                            }
-                        )
-                    }
-
-                    TextButton(
-                        text = "在 GitHub 中查看 Release 页面",
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onOpenBrowser(info.releaseUrl) }
+                            .fillMaxWidth()
+                            .height(logoHeightDp + 48.dp),
                     )
                 }
 
-                // 5. 已是最新版本或检查中
-                else -> {
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(),
-                        onClick = onCheckUpdate,
-                        enabled = !isChecking
+                // ── 更新日志卡片（获取到版本信息后常驻展示，保证稳定可见） ──
+                if (releaseInfo != null) {
+                    item(key = "changelog") {
+                        val changelogTitle = if (hasNew) {
+                            "新版本更新日志 (${releaseInfo?.latestVersion})"
+                        } else {
+                            "当前版本说明 (v${BuildConfig.VERSION_NAME})"
+                        }
+                        SmallTitle(text = changelogTitle)
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp),
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = releaseInfo?.releaseTitle?.ifBlank { "版本特性说明" } ?: "版本特性说明",
+                                    style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold),
+                                    color = MiuixTheme.colorScheme.onSurface,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                MarkdownText(
+                                    markdown = releaseInfo?.changelog ?: "",
+                                    modifier = Modifier.fillMaxWidth(),
+                                    baseFontSize = 14,
+                                )
+
+                                if (isDownloading) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(
+                                            text = "正在下载更新...",
+                                            style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
+                                            color = MiuixTheme.colorScheme.primary,
+                                        )
+                                        val percent = if (downloadProgress >= 0f) "${(downloadProgress * 100).toInt()}%" else ""
+                                        val sizeText = if (totalBytes > 0) {
+                                            "${FileItem.formatFileSize(downloadedBytes)} / ${FileItem.formatFileSize(totalBytes)}"
+                                        } else {
+                                            FileItem.formatFileSize(downloadedBytes)
+                                        }
+                                        Text(
+                                            text = if (percent.isNotEmpty()) "$sizeText ($percent)" else sizeText,
+                                            style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
+                                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    LinearProgressIndicator(
+                                        progress = downloadProgress,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                if (downloadedFile != null) {
+                                    TextButton(
+                                        text = "立即安装更新",
+                                        onClick = {
+                                            updateManager.installApk(context, downloadedFile!!)
+                                        },
+                                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                } else if (hasNew && !isDownloading) {
+                                    TextButton(
+                                        text = "立即下载更新",
+                                        onClick = {
+                                            val url = releaseInfo?.downloadUrl ?: releaseInfo?.releaseUrl
+                                            if (url != null) {
+                                                isDownloading = true
+                                                downloadProgress = 0f
+                                                coroutineScope.launch {
+                                                    val result = updateManager.downloadApk(
+                                                        downloadUrl = url,
+                                                        onProgress = { progress, downloaded, total ->
+                                                            downloadProgress = progress
+                                                            downloadedBytes = downloaded
+                                                            totalBytes = total
+                                                        },
+                                                    )
+                                                    isDownloading = false
+                                                    result.onSuccess { file ->
+                                                        downloadedFile = file
+                                                        updateManager.installApk(context, file)
+                                                    }.onFailure { error ->
+                                                        Toast.makeText(context, "下载失败: ${error.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            } else {
+                                                releaseInfo?.releaseUrl?.let { updateManager.openInBrowser(context, it) }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
+
+                // ── 更新设置 ──
+                item(key = "settings") {
+                    SmallTitle(text = "更新设置")
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                        BasicComponent(
+                            title = "自动检查更新",
+                            summary = "每次启动应用时自动检查最新版本",
+                            endActions = {
+                                Switch(
+                                    checked = autoCheckUpdate,
+                                    onCheckedChange = { checked ->
+                                        autoCheckUpdate = checked
+                                    },
+                                )
+                            },
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = if (isChecking) "正在检查更新..." else "重新检查更新")
+
+                        BasicComponent(
+                            title = "忽略此版本",
+                            summary = when {
+                                isChecking -> "正在检查..."
+                                !hasNew -> "当前已是最新版本"
+                                ignoredVersion == releaseInfo?.latestVersion -> "已忽略版本 ${releaseInfo?.latestVersion}"
+                                else -> "忽略新版本 ${releaseInfo?.latestVersion} 的更新提示"
+                            },
+                            endActions = {
+                                Switch(
+                                    checked = hasNew && ignoredVersion == releaseInfo?.latestVersion,
+                                    onCheckedChange = { checked ->
+                                        ignoredVersion = if (checked) releaseInfo?.latestVersion else null
+                                    },
+                                    enabled = hasNew,
+                                )
+                            },
+                        )
+                    }
+                }
+
+                // ── 版本通道与操作 ──
+                item(key = "channel") {
+                    SmallTitle(text = "版本通道与操作")
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
+                    ) {
+                        BasicComponent(
+                            title = "手动检查更新",
+                            summary = if (isChecking) "正在检索远程版本信息..." else "点击从 GitHub Releases 检索最新版本",
+                            onClick = {
+                                doCheck(userInitiated = true)
+                            },
+                            endActions = {
+                                if (isChecking) {
+                                    InfiniteProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            },
+                        )
+
+                        BasicComponent(
+                            title = "GitHub Releases",
+                            summary = "前往项目官方发布页面查看历史版本",
+                            onClick = {
+                                updateManager.openInBrowser(context, "https://github.com/137458/localsend-miuix/releases")
+                            },
+                        )
+
+                        BasicComponent(
+                            title = "HyperOS 3 流光特效",
+                            summary = if (isOs3Effect) "已开启 HyperOS 3 增强流光着色器" else "当前使用 HyperOS 2 经典流光着色器",
+                            endActions = {
+                                Switch(
+                                    checked = isOs3Effect,
+                                    onCheckedChange = { isOs3Effect = it },
+                                )
+                            },
+                        )
                     }
                 }
             }
         }
-    }
-}
 
-/**
- * 特性条目展示行
- */
-@Composable
-private fun FeatureRow(
-    icon: ImageVector,
-    title: String,
-    desc: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MiuixTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MiuixTheme.colorScheme.onSurface
-            )
-            Text(
-                text = desc,
-                fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+        // 官方 Miuix 风格更新弹窗
+        if (showDialog && releaseInfo != null) {
+            UpdateDialog(
+                show = showDialog,
+                releaseInfo = releaseInfo!!,
+                onDismiss = { showDialog = false },
+                onUpdate = { url ->
+                    showDialog = false
+                    updateManager.openInBrowser(context, url)
+                },
+                onIgnore = { ver ->
+                    ignoredVersion = ver
+                    showDialog = false
+                },
             )
         }
     }
