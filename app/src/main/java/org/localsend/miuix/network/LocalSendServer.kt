@@ -287,14 +287,20 @@ class LocalSendServer(
                 """
                 <div class="text-card">
                     <pre class="text-content" id="text-${textItem.id}">$escapedText</pre>
-                    <button class="btn btn-sec" onclick="copyText('text-${textItem.id}')">📋 复制文本</button>
+                    <button class="btn btn-sec" onclick="copyText('text-${textItem.id}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        复制文本
+                    </button>
                 </div>
                 """.trimIndent()
             }
             """
             <div class="section-card">
                 <div class="section-header">
-                    <span class="section-title">💬 共享文本</span>
+                    <span class="section-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                        共享文本
+                    </span>
                     <span class="section-tag">${textItems.size} 条</span>
                 </div>
                 $textCards
@@ -311,14 +317,20 @@ class LocalSendServer(
                         <span class="file-name">${escapeHtml(file.name)}</span>
                         <span class="file-meta">${file.formattedSize}</span>
                     </div>
-                    <a class="btn btn-primary" href="$downloadUrl" download="${escapeHtml(file.name)}">⬇️ 下载</a>
+                    <a class="btn btn-primary" href="$downloadUrl" download="${escapeHtml(file.name)}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        下载
+                    </a>
                 </div>
                 """.trimIndent()
             }
             """
             <div class="section-card">
                 <div class="section-header">
-                    <span class="section-title">📦 共享文件</span>
+                    <span class="section-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                        共享文件
+                    </span>
                     <span class="section-tag">${binaryFiles.size} 个</span>
                 </div>
                 <div class="file-list">$rows</div>
@@ -329,7 +341,7 @@ class LocalSendServer(
         val noShareHint = if (!hasSessionFiles) {
             """
             <div class="empty-hint">
-                <p>当前发送端未添加共享内容，但您可以直接向手机上传文件 👇</p>
+                <p>当前发送端未添加共享内容，但您可以直接向手机上传文件</p>
             </div>
             """.trimIndent()
         } else ""
@@ -497,7 +509,7 @@ class LocalSendServer(
                         border-color: var(--primary-hover);
                         background: rgba(0, 122, 255, 0.14);
                     }
-                    .dropzone-icon { font-size: 32px; margin-bottom: 6px; }
+                    .dropzone-icon { display: flex; justify-content: center; margin-bottom: 8px; }
                     .dropzone-text { font-size: 14px; font-weight: 600; color: var(--primary); margin-bottom: 4px; }
                     .dropzone-hint { font-size: 12px; color: var(--text-sub); }
                     .upload-status-box {
@@ -532,8 +544,8 @@ class LocalSendServer(
                     .drag-overlay {
                         position: fixed;
                         top: 0; left: 0; right: 0; bottom: 0;
-                        background: rgba(0, 122, 255, 0.88);
-                        backdrop-filter: blur(10px);
+                        background: rgba(0, 122, 255, 0.92);
+                        backdrop-filter: blur(12px);
                         display: flex;
                         flex-direction: column;
                         align-items: center;
@@ -545,8 +557,8 @@ class LocalSendServer(
                         transition: opacity 0.2s ease;
                     }
                     .drag-overlay.active { opacity: 1; pointer-events: all; }
-                    .drag-overlay-icon { font-size: 64px; margin-bottom: 12px; }
-                    .drag-overlay-title { font-size: 22px; font-weight: 700; }
+                    .drag-overlay-icon { display: flex; justify-content: center; margin-bottom: 16px; }
+                    .drag-overlay-title { font-size: 20px; font-weight: 700; }
                     .toast {
                         position: fixed;
                         bottom: 28px;
@@ -570,7 +582,10 @@ class LocalSendServer(
             <body>
                 <div class="container">
                     <div class="header-card">
-                        <div class="device-badge">📱 局域网在线</div>
+                        <div class="device-badge">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+                            局域网在线
+                        </div>
                         <div class="header-title">${escapeHtml(alias)}</div>
                         <div class="header-sub">通过局域网高速安全传输，无需外网连接</div>
                     </div>
@@ -579,11 +594,16 @@ class LocalSendServer(
                     $fileListHtml
                     <div class="section-card">
                         <div class="section-header">
-                            <span class="section-title">📤 上传文件到手机</span>
+                            <span class="section-title">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                上传文件到手机
+                            </span>
                             <span class="section-tag">双向快传</span>
                         </div>
                         <div class="upload-dropzone" id="uploadDropzone">
-                            <div class="dropzone-icon">📁</div>
+                            <div class="dropzone-icon">
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            </div>
                             <div class="dropzone-text">点击选择文件 或 拖拽文件到此处</div>
                             <div class="dropzone-hint">支持任意格式文件与多文件同时上传</div>
                         </div>
@@ -605,7 +625,9 @@ class LocalSendServer(
                 </div>
 
                 <div class="drag-overlay" id="dragOverlay">
-                    <div class="drag-overlay-icon">📥</div>
+                    <div class="drag-overlay-icon">
+                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    </div>
                     <div class="drag-overlay-title">松开鼠标即可上传至手机</div>
                 </div>
 
@@ -797,7 +819,7 @@ class LocalSendServer(
 
                         function uploadNext(index) {
                             if (index >= fileIds.length) {
-                                statusTitle.innerText = '✅ 上传完成！';
+                                statusTitle.innerText = '上传完成';
                                 statusTitle.style.color = 'var(--success)';
                                 statusPercent.innerText = '100%';
                                 progressBar.style.width = '100%';
@@ -855,7 +877,7 @@ class LocalSendServer(
 
                     function finishError(msg) {
                         isUploading = false;
-                        statusTitle.innerText = '❌ 上传失败';
+                        statusTitle.innerText = '上传失败';
                         statusTitle.style.color = 'var(--danger)';
                         detailText.innerText = msg;
                         showToast(msg);

@@ -32,6 +32,7 @@ import org.localsend.miuix.network.NetworkUtils
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
@@ -146,22 +147,37 @@ fun WebShareDialog(
                             text = "当前共享内容 (${currentShare.files.size} 项)",
                             style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold)
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        currentShare.files.take(4).forEach { file ->
-                            Text(
-                                text = if (file.isTextMessage) "💬 ${file.textContent?.take(40) ?: "纯文本"}" else "📄 ${file.name} (${file.formattedSize})",
-                                style = MiuixTheme.textStyles.footnote1,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(vertical = 2.dp)
-                            )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        currentShare.files.take(5).forEach { file ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (file.isTextMessage) AppIcons.Text else AppIcons.getFileIcon(file.mimeType, file.name),
+                                    contentDescription = null,
+                                    tint = MiuixTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (file.isTextMessage) (file.textContent?.take(40) ?: "纯文本") else "${file.name} (${file.formattedSize})",
+                                    style = MiuixTheme.textStyles.footnote1,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
-                        if (currentShare.files.size > 4) {
+                        if (currentShare.files.size > 5) {
                             Text(
                                 text = "... 等共 ${currentShare.files.size} 项",
                                 style = MiuixTheme.textStyles.footnote1,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                modifier = Modifier.padding(top = 4.dp, start = 24.dp)
                             )
                         }
                     }
