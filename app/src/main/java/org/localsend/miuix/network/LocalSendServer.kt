@@ -78,6 +78,34 @@ class LocalSendServer(
     private val activeSessions = ConcurrentHashMap<String, TransferSession>()
     private val sessionTokens = ConcurrentHashMap<String, MutableMap<String, String>>() // sessionId -> (fileId -> token)
 
+    /**
+     * 清理过期、中断、已完成或处于终端状态的残留接收会话，防止 activeSessions 死锁导致后续传输报 409。
+     */
+    private fun cleanStaleSessions(incomingIp: String? = null) {
+        val now = System.currentTimeMillis()
+        val iterator = activeSessions.entries.iterator()
+        while (iterator.hasNext()) {
+            val (id, session) = iterator.next()
+            val isTerminal = session.status == TransferStatus.Completed ||
+                session.status == TransferStatus.Failed ||
+                session.status == TransferStatus.Canceled
+            val isStale = (now - session.startTime > 120_000L && session.transferredBytes == 0L) ||
+                (session.endTime?.let { now - it > 5_000L } ?: false)
+            val isSameSenderReconnecting = incomingIp != null && session.device.ip == incomingIp &&
+                (session.status == TransferStatus.WaitingApproval || session.status == TransferStatus.Failed || now - session.startTime > 10_000L)
+
+            if (isTerminal || isStale || isSameSenderReconnecting) {
+                iterator.remove()
+                sessionTokens.remove(id)
+                if (session.status == TransferStatus.WaitingApproval || session.status == TransferStatus.InProgress) {
+                    session.status = TransferStatus.Canceled
+                    session.endTime = now
+                    onSessionUpdated(session)
+                }
+            }
+        }
+    }
+
     // 429 限流：按来源 IP 统计 prepare-upload 请求频率
     private val requestHits = ConcurrentHashMap<String, MutableList<Long>>()
 
@@ -1022,6 +1050,7 @@ class LocalSendServer(
                     return@post
                 }
                 val remoteIp = call.request.origin.remoteHost
+                cleanStaleSessions(remoteIp)
                 if (tooFrequent(remoteIp)) {
                     call.respond(HttpStatusCode.TooManyRequests, "Too many requests")
                     return@post
@@ -1090,6 +1119,7 @@ class LocalSendServer(
                     )
                 } else {
                     session.status = TransferStatus.Canceled
+                    session.endTime = System.currentTimeMillis()
                     activeSessions.remove(sessionId)
                     sessionTokens.remove(sessionId)
                     onSessionUpdated(session)
@@ -1133,80 +1163,97 @@ class LocalSendServer(
                 fileItem.status = TransferStatus.InProgress
                 fileItem.bytesTransferred = 0L
 
-                val checksum = withContext(Dispatchers.IO) {
-                    var digest: MessageDigest? = if (fileItem.expectedSha256 != null) {
-                        MessageDigest.getInstance("SHA-256")
-                    } else {
-                        null
-                    }
-                    val textBuffer = if (fileItem.isTextMessage || fileItem.mimeType.startsWith("text/")) {
-                        java.io.ByteArrayOutputStream()
-                    } else null
-
-                    openSaveStream(fileItem, saveTarget).buffered(128 * 1024).use { fos ->
-                        val channel = call.receiveChannel()
-                        val buffer = ByteArray(128 * 1024)
-                        var lastTime = System.currentTimeMillis()
-                        var bytesSinceLast = 0L
-
-                        while (!channel.isClosedForRead) {
-                            val read = channel.readAvailable(buffer, 0, buffer.size)
-                            if (read <= 0) break
-                            fos.write(buffer, 0, read)
-                            textBuffer?.write(buffer, 0, read)
-                            digest?.update(buffer, 0, read)
-                            fileItem.bytesTransferred += read
-                            session.transferredBytes += read
-                            bytesSinceLast += read
-
-                            val now = System.currentTimeMillis()
-                            val delta = now - lastTime
-                            if (delta >= 500) {
-                                val currentSpeed = (bytesSinceLast * 1000) / delta
-                                fileItem.speed = currentSpeed
-                                session.speed = currentSpeed
-                                if (fileItem.size > 0) {
-                                    fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
-                                }
-                                bytesSinceLast = 0
-                                lastTime = now
-                                onSessionUpdated(session)
-                            }
+                try {
+                    val checksum = withContext(Dispatchers.IO) {
+                        var digest: MessageDigest? = if (fileItem.expectedSha256 != null) {
+                            MessageDigest.getInstance("SHA-256")
+                        } else {
+                            null
                         }
-                        fos.flush()
-                    }
-                    if (textBuffer != null && textBuffer.size() > 0) {
-                        fileItem.textContent = textBuffer.toString(Charsets.UTF_8.name())
-                    }
-                    // MediaStore 路径：写入完成后清除 IS_PENDING，使文件立即可见
-                    confirmMediaStoreWrite(fileItem)
-                    digest?.digest()?.joinToString("") { "%02x".format(it) }
-                }
+                        val textBuffer = if (fileItem.isTextMessage || fileItem.mimeType.startsWith("text/")) {
+                            java.io.ByteArrayOutputStream()
+                        } else null
 
-                // 发送方声明了 sha256 且校验失败：删除已写入文件并按规范回 422
-                if (fileItem.expectedSha256 != null && fileItem.expectedSha256 != checksum) {
+                        openSaveStream(fileItem, saveTarget).buffered(128 * 1024).use { fos ->
+                            val channel = call.receiveChannel()
+                            val buffer = ByteArray(128 * 1024)
+                            var lastTime = System.currentTimeMillis()
+                            var bytesSinceLast = 0L
+
+                            while (!channel.isClosedForRead) {
+                                val read = channel.readAvailable(buffer, 0, buffer.size)
+                                if (read <= 0) break
+                                fos.write(buffer, 0, read)
+                                textBuffer?.write(buffer, 0, read)
+                                digest?.update(buffer, 0, read)
+                                fileItem.bytesTransferred += read
+                                session.transferredBytes += read
+                                bytesSinceLast += read
+
+                                val now = System.currentTimeMillis()
+                                val delta = now - lastTime
+                                if (delta >= 500) {
+                                    val currentSpeed = (bytesSinceLast * 1000) / delta
+                                    fileItem.speed = currentSpeed
+                                    session.speed = currentSpeed
+                                    if (fileItem.size > 0) {
+                                        fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
+                                    }
+                                    bytesSinceLast = 0
+                                    lastTime = now
+                                    onSessionUpdated(session)
+                                }
+                            }
+                            fos.flush()
+                        }
+                        if (textBuffer != null && textBuffer.size() > 0) {
+                            fileItem.textContent = textBuffer.toString(Charsets.UTF_8.name())
+                        }
+                        // MediaStore 路径：写入完成后清除 IS_PENDING，使文件立即可见
+                        confirmMediaStoreWrite(fileItem)
+                        digest?.digest()?.joinToString("") { "%02x".format(it) }
+                    }
+
+                    // 发送方声明了 sha256 且校验失败：删除已写入文件并按规范回 422
+                    if (fileItem.expectedSha256 != null && fileItem.expectedSha256 != checksum) {
+                        deleteSavedFile(fileItem, saveTarget)
+                        fileItem.status = TransferStatus.Failed
+                        fileItem.progress = 0f
+                        session.status = TransferStatus.Failed
+                        session.endTime = System.currentTimeMillis()
+                        activeSessions.remove(sessionId)
+                        sessionTokens.remove(sessionId)
+                        onSessionUpdated(session)
+                        call.respond(HttpStatusCode.UnprocessableEntity, "CHECKSUM_MISMATCH")
+                        return@post
+                    }
+
+                    fileItem.status = TransferStatus.Completed
+                    fileItem.progress = 1f
+                    fileItem.bytesTransferred = fileItem.size
+
+                    // Check if all files in session completed
+                    if (session.files.all { it.status == TransferStatus.Completed }) {
+                        session.status = TransferStatus.Completed
+                        session.endTime = System.currentTimeMillis()
+                        activeSessions.remove(sessionId)
+                        sessionTokens.remove(sessionId)
+                    }
+                    onSessionUpdated(session)
+
+                    call.respond(HttpStatusCode.OK, mapOf("message" to "File uploaded successfully"))
+                } catch (e: Throwable) {
+                    e.printStackTrace()
                     deleteSavedFile(fileItem, saveTarget)
                     fileItem.status = TransferStatus.Failed
                     fileItem.progress = 0f
-                    onSessionUpdated(session)
-                    call.respond(HttpStatusCode.UnprocessableEntity, "CHECKSUM_MISMATCH")
-                    return@post
-                }
-
-                fileItem.status = TransferStatus.Completed
-                fileItem.progress = 1f
-                fileItem.bytesTransferred = fileItem.size
-
-                // Check if all files in session completed
-                if (session.files.all { it.status == TransferStatus.Completed }) {
-                    session.status = TransferStatus.Completed
+                    session.status = TransferStatus.Failed
                     session.endTime = System.currentTimeMillis()
                     activeSessions.remove(sessionId)
                     sessionTokens.remove(sessionId)
+                    onSessionUpdated(session)
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("message" to (e.message ?: "Upload failed")))
                 }
-                onSessionUpdated(session)
-
-                call.respond(HttpStatusCode.OK, mapOf("message" to "File uploaded successfully"))
             }
 
             post("/api/localsend/v2/cancel") {

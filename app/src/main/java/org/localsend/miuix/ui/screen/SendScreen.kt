@@ -117,6 +117,7 @@ fun SendScreen(
                 isRefreshing = false
             },
             pullToRefreshState = pullToRefreshState,
+            refreshTexts = listOf("下拉刷新", "释放立即刷新", "正在刷新...", "刷新完成"),
             modifier = Modifier
                 .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection)

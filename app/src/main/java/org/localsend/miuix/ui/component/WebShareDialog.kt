@@ -65,76 +65,75 @@ fun WebShareDialog(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (isSharing) {
-                val currentShare = shares.first()
+            Text(
+                text = "同局域网设备扫描二维码或在浏览器访问下方地址即可互传",
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
 
-                Text(
-                    text = "同局域网设备扫描二维码或在浏览器访问下方地址即可接收",
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 16.dp)
+            // QR Code Container with clean white background for scanning
+            Box(
+                modifier = Modifier
+                    .size(220.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .padding(12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                QrCodeImage(
+                    content = shareUrl,
+                    size = 196.dp,
+                    darkColor = Color.Black,
+                    lightColor = Color.White
                 )
+            }
 
-                // QR Code Container with clean white background for scanning
-                Box(
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
                     modifier = Modifier
-                        .size(220.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White)
-                        .padding(12.dp),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    QrCodeImage(
-                        content = shareUrl,
-                        size = 196.dp,
-                        darkColor = Color.Black,
-                        lightColor = Color.White
-                    )
-                }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "网页访问地址",
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = shareUrl,
+                            style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.SemiBold),
+                            color = MiuixTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Button(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Web URL", shareUrl))
+                        },
+                        colors = ButtonDefaults.buttonColorsPrimary()
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "网页访问地址",
-                                style = MiuixTheme.textStyles.footnote1,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = shareUrl,
-                                style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.SemiBold),
-                                color = MiuixTheme.colorScheme.primary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Web URL", shareUrl))
-                            },
-                            colors = ButtonDefaults.buttonColorsPrimary()
-                        ) {
-                            Text("复制")
-                        }
+                        Text("复制")
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
+            if (isSharing) {
+                val currentShare = shares.first()
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -182,25 +181,51 @@ fun WebShareDialog(
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Button(
-                        onClick = onDismissRequest,
-                        colors = ButtonDefaults.buttonColors(),
-                        modifier = Modifier.weight(1f)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
                     ) {
-                        Text("关闭窗口")
+                        Text(
+                            text = "双向网页快传已就绪",
+                            style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (selectedFiles.isNotEmpty()) {
+                                "当前已选择 ${selectedFiles.size} 项文件，可随时加入共享供对方下载；电脑/浏览器端也可以直接向手机回传文件。"
+                            } else {
+                                "对方在浏览器打开此链接可直接拖拽或选择文件回传到手机。如需共享文件给对方，请先在发送页添加内容。"
+                            },
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
                     }
+                }
+            }
 
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onDismissRequest,
+                    colors = ButtonDefaults.buttonColors(),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("关闭")
+                }
+
+                if (isSharing) {
                     Button(
                         onClick = {
                             manager.stopShare()
-                            onDismissRequest()
                         },
                         colors = ButtonDefaults.buttonColors(
                             color = MiuixTheme.colorScheme.error,
@@ -210,58 +235,15 @@ fun WebShareDialog(
                     ) {
                         Text("停止共享")
                     }
-                }
-            } else {
-                Text(
-                    text = "通过网页分享可以让任何支持浏览器的设备（如 iOS、Mac、Linux、无客户端电脑）直接下载文件或复制文本。",
-                    style = MiuixTheme.textStyles.body1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(vertical = 16.dp)
-                )
-
-                if (selectedFiles.isEmpty()) {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "当前待发送列表中暂无内容，请先在发送页选择文件或输入文本。",
-                            style = MiuixTheme.textStyles.body2,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            modifier = Modifier.padding(16.dp),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                } else {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "将以当前已选的 ${selectedFiles.size} 项内容启动 Web 共享服务。",
-                            style = MiuixTheme.textStyles.body2,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Button(
-                        onClick = onDismissRequest,
-                        colors = ButtonDefaults.buttonColors()
-                    ) {
-                        Text("取消")
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
+                } else if (selectedFiles.isNotEmpty()) {
                     Button(
                         onClick = {
                             manager.startShare(selectedFiles)
                         },
-                        enabled = selectedFiles.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColorsPrimary()
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text("开始 Web 共享")
+                        Text("共享已选 ${selectedFiles.size} 项")
                     }
                 }
             }
