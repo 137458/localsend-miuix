@@ -272,8 +272,9 @@ fun LiquidGlassBottomBar(
                 }
                 Text(
                     text = item.label,
-                    fontSize = 10.sp,
-                    lineHeight = 12.sp,
+                    fontSize = 11.sp,
+                    lineHeight = 13.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
                     color = activeColor,
                     maxLines = 1,
                     softWrap = false,
@@ -285,8 +286,8 @@ fun LiquidGlassBottomBar(
 
     Box(
         modifier = modifier
-            .widthIn(min = 210.dp, max = 240.dp)
-            .height(56.dp),
+            .fillMaxWidth()
+            .height(64.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         // 1. Base Layer
@@ -296,14 +297,14 @@ fun LiquidGlassBottomBar(
                     .fillMaxSize()
                     .onGloballyPositioned { coords ->
                         totalWidthPx = coords.size.width.toFloat()
-                        val contentWidthPx = totalWidthPx - with(density) { 6.dp.toPx() }
+                        val contentWidthPx = totalWidthPx - with(density) { 8.dp.toPx() }
                         tabWidthPx = (contentWidthPx / tabsCount).coerceAtLeast(0f)
                     }
                     .graphicsLayer { translationX = panelOffset }
                     .dropShadow(
                         shape = pillShape,
                         shadow = Shadow(
-                            radius = 8.dp,
+                            radius = 10.dp,
                             color = Color.Black,
                             alpha = if (isInDark) 0.2f else 0.1f,
                         ),
@@ -322,14 +323,14 @@ fun LiquidGlassBottomBar(
                                     vibrancy()
                                     blur(4.dp.toPx(), 4.dp.toPx())
                                     lens(
-                                        refractionHeight = 20.dp.toPx(),
-                                        refractionAmount = 20.dp.toPx(),
+                                        refractionHeight = 24.dp.toPx(),
+                                        refractionAmount = 24.dp.toPx(),
                                     )
                                 },
                                 highlight = { baseHighlight.copy(alpha = 0.75f) },
                                 layerBlock = {
                                     val width = size.width.coerceAtLeast(1f)
-                                    val s = lerp(1f, 1f + 12.dp.toPx() / width, dampedDragAnimation.pressProgress)
+                                    val s = lerp(1f, 1f + 16.dp.toPx() / width, dampedDragAnimation.pressProgress)
                                     scaleX = s
                                     scaleY = s
                                 },
@@ -351,7 +352,7 @@ fun LiquidGlassBottomBar(
                         }
                     )
                     .then(if (isLiquidGlassMode && interactiveHighlight != null) interactiveHighlight.modifier else Modifier)
-                    .padding(3.dp),
+                    .padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 content = tabsContent,
             )
@@ -361,7 +362,7 @@ fun LiquidGlassBottomBar(
         if (isLiquidGlassMode && backdrop != null && combinedBackdrop != null) {
             CompositionLocalProvider(
                 LocalLiquidBarTabScale provides {
-                    lerp(1f, 1.15f, dampedDragAnimation.pressProgress)
+                    lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
                 },
                 LocalLiquidBarContentColor provides primaryColor
             ) {
@@ -372,7 +373,7 @@ fun LiquidGlassBottomBar(
                         .layerBackdrop(tabsBackdrop)
                         .fillMaxSize()
                         .graphicsLayer { translationX = panelOffset }
-                        .padding(3.dp),
+                        .padding(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     content = tabsContent,
                 )
@@ -385,7 +386,7 @@ fun LiquidGlassBottomBar(
             if (isLiquidGlassMode && combinedBackdrop != null) {
                 Box(
                     Modifier
-                        .padding(horizontal = 3.dp)
+                        .padding(horizontal = 4.dp)
                         .graphicsLayer {
                             val progressOffset = dampedDragAnimation.value * tabWidthPx
                             translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
@@ -428,13 +429,13 @@ fun LiquidGlassBottomBar(
                                 alpha = dampedDragAnimation.pressProgress,
                             )
                         }
-                        .height(50.dp)
+                        .height(56.dp)
                         .width(tabWidthDp)
                 )
             } else {
                 Box(
                     modifier = Modifier
-                        .padding(horizontal = 3.dp)
+                        .padding(horizontal = 4.dp)
                         .graphicsLayer {
                             val progressOffset = dampedDragAnimation.value * tabWidthPx
                             translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
@@ -442,7 +443,7 @@ fun LiquidGlassBottomBar(
                         .then(dampedDragAnimation.modifier)
                         .clip(pillShape)
                         .background(primaryColor.copy(alpha = 0.15f), pillShape)
-                        .height(50.dp)
+                        .height(56.dp)
                         .width(tabWidthDp),
                     contentAlignment = Alignment.CenterStart
                 ) {
@@ -451,8 +452,8 @@ fun LiquidGlassBottomBar(
                             Modifier
                                 .clearAndSetSemantics {}
                                 .wrapContentWidth(align = Alignment.Start, unbounded = true)
-                                .requiredWidth(with(density) { (totalWidthPx - 6.dp.toPx()).toDp() })
-                                .height(50.dp)
+                                .requiredWidth(with(density) { (totalWidthPx - 8.dp.toPx()).toDp() })
+                                .height(56.dp)
                                 .graphicsLayer {
                                     val progressOffset = dampedDragAnimation.value * tabWidthPx
                                     translationX = if (isLtr) -progressOffset else progressOffset
