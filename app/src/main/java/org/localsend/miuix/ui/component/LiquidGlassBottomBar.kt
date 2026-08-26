@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
@@ -58,10 +56,10 @@ import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import org.localsend.miuix.ui.animation.DampedDragAnimation
 import org.localsend.miuix.ui.animation.InteractiveHighlight
+import org.localsend.miuix.ui.effect.isRuntimeShaderSupported
 import org.localsend.miuix.ui.libs.liquid.InnerShadow
 import org.localsend.miuix.ui.libs.liquid.innerShadow
 import org.localsend.miuix.ui.libs.liquid.lens
@@ -73,52 +71,32 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.blur.drawBackdrop
-import top.yukonga.miuix.kmp.blur.highlight.BloomStroke
-import top.yukonga.miuix.kmp.blur.highlight.Highlight
-import top.yukonga.miuix.kmp.blur.highlight.LightPosition
-import top.yukonga.miuix.kmp.blur.highlight.LightSource
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.abs
 import kotlin.math.sign
 
 val LocalLiquidBarContentColor = staticCompositionLocalOf { Color.Unspecified }
-val LocalLiquidBarTabScale = staticCompositionLocalOf<() -> Float> { { 1f } }
+val LocalLiquidBarTabScale = staticCompositionLocalOf { { 1f } }
 
-private val iosIndicatorSpecular: Highlight = Highlight(
-    width = 1.dp,
-    alpha = 1f,
-    style = BloomStroke(
-        color = Color.White.copy(alpha = 0.12f),
-        innerBlurRadius = 2.0.dp,
-        primaryLight = LightSource(
-            position = LightPosition(0.5f, -0.3f, -0.05f),
-            color = Color.White,
-            intensity = 1f,
-        ),
-        secondaryLight = LightSource(
-            position = LightPosition(0.5f, 0.8f, -0.5f),
-            color = Color.White,
-            intensity = 0.4f,
-        ),
-        dualPeak = true,
-    ),
-)
-
+/**
+ * 官方 Miuix / HyperOS 规范液态玻璃（Liquid Glass）悬浮胶囊底栏。
+ * 遵循 InstallerX-Revived 与 AndroidLiquidGlass 生产级双重 Backdrop 架构与折射规范。
+ */
 @Composable
 fun LiquidGlassBottomBar(
+    modifier: Modifier = Modifier,
     items: List<NavigationItem>,
     selectedIndex: () -> Int,
-    onSelected: (index: Int) -> Unit,
+    onSelected: (Int) -> Unit,
     backdrop: Backdrop?,
-    modifier: Modifier = Modifier,
     badge: (Int) -> (@Composable () -> Unit)? = { null },
 ) {
     val isInDark = MiuixTheme.colorScheme.surface.luminance() < 0.5f
     val pillShape = remember { CircleShape }
-    val isLiquidGlassMode = backdrop != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+    val isLiquidGlassMode = backdrop != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && isRuntimeShaderSupported()
 
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
     val primaryColor = MiuixTheme.colorScheme.primary
@@ -166,7 +144,7 @@ fun LiquidGlassBottomBar(
 
                 val currentValue = anim.value
                 val indicatorX = currentValue * tabWidthPx
-                val padding = with(density) { 3.dp.toPx() }
+                val padding = with(density) { 4.dp.toPx() }
                 val globalTouchX = if (isLtr) {
                     padding + indicatorX + offset.x
                 } else {
@@ -217,9 +195,6 @@ fun LiquidGlassBottomBar(
             )
         }
     } else null
-
-    val baseHighlight = remember { iosIndicatorSpecular.copy(alpha = 0.75f) }
-    val pillHighlight = remember { iosIndicatorSpecular }
 
     val combinedBackdrop = if (backdrop != null) {
         rememberCombinedBackdrop(backdrop, tabsBackdrop)
@@ -286,13 +261,21 @@ fun LiquidGlassBottomBar(
         }
     }
 
+    val blur4Px = with(density) { 4.dp.toPx() }
+    val blur20Px = with(density) { 20.dp.toPx() }
+    val lens24Px = with(density) { 24.dp.toPx() }
+    val pad40Px = with(density) { 40.dp.toPx() }
+    val lensHeight8Px = with(density) { 8.dp.toPx() }
+    val lensAmount12Px = with(density) { 12.dp.toPx() }
+    val scale16Px = with(density) { 16.dp.toPx() }
+
     Box(
         modifier = modifier
             .width(IntrinsicSize.Min)
             .height(62.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        // 1. Base Layer
+        // ── 1. Base Layer: 底栏外壳（基础层，承载未激活文字与折射底层） ──
         CompositionLocalProvider(LocalLiquidBarContentColor provides contentColor) {
             Row(
                 modifier = Modifier
@@ -322,17 +305,17 @@ fun LiquidGlassBottomBar(
                                 backdrop = backdrop,
                                 shape = { pillShape },
                                 effects = {
+                                    padding = maxOf(padding, pad40Px)
                                     vibrancy()
-                                    blur(4.dp.toPx(), 4.dp.toPx())
+                                    blur(blur4Px, blur4Px)
                                     lens(
-                                        refractionHeight = 24.dp.toPx(),
-                                        refractionAmount = 24.dp.toPx(),
+                                        refractionHeight = lens24Px,
+                                        refractionAmount = lens24Px,
                                     )
                                 },
-                                highlight = { baseHighlight.copy(alpha = 0.75f) },
                                 layerBlock = {
                                     val width = size.width.coerceAtLeast(1f)
-                                    val s = lerp(1f, 1f + 16.dp.toPx() / width, dampedDragAnimation.pressProgress)
+                                    val s = lerp(1f, 1f + scale16Px / width, dampedDragAnimation.pressProgress)
                                     scaleX = s
                                     scaleY = s
                                 },
@@ -343,7 +326,7 @@ fun LiquidGlassBottomBar(
                                 backdrop = backdrop,
                                 shape = { pillShape },
                                 effects = {
-                                    blur(20.dp.toPx(), 20.dp.toPx())
+                                    blur(blur20Px, blur20Px)
                                 },
                                 onDrawSurface = {
                                     drawRect(containerColor.copy(alpha = 0.65f))
@@ -361,7 +344,7 @@ fun LiquidGlassBottomBar(
             )
         }
 
-        // 2. Active Layer (Hidden for tabsBackdrop recording)
+        // ── 2. Active Layer: 离屏高亮 Tab 采样层（供 tabsBackdrop 记录） ──
         if (isLiquidGlassMode && backdrop != null && combinedBackdrop != null) {
             CompositionLocalProvider(
                 LocalLiquidBarTabScale provides {
@@ -374,8 +357,19 @@ fun LiquidGlassBottomBar(
                         .clearAndSetSemantics {}
                         .alpha(0f)
                         .layerBackdrop(tabsBackdrop)
-                        .fillMaxHeight()
                         .graphicsLayer { translationX = panelOffset }
+                        .drawBackdrop(
+                            backdrop = backdrop,
+                            shape = { pillShape },
+                            effects = {
+                                vibrancy()
+                                blur(blur4Px, blur4Px)
+                                lens(refractionHeight = lens24Px, refractionAmount = lens24Px)
+                            },
+                            onDrawSurface = { drawRect(containerColor) },
+                        )
+                        .then(interactiveHighlight?.modifier ?: Modifier)
+                        .fillMaxHeight()
                         .height(62.dp)
                         .padding(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -384,7 +378,7 @@ fun LiquidGlassBottomBar(
             }
         }
 
-        // 3. Sliding Liquid Glass Indicator Layer
+        // ── 3. Indicator Layer: 滑动液态玻璃透镜胶囊滑块 ──
         if (tabWidthPx > 0f) {
             val tabWidthDp = with(density) { tabWidthPx.toDp() }
             if (isLiquidGlassMode && combinedBackdrop != null) {
@@ -403,13 +397,12 @@ fun LiquidGlassBottomBar(
                             effects = {
                                 val progress = dampedDragAnimation.pressProgress
                                 lens(
-                                    refractionHeight = 8.dp.toPx() * progress,
-                                    refractionAmount = 12.dp.toPx() * progress,
+                                    refractionHeight = lensHeight8Px * (1f + 0.25f * progress),
+                                    refractionAmount = lensAmount12Px * (1f + 0.25f * progress),
                                     depthEffect = true,
                                     chromaticAberration = 0.5f,
                                 )
                             },
-                            highlight = { pillHighlight.copy(alpha = dampedDragAnimation.pressProgress) },
                             layerBlock = {
                                 scaleX = dampedDragAnimation.scaleX
                                 scaleY = dampedDragAnimation.scaleY
@@ -419,24 +412,26 @@ fun LiquidGlassBottomBar(
                             },
                             onDrawSurface = {
                                 val progress = dampedDragAnimation.pressProgress
+                                // 保证胶囊指示器始终有稳固优雅的高光底板，移动与静止时永不消失
+                                drawRect(primaryColor.copy(alpha = 0.12f + 0.08f * progress))
                                 drawRect(
-                                    color = if (!isInDark) Color.Black.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.1f),
+                                    color = if (!isInDark) Color.Black.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.08f),
                                     alpha = 1f - progress,
                                 )
-                                drawRect(Color.Black.copy(alpha = 0.03f * progress))
                             },
                         )
                         .innerShadow(shape = pillShape) {
                             InnerShadow(
-                                radius = 6.dp * dampedDragAnimation.pressProgress,
-                                color = Color.Black.copy(alpha = 0.15f),
-                                alpha = dampedDragAnimation.pressProgress,
+                                radius = 4.dp + 4.dp * dampedDragAnimation.pressProgress,
+                                color = Color.Black.copy(alpha = 0.12f + 0.08f * dampedDragAnimation.pressProgress),
+                                alpha = 0.6f + 0.4f * dampedDragAnimation.pressProgress,
                             )
                         }
                         .height(54.dp)
                         .width(tabWidthDp)
                 )
             } else {
+                // 降级模式胶囊滑块
                 Box(
                     modifier = Modifier
                         .padding(horizontal = 4.dp)
