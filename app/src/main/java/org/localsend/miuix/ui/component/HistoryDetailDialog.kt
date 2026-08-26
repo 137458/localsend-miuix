@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -163,6 +164,30 @@ fun HistoryDetailDialog(
                             .fillMaxWidth()
                             .padding(14.dp)
                     ) {
+                        val detectedUrl = remember(item.textContent) {
+                            val trimmed = item.textContent.trim()
+                            if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+                                if (!trimmed.contains(" ") && !trimmed.contains("\n")) {
+                                    trimmed
+                                } else {
+                                    val matcher = android.util.Patterns.WEB_URL.matcher(trimmed)
+                                    if (matcher.find()) matcher.group() else null
+                                }
+                            } else {
+                                val matcher = android.util.Patterns.WEB_URL.matcher(trimmed)
+                                if (matcher.find()) {
+                                    val found = matcher.group()
+                                    if (found.startsWith("http://", ignoreCase = true) || found.startsWith("https://", ignoreCase = true)) {
+                                        found
+                                    } else {
+                                        "https://$found"
+                                    }
+                                } else {
+                                    null
+                                }
+                            }
+                        }
+
                         Text(
                             text = item.textContent,
                             style = MiuixTheme.textStyles.body2,
@@ -173,7 +198,7 @@ fun HistoryDetailDialog(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                         ) {
                             Button(
                                 onClick = {
@@ -181,9 +206,27 @@ fun HistoryDetailDialog(
                                     clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Text", item.textContent))
                                     Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
                                 },
-                                colors = ButtonDefaults.buttonColorsPrimary()
+                                colors = if (detectedUrl != null) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary()
                             ) {
                                 Text("复制完整文本")
+                            }
+
+                            if (detectedUrl != null) {
+                                Button(
+                                    onClick = {
+                                        try {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(detectedUrl)).apply {
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            }
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColorsPrimary()
+                                ) {
+                                    Text("打开链接")
+                                }
                             }
                         }
                     }

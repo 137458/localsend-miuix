@@ -1,5 +1,8 @@
 package org.localsend.miuix.ui.component
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -463,6 +467,30 @@ fun IncomingTransferDialog(
 
                 if (session.isTextMessage) {
                     val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: "纯文本消息"
+                    val detectedUrl = remember(previewText) {
+                        val trimmed = previewText.trim()
+                        if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+                            if (!trimmed.contains(" ") && !trimmed.contains("\n")) {
+                                trimmed
+                            } else {
+                                val matcher = android.util.Patterns.WEB_URL.matcher(trimmed)
+                                if (matcher.find()) matcher.group() else null
+                            }
+                        } else {
+                            val matcher = android.util.Patterns.WEB_URL.matcher(trimmed)
+                            if (matcher.find()) {
+                                val found = matcher.group()
+                                if (found.startsWith("http://", ignoreCase = true) || found.startsWith("https://", ignoreCase = true)) {
+                                    found
+                                } else {
+                                    "https://$found"
+                                }
+                            } else {
+                                null
+                            }
+                        }
+                    }
+
                     Text(
                         text = "文本内容 (${previewText.length} 字符)",
                         style = MiuixTheme.textStyles.footnote1,
@@ -494,25 +522,33 @@ fun IncomingTransferDialog(
                         ) {
                             Text("拒绝")
                         }
-                        Button(
-                            onClick = onAccept,
-                            colors = ButtonDefaults.buttonColors(),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("关闭")
-                        }
+
                         Button(
                             onClick = onAcceptAndCopy,
-                            colors = ButtonDefaults.buttonColorsPrimary(),
-                            modifier = Modifier.weight(1.4f)
+                            colors = if (detectedUrl != null) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary(),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("复制并关闭")
+                            Text("复制")
+                        }
+
+                        if (detectedUrl != null) {
+                            Button(
+                                onClick = {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(detectedUrl)).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show()
+                                    }
+                                    onAccept()
+                                },
+                                colors = ButtonDefaults.buttonColorsPrimary(),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("打开")
+                            }
                         }
                     }
                 } else {

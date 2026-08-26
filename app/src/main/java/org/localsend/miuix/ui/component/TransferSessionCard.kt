@@ -1,5 +1,7 @@
 package org.localsend.miuix.ui.component
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -172,12 +174,36 @@ private fun TextMessageCardContent(
         )
     }
 
-    // 3. 复制快捷操作
+    // 3. 复制 / 打开链接快捷操作
     if (session.isIncoming && (session.status == TransferStatus.Completed || session.status == TransferStatus.InProgress)) {
+        val detectedUrl = remember(previewText) {
+            val trimmed = previewText.trim()
+            if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+                if (!trimmed.contains(" ") && !trimmed.contains("\n")) {
+                    trimmed
+                } else {
+                    val matcher = android.util.Patterns.WEB_URL.matcher(trimmed)
+                    if (matcher.find()) matcher.group() else null
+                }
+            } else {
+                val matcher = android.util.Patterns.WEB_URL.matcher(trimmed)
+                if (matcher.find()) {
+                    val found = matcher.group()
+                    if (found.startsWith("http://", ignoreCase = true) || found.startsWith("https://", ignoreCase = true)) {
+                        found
+                    } else {
+                        "https://$found"
+                    }
+                } else {
+                    null
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(10.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
         ) {
             Button(
                 onClick = {
@@ -185,7 +211,7 @@ private fun TextMessageCardContent(
                     clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", previewText))
                     android.widget.Toast.makeText(context, "已复制文本到剪贴板", android.widget.Toast.LENGTH_SHORT).show()
                 },
-                colors = ButtonDefaults.buttonColors()
+                colors = if (detectedUrl != null) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary()
             ) {
                 Icon(
                     imageVector = Icons.Default.ContentCopy,
@@ -194,6 +220,24 @@ private fun TextMessageCardContent(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("复制文本")
+            }
+
+            if (detectedUrl != null) {
+                Button(
+                    onClick = {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(detectedUrl)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "无法打开链接", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColorsPrimary()
+                ) {
+                    Text("打开链接")
+                }
             }
         }
     }
