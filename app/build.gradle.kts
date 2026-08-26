@@ -116,6 +116,9 @@ dependencies {
     // Okio for fast streaming IO
     implementation("com.squareup.okio:okio:3.9.1")
 
+    // ZXing for compliant, fast and scan-friendly QR Code generation
+    implementation("com.google.zxing:core:3.5.3")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
 }

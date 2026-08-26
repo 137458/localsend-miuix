@@ -22,7 +22,8 @@ data class AppSettings(
     // 接收方 PIN 保护：非空时，发送方需在 prepare-upload/download 携带 ?pin= 且匹配才被接受
     val pin: String? = null,
     val themeModeIndex: Int = 0, // 0: System, 1: Light, 2: Dark, 3: MonetSystem, 4: MonetLight, 5: MonetDark
-    val vibrateOnComplete: Boolean = true
+    val vibrateOnComplete: Boolean = true,
+    val lastSelectedTabIndex: Int = 0 // 记录离开时的 Tab 索引，进程恢复时自动还原页面
 ) {
     companion object {
         private val ADJECTIVES = listOf(

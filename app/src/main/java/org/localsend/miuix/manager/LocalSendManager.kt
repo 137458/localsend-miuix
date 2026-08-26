@@ -99,7 +99,8 @@ class LocalSendManager(private val context: Context) {
             downloadTreeUri = prefs.getString(KEY_TREE_URI, null),
             downloadDisplay = prefs.getString(KEY_DOWNLOAD_DISPLAY, null),
             downloadPath = defaultDownloadPath,
-            vibrateOnComplete = prefs.getBoolean(KEY_VIBRATE, true)
+            vibrateOnComplete = prefs.getBoolean(KEY_VIBRATE, true),
+            lastSelectedTabIndex = prefs.getInt(KEY_LAST_TAB, 0)
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -209,14 +210,18 @@ class LocalSendManager(private val context: Context) {
     )
 
     fun start() {
-        server.start()
-        discoveryService.start()
+        scope.launch(Dispatchers.IO) {
+            server.start()
+            discoveryService.start()
+        }
     }
 
     fun onResume() {
-        server.ensureStarted()
-        discoveryService.ensureStarted()
-        discoveryService.sendAnnouncement()
+        scope.launch(Dispatchers.IO) {
+            server.ensureStarted()
+            discoveryService.ensureStarted()
+            discoveryService.sendAnnouncement()
+        }
     }
 
     fun stop() {
@@ -736,6 +741,7 @@ class LocalSendManager(private val context: Context) {
             .putString(KEY_PIN, s.pin)
             .putInt(KEY_THEME, s.themeModeIndex)
             .putBoolean(KEY_VIBRATE, s.vibrateOnComplete)
+            .putInt(KEY_LAST_TAB, s.lastSelectedTabIndex)
             .apply()
     }
 
@@ -754,5 +760,6 @@ class LocalSendManager(private val context: Context) {
         private const val KEY_TREE_URI = "download_tree_uri"
         private const val KEY_DOWNLOAD_DISPLAY = "download_display"
         private const val KEY_VIBRATE = "vibrate_on_complete"
+        private const val KEY_LAST_TAB = "last_selected_tab"
     }
 }

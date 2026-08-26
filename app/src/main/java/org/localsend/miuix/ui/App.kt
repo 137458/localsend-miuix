@@ -93,10 +93,18 @@ fun App(manager: LocalSendManager) {
     }
     val themeController = remember(colorSchemeMode) { ThemeController(colorSchemeMode) }
 
-    // 2. Horizontal Pager State
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    // 2. Horizontal Pager State（支持进程重建时恢复离开时的页面）
+    val pagerState = rememberPagerState(
+        initialPage = settings.lastSelectedTabIndex.coerceIn(0, 2),
+        pageCount = { 3 }
+    )
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage != settings.lastSelectedTabIndex) {
+            manager.updateSettings { it.copy(lastSelectedTabIndex = pagerState.currentPage) }
+        }
+    }
 
-    // 3. Navigation Items（接收在第 0 页，发送在第 1 页）
+    // 3. Navigation Items（接收在第 0 页，发送在第 1 页，设置在第 2 页）
     val navigationItems = remember {
         listOf(
             NavigationItem("接收", AppIcons.Receive),
