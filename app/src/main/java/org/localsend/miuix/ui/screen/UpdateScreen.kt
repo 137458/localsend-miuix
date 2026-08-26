@@ -195,11 +195,10 @@ fun UpdateScreen(
                         }
                         .background(MiuixTheme.colorScheme.surfaceVariant),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.SystemUpdate,
+                    Image(
+                        painter = androidx.compose.ui.res.painterResource(id = org.localsend.miuix.R.drawable.ic_localsend_logo),
                         contentDescription = "LocalSend",
-                        tint = MiuixTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(52.dp)
                     )
                 }
 
