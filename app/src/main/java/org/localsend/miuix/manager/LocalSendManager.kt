@@ -239,12 +239,11 @@ class LocalSendManager(private val context: Context) {
                 val now = System.currentTimeMillis()
                 val alive = current.filter { now - it.lastSeen < DEVICE_TTL_MS }
                 val index = alive.indexOfFirst {
-                    it.fingerprint == device.fingerprint ||
-                        (it.ip == device.ip && it.port == device.port)
+                    it.ip == device.ip && it.port == device.port
                 }
                 if (index < 0) {
                     alive + device
-                } else if (sameIdentity(alive[index], device) && alive[index].ip == device.ip) {
+                } else if (sameIdentity(alive[index], device)) {
                     if (alive.size == current.size && alive[index].lastSeen == device.lastSeen) {
                         current
                     } else {
