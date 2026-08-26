@@ -10,3 +10,4 @@
 local.properties
 **/build/
 .kotlin/
+release-assets/
