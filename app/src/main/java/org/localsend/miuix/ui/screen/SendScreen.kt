@@ -19,9 +19,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -62,15 +66,20 @@ fun SendScreen(
     contentPadding: PaddingValues,
     onOpenAddSheet: () -> Unit,
     onPickFiles: () -> Unit,
+    onPickFolder: () -> Unit,
     onPickMedia: () -> Unit,
+    onPickApps: () -> Unit,
     onSendText: () -> Unit,
-    onPasteClipboard: () -> Unit
+    onPasteClipboard: () -> Unit,
+    onOpenWebShare: () -> Unit,
+    onManualIp: () -> Unit
 ) {
     val context = LocalContext.current
     val selectedFiles by manager.selectedFiles.collectAsState()
     val nearbyDevices by manager.nearbyDevices.collectAsState()
     val isScanning by manager.isScanning.collectAsState()
     val activeSessions by manager.activeSessions.collectAsState()
+    val shares by manager.shares.collectAsState()
     val outgoingSessions = remember(activeSessions) { activeSessions.filter { !it.isIncoming } }
     val totalSelectedSize = remember(selectedFiles) { selectedFiles.sumOf { it.size } }
 
@@ -85,6 +94,9 @@ fun SendScreen(
             title = "发送",
             scrollBehavior = scrollBehavior,
             actions = {
+                IconButton(onClick = onManualIp) {
+                    Icon(imageVector = AppIcons.Send, contentDescription = "输入IP")
+                }
                 IconButton(
                     onClick = {
                         manager.refreshDevices()
@@ -119,25 +131,52 @@ fun SendScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Section 1: Quick Action Grid
+                // Section 1: Quick Action Grid (6 types)
                 item {
-                    SmallTitle(text = "快速选择")
+                    SmallTitle(text = "快速选择内容")
                     Card(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp, horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            QuickActionItem(title = "文件", icon = Icons.Default.Folder, onClick = onPickFiles)
-                            QuickActionItem(title = "媒体", icon = Icons.Default.Image, onClick = onPickMedia)
-                            QuickActionItem(title = "文本", icon = Icons.Default.TextFields, onClick = onSendText)
-                            QuickActionItem(
-                                title = "剪贴板",
-                                icon = Icons.AutoMirrored.Filled.Assignment,
-                                onClick = onPasteClipboard
-                            )
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                QuickActionItem(title = "文件", icon = Icons.Default.Folder, onClick = onPickFiles)
+                                QuickActionItem(title = "文件夹", icon = Icons.Default.FolderOpen, onClick = onPickFolder)
+                                QuickActionItem(title = "媒体", icon = Icons.Default.Image, onClick = onPickMedia)
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                QuickActionItem(title = "应用", icon = Icons.Default.Android, onClick = onPickApps)
+                                QuickActionItem(title = "纯文本", icon = Icons.Default.TextFields, onClick = onSendText)
+                                QuickActionItem(
+                                    title = "剪贴板",
+                                    icon = Icons.AutoMirrored.Filled.Assignment,
+                                    onClick = onPasteClipboard
+                                )
+                            }
                         }
+                    }
+                }
+
+                // Section 1.5: Web Share Trigger
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        ArrowPreference(
+                            title = if (shares.isNotEmpty()) "Web 共享正在运行中" else "通过浏览器链接分享 (Web Share)",
+                            summary = if (shares.isNotEmpty()) "已有 ${shares.first().files.size} 项正在局域网共享，点击查看链接与二维码" else "无需客户端，任何浏览器扫描二维码或访问链接即可接收",
+                            startAction = {
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = null,
+                                    tint = if (shares.isNotEmpty()) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceSecondary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            },
+                            onClick = onOpenWebShare
+                        )
                     }
                 }
 

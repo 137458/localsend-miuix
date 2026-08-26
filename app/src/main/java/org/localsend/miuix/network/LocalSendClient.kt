@@ -202,11 +202,14 @@ class LocalSendClient(
     }
 
     /** 打开文件/URI/文本对应的输入流，供上传与哈希计算共用；不持有则返回 null。 */
-    private fun openSourceStream(fileItem: FileItem): InputStream? = when {
-        fileItem.uri != null -> context.contentResolver.openInputStream(fileItem.uri)
-        fileItem.path != null -> File(fileItem.path).inputStream()
-        fileItem.textContent != null -> fileItem.textContent.byteInputStream(Charsets.UTF_8)
-        else -> null
+    private fun openSourceStream(fileItem: FileItem): InputStream? {
+        val text = fileItem.textContent
+        return when {
+            fileItem.uri != null -> context.contentResolver.openInputStream(fileItem.uri)
+            fileItem.path != null -> File(fileItem.path).inputStream()
+            text != null -> text.byteInputStream(Charsets.UTF_8)
+            else -> null
+        }
     }
 
     private fun computeSha256(fileItem: FileItem): String? {

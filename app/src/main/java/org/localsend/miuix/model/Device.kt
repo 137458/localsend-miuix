@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class DeviceType(val value: String) {
     mobile("mobile"),
+    tablet("tablet"),
     desktop("desktop"),
     web("web"),
     headless("headless"),

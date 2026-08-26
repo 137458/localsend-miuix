@@ -44,6 +44,7 @@ object AppIcons {
     fun getDeviceIcon(type: DeviceType): ImageVector {
         return when (type) {
             DeviceType.mobile -> Icons.Default.PhoneAndroid
+            DeviceType.tablet -> Icons.Default.Tablet
             DeviceType.desktop -> Icons.Default.Computer
             DeviceType.web -> Icons.Default.Language
             DeviceType.headless, DeviceType.server -> Icons.Default.Storage

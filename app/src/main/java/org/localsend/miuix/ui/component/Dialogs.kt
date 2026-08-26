@@ -285,14 +285,166 @@ fun SendTextDialog(
 }
 
 @Composable
+fun PinDialog(
+    show: Boolean,
+    initialPin: String?,
+    onDismissRequest: () -> Unit,
+    onConfirm: (String?) -> Unit
+) {
+    var pin by remember(show, initialPin) { mutableStateOf(initialPin ?: "") }
+
+    WindowDialog(
+        show = show,
+        title = "设置传输 PIN 码",
+        onDismissRequest = onDismissRequest
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+        ) {
+            Text(
+                text = "设置 PIN 码后，其它设备向您发送内容时必须输入相同的 PIN 码才能完成握手。留空则表示不启用 PIN 保护。",
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceSecondary
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            TextField(
+                value = pin,
+                onValueChange = { pin = it },
+                label = "PIN 码（留空关闭）",
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = onDismissRequest,
+                    colors = ButtonDefaults.buttonColors(),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("取消")
+                }
+                Button(
+                    onClick = {
+                        val trimmed = pin.trim().ifEmpty { null }
+                        onConfirm(trimmed)
+                        onDismissRequest()
+                    },
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("保存")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CertFingerprintDialog(
+    show: Boolean,
+    fingerprint: String,
+    onDismissRequest: () -> Unit,
+    onRegenerate: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    WindowDialog(
+        show = show,
+        title = "TLS 安全证书指纹",
+        onDismissRequest = onDismissRequest
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+        ) {
+            Text(
+                text = "LocalSend 在 HTTPS 模式下使用本设备生成的自签名 X.509 证书进行端到端加密。对方设备可通过比对此 SHA-256 指纹确认未遭受中间人攻击。",
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceSecondary
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "SHA-256 指纹",
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = fingerprint.ifEmpty { "未生成或 HTTPS 未启用" },
+                        style = MiuixTheme.textStyles.body2.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                        color = MiuixTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Certificate Fingerprint", fingerprint))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("复制指纹")
+                }
+
+                Button(
+                    onClick = {
+                        onRegenerate()
+                        onDismissRequest()
+                    },
+                    colors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.error, contentColor = androidx.compose.ui.graphics.Color.White),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("重新生成")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = onDismissRequest,
+                colors = ButtonDefaults.buttonColors(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("关闭")
+            }
+        }
+    }
+}
+
+@Composable
 fun IncomingTransferDialog(
     session: TransferSession?,
     onAccept: () -> Unit,
     onDecline: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     WindowDialog(
         show = session != null,
-        title = "收到传输请求",
+        title = if (session?.isTextMessage == true) "收到纯文本消息" else "收到传输请求",
         onDismissRequest = onDecline
     ) {
         if (session != null) {
@@ -305,47 +457,82 @@ fun IncomingTransferDialog(
                     text = "来自设备: ${session.device.alias} (${session.device.ip})",
                     style = MiuixTheme.textStyles.body1
                 )
-                Text(
-                    text = "共 ${session.files.size} 个文件，大小 ${session.formattedTotalSize}",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                if (session.isTextMessage) {
+                    val previewText = session.singleTextMessageContent ?: "纯文本消息"
+                    Text(
+                        text = "文本内容 (${previewText.length} 字符)",
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
 
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(160.dp)
-                            .padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = previewText,
+                                style = MiuixTheme.textStyles.body1,
+                                maxLines = 6
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = {
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", previewText))
+                        },
+                        colors = ButtonDefaults.buttonColors(),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(session.files) { file ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = AppIcons.getFileIcon(file.mimeType, file.name),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MiuixTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = file.name,
-                                    style = MiuixTheme.textStyles.body1,
-                                    modifier = Modifier.weight(1f),
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = file.formattedSize,
-                                    style = MiuixTheme.textStyles.footnote1,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                )
+                        Text("📋 复制到剪贴板")
+                    }
+                } else {
+                    Text(
+                        text = "共 ${session.files.size} 个文件，大小 ${session.formattedTotalSize}",
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(session.files) { file ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = AppIcons.getFileIcon(file.mimeType, file.name),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MiuixTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = file.name,
+                                        style = MiuixTheme.textStyles.body1,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        text = file.formattedSize,
+                                        style = MiuixTheme.textStyles.footnote1,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                    )
+                                }
                             }
                         }
                     }
@@ -382,11 +569,13 @@ fun AddContentBottomSheet(
     show: Boolean,
     onDismissRequest: () -> Unit,
     onPickFiles: () -> Unit,
+    onPickFolder: () -> Unit,
     onPickMedia: () -> Unit,
+    onPickApps: () -> Unit,
     onSendText: () -> Unit,
     onPasteClipboard: () -> Unit
 ) {
-    WindowBottomSheet(
+    top.yukonga.miuix.kmp.window.WindowBottomSheet(
         show = show,
         title = "添加发送内容",
         onDismissRequest = onDismissRequest
@@ -406,11 +595,27 @@ fun AddContentBottomSheet(
                     }
                 )
                 ArrowPreference(
+                    title = "选择文件夹",
+                    summary = "递归添加整个文件夹内的所有文件",
+                    onClick = {
+                        onDismissRequest()
+                        onPickFolder()
+                    }
+                )
+                ArrowPreference(
                     title = "选择媒体",
                     summary = "从相册选择照片与视频",
                     onClick = {
                         onDismissRequest()
                         onPickMedia()
+                    }
+                )
+                ArrowPreference(
+                    title = "选择应用 (APK)",
+                    summary = "提取本机已安装应用的 APK 文件",
+                    onClick = {
+                        onDismissRequest()
+                        onPickApps()
                     }
                 )
                 ArrowPreference(
@@ -423,7 +628,7 @@ fun AddContentBottomSheet(
                 )
                 ArrowPreference(
                     title = "从剪贴板粘贴",
-                    summary = "快速提取当前剪贴板内容",
+                    summary = "快速提取当前剪贴板文本或链接",
                     onClick = {
                         onDismissRequest()
                         onPasteClipboard()

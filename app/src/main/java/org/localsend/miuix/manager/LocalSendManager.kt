@@ -1,10 +1,24 @@
 package org.localsend.miuix.manager
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import androidx.documentfile.provider.DocumentFile
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.get
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,10 +28,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import org.localsend.miuix.model.AppSettings
 import org.localsend.miuix.model.Device
+import org.localsend.miuix.model.DeviceDto
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.model.HistoryFileEntry
 import org.localsend.miuix.model.SaveTarget
 import org.localsend.miuix.model.ShareSession
 import org.localsend.miuix.model.TransferHistoryItem
@@ -28,10 +46,22 @@ import org.localsend.miuix.network.FingerprintTrust
 import org.localsend.miuix.network.LocalSendClient
 import org.localsend.miuix.network.LocalSendServer
 import org.localsend.miuix.network.NetworkUtils
+import org.localsend.miuix.network.SslHelper
 import org.localsend.miuix.network.TlsStore
 import org.localsend.miuix.notification.TransferNotifier
+import java.io.File
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import javax.net.ssl.X509TrustManager
+
+data class AppInfoItem(
+    val label: String,
+    val packageName: String,
+    val versionName: String,
+    val sourceDir: String,
+    val apkSize: Long,
+    val isSystemApp: Boolean
+)
 
 class LocalSendManager(private val context: Context) {
 
@@ -57,13 +87,17 @@ class LocalSendManager(private val context: Context) {
             alias = initialAlias,
             port = prefs.getInt(KEY_PORT, 53317),
             quickSave = prefs.getBoolean(KEY_QUICK_SAVE, false),
+            autoCopyText = prefs.getBoolean(KEY_AUTO_COPY_TEXT, false),
+            saveToHistory = prefs.getBoolean(KEY_SAVE_TO_HISTORY, true),
             useHttps = prefs.getBoolean(KEY_USE_HTTPS, false),
+            deviceType = DeviceType.fromString(prefs.getString(KEY_DEVICE_TYPE, DeviceType.mobile.value)),
             download = prefs.getBoolean(KEY_DOWNLOAD, false),
             pin = prefs.getString(KEY_PIN, null),
             themeModeIndex = prefs.getInt(KEY_THEME, 0),
             downloadTreeUri = prefs.getString(KEY_TREE_URI, null),
             downloadDisplay = prefs.getString(KEY_DOWNLOAD_DISPLAY, null),
-            downloadPath = defaultDownloadPath
+            downloadPath = defaultDownloadPath,
+            vibrateOnComplete = prefs.getBoolean(KEY_VIBRATE, true)
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -86,7 +120,7 @@ class LocalSendManager(private val context: Context) {
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
-    // 传输过程中的一次性提示（如"对方拒绝接收"），UI 读取后清空
+    // 传输过程中的一次性提示（如"对方拒绝接收"、"已自动复制文本"），UI 读取后清空
     private val _sessionMessage = MutableStateFlow<String?>(null)
     val sessionMessage: StateFlow<String?> = _sessionMessage.asStateFlow()
 
@@ -95,8 +129,6 @@ class LocalSendManager(private val context: Context) {
     val shares: StateFlow<List<ShareSession>> = _shares.asStateFlow()
 
     private val incomingApprovalDeferreds = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
-
-    // 记录哪些 incoming 会话已弹出过首帧"收到文件"通知，避免进度更新时重复弹
     private val notifiedIncoming = ConcurrentHashMap.newKeySet<String>()
 
     private val discoveryService = DiscoveryService(
@@ -137,35 +169,7 @@ class LocalSendManager(private val context: Context) {
             result
         },
         onSessionUpdated = { session ->
-            scope.launch {
-                // 接收端通知：进度与结果反馈（仅对 incoming 会话发通知，避免发送端刷屏）
-                updateTransferNotification(session)
-
-                // 进行中的会话写入正在传输区；已结束的会话移入历史并从活动列表移除
-                if (isTerminal(session.status)) {
-                    _activeSessions.update { list -> list.filterNot { it.sessionId == session.sessionId } }
-                    addHistory(
-                        TransferHistoryItem(
-                            deviceAlias = session.device.alias,
-                            deviceIp = session.device.ip,
-                            isIncoming = session.isIncoming,
-                            fileCount = session.files.size,
-                            totalSize = session.totalBytes,
-                            status = session.status,
-                            fileNames = session.files.map { it.name }
-                        )
-                    )
-                } else {
-                    _activeSessions.update { list ->
-                        val index = list.indexOfFirst { it.sessionId == session.sessionId }
-                        if (index >= 0) {
-                            list.toMutableList().apply { set(index, session) }
-                        } else {
-                            list + session
-                        }
-                    }
-                }
-            }
+            handleSessionUpdate(session)
         }
     )
 
@@ -186,7 +190,7 @@ class LocalSendManager(private val context: Context) {
             alias = _settings.value.alias,
             version = "2.1",
             deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
-            deviceType = DeviceType.mobile,
+            deviceType = _settings.value.deviceType,
             // HTTPS 模式下指纹 = 自签名证书的 SHA-256 哈希（协议 §2），否则用稳定的随机 UUID
             fingerprint = if (useHttps) TlsStore.fingerprint(context) else fingerprint,
             port = _settings.value.port,
@@ -223,15 +227,9 @@ class LocalSendManager(private val context: Context) {
         }
     }
 
-    /** 发现到的新设备与列表内已有条目是否"数据一致"（仅指纹/协议/端口改变才值得刷新，降低扫描期重组开销）。 */
     private fun sameIdentity(a: Device, b: Device): Boolean =
         a.fingerprint == b.fingerprint && a.port == b.port && a.protocol == b.protocol
 
-    /**
-     * 集中处理设备发现：多播 / 广播 / 子网扫描 / HTTP register 都走这里合并进 nearbyDevices。
-     * 去重键为 fingerprint，其次 (ip+port)；同时清理长时间未刷新的过期设备，
-     * 避免同一设备因更换 IP / HTTPS↔HTTP 指纹变化而在列表中残留成多个同名条目。
-     */
     private fun upsertDevice(device: Device) {
         if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
             FingerprintTrust.trust(device.fingerprint)
@@ -245,12 +243,8 @@ class LocalSendManager(private val context: Context) {
                         (it.ip == device.ip && it.port == device.port)
                 }
                 if (index < 0) {
-                    // 全新设备：追加
                     alive + device
                 } else if (sameIdentity(alive[index], device) && alive[index].ip == device.ip) {
-                    // 内容未变。仅当列表没有过滤掉过期设备、且 lastSeen 也未变化时，
-                    // 才返回原列表避免无意义重组；否则仍以 device 替换，刷新 lastSeen
-                    // 并顺带消除本次被过滤掉的过期设备，避免其永远残留。
                     if (alive.size == current.size && alive[index].lastSeen == device.lastSeen) {
                         current
                     } else {
@@ -342,22 +336,97 @@ class LocalSendManager(private val context: Context) {
         }
     }
 
-    private fun updateSessionState(session: TransferSession) {
+    /** 手动输入 IP 发起传输：先通过 /info 探查目标设备元数据，再发起上传。 */
+    fun sendToIp(ip: String, port: Int = 53317, filesToSend: List<FileItem> = _selectedFiles.value) {
+        if (filesToSend.isEmpty()) return
+        scope.launch(Dispatchers.IO) {
+            var targetDevice: Device? = null
+            val rawHttpClient = HttpClient(CIO) {
+                engine {
+                    https {
+                        trustManager = SslHelper.trustAllCerts[0] as X509TrustManager
+                    }
+                }
+                install(ContentNegotiation) {
+                    json(Json { ignoreUnknownKeys = true })
+                }
+            }
+            try {
+                for (proto in listOf("https", "http")) {
+                    try {
+                        val response = rawHttpClient.get("$proto://$ip:$port/api/localsend/v2/info")
+                        val dto = response.body<DeviceDto>()
+                        targetDevice = Device.fromDto(dto, ip)
+                        if (targetDevice.protocol.equals("https", ignoreCase = true) && targetDevice.fingerprint.isNotBlank()) {
+                            FingerprintTrust.trust(targetDevice.fingerprint)
+                        }
+                        break
+                    } catch (ignored: Exception) {}
+                }
+            } finally {
+                rawHttpClient.close()
+            }
+
+            val finalDevice = targetDevice ?: Device(
+                alias = "设备 ($ip)",
+                fingerprint = "",
+                port = port,
+                protocol = "http",
+                ip = ip
+            )
+            withContext(Dispatchers.Main) {
+                sendFilesTo(finalDevice, filesToSend)
+            }
+        }
+    }
+
+    private fun handleSessionUpdate(session: TransferSession) {
         scope.launch {
+            updateTransferNotification(session)
+
             if (isTerminal(session.status)) {
-                // 已结束的会话：从活动列表移除并写入历史
                 _activeSessions.update { list -> list.filterNot { it.sessionId == session.sessionId } }
-                addHistory(
-                    TransferHistoryItem(
+                
+                // 处理文本接收与反馈
+                if (session.isIncoming && session.status == TransferStatus.Completed) {
+                    if (session.isTextMessage && !session.singleTextMessageContent.isNullOrEmpty()) {
+                        val text = session.singleTextMessageContent!!
+                        if (_settings.value.autoCopyText) {
+                            copyTextToClipboard(text)
+                            _sessionMessage.value = "已接收并自动复制文本：${text.take(20)}"
+                        } else {
+                            _sessionMessage.value = "已收到来自 ${session.device.alias} 的文本消息"
+                        }
+                    }
+                    vibrateIfEnabled()
+                } else if (!session.isIncoming && session.status == TransferStatus.Completed) {
+                    _sessionMessage.value = "内容已成功发送至 ${session.device.alias}"
+                    vibrateIfEnabled()
+                }
+
+                if (_settings.value.saveToHistory) {
+                    val historyItem = TransferHistoryItem(
                         deviceAlias = session.device.alias,
                         deviceIp = session.device.ip,
                         isIncoming = session.isIncoming,
                         fileCount = session.files.size,
                         totalSize = session.totalBytes,
                         status = session.status,
-                        fileNames = session.files.map { it.name }
+                        fileNames = session.files.map { it.name },
+                        textContent = if (session.isTextMessage) session.singleTextMessageContent else null,
+                        isTextMessage = session.isTextMessage,
+                        fileEntries = session.files.map {
+                            HistoryFileEntry(
+                                name = it.name,
+                                size = it.size,
+                                uri = it.uri ?: it.mediaStoreUri,
+                                path = it.path,
+                                mimeType = it.mimeType
+                            )
+                        }
                     )
-                )
+                    addHistory(historyItem)
+                }
             } else {
                 _activeSessions.update { list ->
                     val index = list.indexOfFirst { it.sessionId == session.sessionId }
@@ -371,24 +440,47 @@ class LocalSendManager(private val context: Context) {
         }
     }
 
+    private fun updateSessionState(session: TransferSession) {
+        handleSessionUpdate(session)
+    }
+
     private fun isTerminal(status: TransferStatus): Boolean =
         status == TransferStatus.Completed ||
             status == TransferStatus.Failed ||
             status == TransferStatus.Canceled
 
-    /**
-     * 接收端的系统通知：仅对 incoming 会话弹出。
-     * 非终止状态：首帧弹"收到文件"，随后仅更新进度条；终止状态：弹最终结果。
-     */
     private fun updateTransferNotification(session: TransferSession) {
-        if (!session.isIncoming) return
         if (isTerminal(session.status)) {
             TransferNotifier.notifyResult(context, session)
-        } else if (notifiedIncoming.add(session.sessionId)) {
+        } else if (session.isIncoming && notifiedIncoming.add(session.sessionId)) {
             TransferNotifier.notifyIncoming(context, session)
         } else {
             TransferNotifier.updateProgress(context, session)
         }
+    }
+
+    fun copyTextToClipboard(text: String) {
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend", text))
+        } catch (ignored: Exception) {}
+    }
+
+    private fun vibrateIfEnabled() {
+        if (!_settings.value.vibrateOnComplete) return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            } else {
+                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    v?.vibrate(50)
+                }
+            }
+        } catch (ignored: Exception) {}
     }
 
     fun consumeSessionMessage() {
@@ -426,7 +518,100 @@ class LocalSendManager(private val context: Context) {
         persistSettings(updated)
     }
 
-    /** 计算当前接收保存目标：优先使用用户通过 SAF 选择的自定义目录，否则写入公共 Download（MediaStore）。 */
+    /** 提取本机已安装的应用 (APK) 列表。 */
+    suspend fun getInstalledApps(): List<AppInfoItem> = withContext(Dispatchers.IO) {
+        val pm = context.packageManager
+        val packages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(0))
+        } else {
+            pm.getInstalledPackages(0)
+        }
+        packages.mapNotNull { pkg ->
+            try {
+                val appInfo = pkg.applicationInfo ?: return@mapNotNull null
+                val label = pm.getApplicationLabel(appInfo).toString()
+                val sourceDir = appInfo.sourceDir ?: return@mapNotNull null
+                val file = File(sourceDir)
+                if (!file.exists()) return@mapNotNull null
+                val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                AppInfoItem(
+                    label = label,
+                    packageName = pkg.packageName,
+                    versionName = pkg.versionName ?: "1.0",
+                    sourceDir = sourceDir,
+                    apkSize = file.length(),
+                    isSystemApp = isSystem
+                )
+            } catch (e: Exception) {
+                null
+            }
+        }.sortedWith(compareBy({ it.isSystemApp }, { it.label.lowercase() }))
+    }
+
+    /** 将选中的已安装应用作为 APK 文件添加到待发送列表。 */
+    fun addAppsAsFiles(apps: List<AppInfoItem>) {
+        val items = apps.map { app ->
+            val cleanName = app.label.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            FileItem(
+                name = "$cleanName.apk",
+                size = app.apkSize,
+                path = app.sourceDir,
+                mimeType = "application/vnd.android.package-archive"
+            )
+        }
+        addFiles(items)
+    }
+
+    /** 递归解析用户通过 SAF 选择的文件夹，将其下所有文件添加进发送队列。 */
+    suspend fun addFolder(treeUri: Uri) = withContext(Dispatchers.IO) {
+        val rootDoc = DocumentFile.fromTreeUri(context, treeUri) ?: return@withContext
+        val items = mutableListOf<FileItem>()
+
+        fun traverse(doc: DocumentFile, relativePrefix: String) {
+            val children = doc.listFiles()
+            for (child in children) {
+                val childName = child.name ?: "unnamed"
+                val relativePath = if (relativePrefix.isEmpty()) childName else "$relativePrefix/$childName"
+                if (child.isDirectory) {
+                    traverse(child, relativePath)
+                } else if (child.isFile) {
+                    val mime = child.type ?: "application/octet-stream"
+                    items.add(
+                        FileItem(
+                            name = relativePath,
+                            size = child.length(),
+                            uri = child.uri,
+                            mimeType = mime
+                        )
+                    )
+                }
+            }
+        }
+
+        traverse(rootDoc, "")
+        if (items.isNotEmpty()) {
+            withContext(Dispatchers.Main) {
+                addFiles(items)
+                _sessionMessage.value = "已成功添加文件夹中的 ${items.size} 个文件"
+            }
+        }
+    }
+
+    /** 重新生成自签名安全证书（HTTPS 模式）。 */
+    fun regenerateCertificate() {
+        scope.launch(Dispatchers.IO) {
+            TlsStore.regenerateKeyStore(context)
+            if (_settings.value.useHttps) {
+                server.stop()
+                server.start()
+                discoveryService.sendAnnouncement()
+            }
+            withContext(Dispatchers.Main) {
+                _sessionMessage.value = "安全证书已重新生成，指纹已更新"
+            }
+        }
+    }
+
     fun getSaveTarget(): SaveTarget {
         val tree = _settings.value.downloadTreeUri
         if (!tree.isNullOrEmpty()) {
@@ -437,7 +622,6 @@ class LocalSendManager(private val context: Context) {
         return SaveTarget.MediaStoreTarget
     }
 
-    /** 用户通过 SAF 选择自定义保存目录后调用，持久化其访问权限与显示信息。 */
     fun setDownloadTree(uri: Uri, display: String) {
         try {
             context.contentResolver.takePersistableUriPermission(
@@ -448,7 +632,6 @@ class LocalSendManager(private val context: Context) {
         updateSettings { it.copy(downloadTreeUri = uri.toString(), downloadDisplay = display, downloadPath = display) }
     }
 
-    /** 修改服务端口并重启服务使新端口立即生效。 */
     fun applyPortChange(newPort: Int) {
         if (newPort == _settings.value.port) return
         updateSettings { it.copy(port = newPort) }
@@ -458,11 +641,9 @@ class LocalSendManager(private val context: Context) {
         }
     }
 
-    /** 切换 HTTPS/HTTP 后重启服务（引擎与指纹会随之变化），并重新广播设备信息。 */
     fun applyUseHttpsChange(useHttps: Boolean) {
         if (useHttps == _settings.value.useHttps) return
         updateSettings { it.copy(useHttps = useHttps) }
-        // HTTPS 引擎（Netty + 自签名证书解析）初始化较重，切到 IO 线程执行，避免冻结主线程（UI）
         scope.launch(Dispatchers.IO) {
             server.stop()
             server.start()
@@ -470,7 +651,6 @@ class LocalSendManager(private val context: Context) {
         }
     }
 
-    /** 开始 Web Share：把指定文件共享给局域网浏览器，并重新广播（download=true）。 */
     fun startShare(files: List<FileItem>) {
         if (files.isEmpty() || _shares.value.isNotEmpty()) return
         val session = ShareSession(files = files)
@@ -478,7 +658,6 @@ class LocalSendManager(private val context: Context) {
         discoveryService.sendAnnouncement()
     }
 
-    /** 结束 Web Share 并重新广播（download=false）。 */
     fun stopShare() {
         if (_shares.value.isEmpty()) return
         _shares.value = emptyList()
@@ -492,24 +671,31 @@ class LocalSendManager(private val context: Context) {
             .putString(KEY_TREE_URI, s.downloadTreeUri)
             .putString(KEY_DOWNLOAD_DISPLAY, s.downloadDisplay)
             .putBoolean(KEY_QUICK_SAVE, s.quickSave)
+            .putBoolean(KEY_AUTO_COPY_TEXT, s.autoCopyText)
+            .putBoolean(KEY_SAVE_TO_HISTORY, s.saveToHistory)
             .putBoolean(KEY_USE_HTTPS, s.useHttps)
+            .putString(KEY_DEVICE_TYPE, s.deviceType.value)
             .putBoolean(KEY_DOWNLOAD, s.download)
             .putString(KEY_PIN, s.pin)
             .putInt(KEY_THEME, s.themeModeIndex)
+            .putBoolean(KEY_VIBRATE, s.vibrateOnComplete)
             .apply()
     }
 
     companion object {
-        // 设备发现的过期清理阈值：超过该时长未刷新的设备从附近设备列表移除
         private const val DEVICE_TTL_MS = 90_000L
         private const val KEY_ALIAS = "alias"
         private const val KEY_PORT = "port"
         private const val KEY_QUICK_SAVE = "quick_save"
+        private const val KEY_AUTO_COPY_TEXT = "auto_copy_text"
+        private const val KEY_SAVE_TO_HISTORY = "save_to_history"
         private const val KEY_USE_HTTPS = "use_https"
+        private const val KEY_DEVICE_TYPE = "device_type"
         private const val KEY_DOWNLOAD = "download"
         private const val KEY_PIN = "pin"
         private const val KEY_THEME = "theme_mode_index"
         private const val KEY_TREE_URI = "download_tree_uri"
         private const val KEY_DOWNLOAD_DISPLAY = "download_display"
+        private const val KEY_VIBRATE = "vibrate_on_complete"
     }
 }

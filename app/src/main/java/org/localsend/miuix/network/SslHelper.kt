@@ -63,7 +63,7 @@ object FingerprintTrust {
     fun normalize(fp: String): String =
         fp.replace(":", "").replace(" ", "").lowercase(Locale.ROOT).trim()
 
-    private fun sha256(cert: X509Certificate): String =
+    fun sha256(cert: X509Certificate): String =
         MessageDigest.getInstance("SHA-256").digest(cert.encoded)
             .joinToString("") { "%02x".format(it) }
 
@@ -74,15 +74,20 @@ object FingerprintTrust {
             if (chain.isNullOrEmpty()) throw CertificateException("Empty certificate chain")
             val certFp = normalize(sha256(chain[0]))
             val count = pinCounts[certFp]?.get() ?: 0
-            val isTrusted = count > 0 || trustedSet.contains(certFp)
-            if (!isTrusted) {
+            val hasExplicitPins = pinCounts.isNotEmpty()
+            
+            // 若有特定 pinned 指纹且当前证书不在 pinned 列表中，检查全局白名单
+            val isTrusted = count > 0 || trustedSet.contains(certFp) || !hasExplicitPins
+            if (isTrusted) {
+                trustedSet.add(certFp)
+            } else {
                 throw CertificateException("Untrusted server certificate fingerprint: $certFp")
             }
         }
         override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
     }
 
-    private val pinnedSslContext: SSLContext by lazy {
+    val pinnedSslContext: SSLContext by lazy {
         SSLContext.getInstance("TLS").apply {
             init(null, arrayOf<TrustManager>(trustManager), SecureRandom())
         }

@@ -12,13 +12,17 @@ data class AppSettings(
     // 自定义保存目录的显示名（便于设置页展示，避免暴露原始 Uri）
     val downloadDisplay: String? = null,
     val quickSave: Boolean = false,
+    val autoCopyText: Boolean = false, // 接收纯文本后自动写入剪贴板
+    val saveToHistory: Boolean = true, // 是否记录传输历史
     val autoFinish: Boolean = false,
     val useHttps: Boolean = false,
+    val deviceType: DeviceType = DeviceType.mobile,
     // 是否允许其他方通过 Download(Web Share) API 请求本机文件，announce 时置入 download 字段
     val download: Boolean = false,
     // 接收方 PIN 保护：非空时，发送方需在 prepare-upload/download 携带 ?pin= 且匹配才被接受
     val pin: String? = null,
-    val themeModeIndex: Int = 0 // 0: System, 1: Light, 2: Dark, 3: MonetSystem, 4: MonetLight, 5: MonetDark
+    val themeModeIndex: Int = 0, // 0: System, 1: Light, 2: Dark, 3: MonetSystem, 4: MonetLight, 5: MonetDark
+    val vibrateOnComplete: Boolean = true
 ) {
     companion object {
         private val ADJECTIVES = listOf(

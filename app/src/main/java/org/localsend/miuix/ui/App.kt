@@ -38,6 +38,7 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.ui.component.AddContentBottomSheet
 import org.localsend.miuix.ui.component.AppIcons
+import org.localsend.miuix.ui.component.AppPickerBottomSheet
 import org.localsend.miuix.ui.component.IncomingTransferDialog
 import org.localsend.miuix.ui.component.LiquidGlassBottomBar
 import org.localsend.miuix.ui.component.PortDialog
@@ -107,6 +108,9 @@ fun App(manager: LocalSendManager) {
     var showSendTextDialog by remember { mutableStateOf(false) }
     var showAddContentSheet by remember { mutableStateOf(false) }
     var showPortDialog by remember { mutableStateOf(false) }
+    var showAppPickerSheet by remember { mutableStateOf(false) }
+    var showWebShareDialog by remember { mutableStateOf(false) }
+    var showManualIpDialog by remember { mutableStateOf(false) }
 
     // 5. Activity Result Launchers
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -144,6 +148,16 @@ fun App(manager: LocalSendManager) {
             }
             manager.addFiles(items)
             Toast.makeText(context, "已添加 ${items.size} 个文件", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                manager.addFolder(uri)
+            }
         }
     }
 
@@ -295,13 +309,17 @@ fun App(manager: LocalSendManager) {
                                     contentPadding = pagePadding,
                                     onOpenAddSheet = { showAddContentSheet = true },
                                     onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
+                                    onPickFolder = { folderPickerLauncher.launch(null) },
                                     onPickMedia = {
                                         mediaPickerLauncher.launch(
                                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
                                         )
                                     },
+                                    onPickApps = { showAppPickerSheet = true },
                                     onSendText = { showSendTextDialog = true },
-                                    onPasteClipboard = pickClipboard
+                                    onPasteClipboard = pickClipboard,
+                                    onOpenWebShare = { showWebShareDialog = true },
+                                    onManualIp = { showManualIpDialog = true }
                                 )
                                 2 -> SettingsScreen(
                                     manager = manager,
@@ -379,13 +397,36 @@ fun App(manager: LocalSendManager) {
             show = showAddContentSheet,
             onDismissRequest = { showAddContentSheet = false },
             onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
+            onPickFolder = { folderPickerLauncher.launch(null) },
             onPickMedia = {
                 mediaPickerLauncher.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
                 )
             },
+            onPickApps = { showAppPickerSheet = true },
             onSendText = { showSendTextDialog = true },
             onPasteClipboard = pickClipboard
+        )
+
+        AppPickerBottomSheet(
+            show = showAppPickerSheet,
+            onDismissRequest = { showAppPickerSheet = false },
+            manager = manager
+        )
+
+        org.localsend.miuix.ui.component.WebShareDialog(
+            show = showWebShareDialog,
+            onDismissRequest = { showWebShareDialog = false },
+            manager = manager
+        )
+
+        org.localsend.miuix.ui.component.ManualIpDialog(
+            show = showManualIpDialog,
+            onDismissRequest = { showManualIpDialog = false },
+            onSend = { ip, port ->
+                manager.sendToIp(ip, port)
+                Toast.makeText(context, "正在连接 $ip:$port 发送内容...", Toast.LENGTH_SHORT).show()
+            }
         )
     }
 }

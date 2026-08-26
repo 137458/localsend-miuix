@@ -4,6 +4,8 @@ import android.content.Context
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension
+import org.bouncycastle.asn1.x509.GeneralName
+import org.bouncycastle.asn1.x509.GeneralNames
 import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
@@ -53,6 +55,21 @@ object TlsStore {
         return createAndSave(file)
     }
 
+    /** 重新生成自签名证书并更新指纹。 */
+    @Synchronized
+    fun regenerateKeyStore(context: Context): KeyStore {
+        val file = keystoreFile(context)
+        try {
+            if (file.exists()) {
+                file.delete()
+            }
+        } catch (ignored: Exception) {}
+        cachedFingerprint = null
+        val newStore = createAndSave(file)
+        fingerprint(context)
+        return newStore
+    }
+
     private fun createAndSave(file: File): KeyStore {
         val keystore = KeyStore.getInstance("PKCS12").apply { load(null, null) }
         val keyPair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
@@ -74,6 +91,16 @@ object TlsStore {
             true,
             KeyUsage(KeyUsage.digitalSignature or KeyUsage.keyEncipherment or KeyUsage.dataEncipherment)
         )
+        // 补充 SAN（Subject Alternative Name），避免 Android/Netty 严格 TLS 模式下握手失败
+        val sans = GeneralNames(
+            arrayOf(
+                GeneralName(GeneralName.dNSName, "localhost"),
+                GeneralName(GeneralName.iPAddress, "127.0.0.1"),
+                GeneralName(GeneralName.iPAddress, "0.0.0.0")
+            )
+        )
+        builder.addExtension(Extension.subjectAlternativeName, false, sans)
+
         val signer = JcaContentSignerBuilder("SHA256withRSA").build(keyPair.private)
         val cert: X509Certificate = JcaX509CertificateConverter().getCertificate(builder.build(signer))
         cert.checkValidity()

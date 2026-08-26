@@ -12,12 +12,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.manager.LocalSendManager
+import org.localsend.miuix.model.DeviceType
+import org.localsend.miuix.ui.component.CertFingerprintDialog
+import org.localsend.miuix.ui.component.PinDialog
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTitle
@@ -38,6 +43,9 @@ fun SettingsScreen(
     val settings by manager.settings.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
 
+    var showPinDialog by remember { mutableStateOf(false) }
+    var showCertDialog by remember { mutableStateOf(false) }
+
     val themeOptions = remember {
         listOf(
             "跟随系统",
@@ -47,6 +55,19 @@ fun SettingsScreen(
             "莫奈浅色",
             "莫奈深色"
         )
+    }
+
+    val deviceTypeOptions = remember {
+        listOf("手机 (Mobile)", "平板 (Tablet)", "电脑 (Desktop)", "服务器 (Server)")
+    }
+    val currentDeviceTypeIndex = remember(settings.deviceType) {
+        when (settings.deviceType) {
+            DeviceType.mobile -> 0
+            DeviceType.tablet -> 1
+            DeviceType.desktop -> 2
+            DeviceType.server -> 3
+            else -> 0
+        }
     }
 
     Column(
@@ -79,6 +100,21 @@ fun SettingsScreen(
                         onClick = onOpenRenameDialog
                     )
                     WindowDropdownPreference(
+                        title = "设备类型",
+                        items = deviceTypeOptions,
+                        selectedIndex = currentDeviceTypeIndex,
+                        onSelectedIndexChange = { index ->
+                            val newType = when (index) {
+                                0 -> DeviceType.mobile
+                                1 -> DeviceType.tablet
+                                2 -> DeviceType.desktop
+                                3 -> DeviceType.server
+                                else -> DeviceType.mobile
+                            }
+                            manager.updateSettings { it.copy(deviceType = newType) }
+                        }
+                    )
+                    WindowDropdownPreference(
                         title = "应用主题",
                         items = themeOptions,
                         selectedIndex = settings.themeModeIndex,
@@ -87,61 +123,122 @@ fun SettingsScreen(
                         }
                     )
                     SwitchPreference(
-                        title = "自动保存",
+                        title = "传输完成震动反馈",
+                        summary = "发送或接收完成时触发触感震动",
+                        checked = settings.vibrateOnComplete,
+                        onCheckedChange = { checked ->
+                            manager.updateSettings { it.copy(vibrateOnComplete = checked) }
+                        }
+                    )
+                }
+            }
+
+            // Section 2: Receive Settings
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                SmallTitle(text = "接收设置")
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    SwitchPreference(
+                        title = "快速保存",
                         summary = "自动接收所有传入的发送请求",
                         checked = settings.quickSave,
                         onCheckedChange = { checked ->
                             manager.updateSettings { it.copy(quickSave = checked) }
                         }
                     )
-                }
-            }
-
-            // Section 2: Network Settings
-            item {
-                Spacer(modifier = Modifier.height(4.dp))
-                SmallTitle(text = "网络与传输")
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    ArrowPreference(
-                        title = "端口号",
-                        summary = settings.port.toString(),
-                        onClick = onOpenPortDialog
+                    SwitchPreference(
+                        title = "自动复制文本",
+                        summary = "收到纯文本消息时自动复制到剪贴板",
+                        checked = settings.autoCopyText,
+                        onCheckedChange = { checked ->
+                            manager.updateSettings { it.copy(autoCopyText = checked) }
+                        }
                     )
                     SwitchPreference(
-                        title = "启用 HTTPS 加密",
-                        summary = "使用 TLS 进行局域网传输加密",
-                        checked = settings.useHttps,
+                        title = "保存传输历史",
+                        summary = "将完成和取消的传输记录存入历史页面",
+                        checked = settings.saveToHistory,
                         onCheckedChange = { checked ->
-                            manager.applyUseHttpsChange(checked)
+                            manager.updateSettings { it.copy(saveToHistory = checked) }
                         }
                     )
                     ArrowPreference(
-                        title = "保存目录",
+                        title = "文件保存目录",
                         summary = settings.downloadDisplay ?: settings.downloadPath,
                         onClick = onPickDirectory
                     )
                 }
             }
 
-            // Section 3: About
+            // Section 3: Network & Security Settings
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                SmallTitle(text = "网络与安全")
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    ArrowPreference(
+                        title = "服务端口",
+                        summary = settings.port.toString(),
+                        onClick = onOpenPortDialog
+                    )
+                    SwitchPreference(
+                        title = "启用 HTTPS (TLS 加密)",
+                        summary = "使用端到端自签名证书加密局域网通信",
+                        checked = settings.useHttps,
+                        onCheckedChange = { checked ->
+                            manager.applyUseHttpsChange(checked)
+                        }
+                    )
+                    ArrowPreference(
+                        title = "传输 PIN 码保护",
+                        summary = if (settings.pin.isNullOrEmpty()) "未启用 (点击设置)" else "已设置: ••••",
+                        onClick = { showPinDialog = true }
+                    )
+                    ArrowPreference(
+                        title = "TLS 证书指纹",
+                        summary = if (settings.useHttps) "查看与重新生成 SHA-256 指纹" else "HTTPS 开启后可用",
+                        onClick = { showCertDialog = true }
+                    )
+                }
+            }
+
+            // Section 4: About
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 SmallTitle(text = "关于")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ArrowPreference(
                         title = "LocalSend Miuix",
-                        summary = "版本 1.0.0 (基于 Miuix 0.9.4 & HyperOS 视觉规范)",
+                        summary = "版本 2.1.0 (基于 Miuix 0.9.4 & HyperOS 视觉规范)",
                         onClick = {
                             Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
                         }
                     )
                     ArrowPreference(
-                        title = "开源协议",
-                        summary = "LocalSend 协议标准 v2.1 • Apache 2.0",
+                        title = "开源协议与标准",
+                        summary = "LocalSend Protocol v2.1 • Apache 2.0 License",
                         onClick = {}
                     )
                 }
             }
         }
     }
+
+    PinDialog(
+        show = showPinDialog,
+        initialPin = settings.pin,
+        onDismissRequest = { showPinDialog = false },
+        onConfirm = { newPin ->
+            manager.updateSettings { it.copy(pin = newPin) }
+        }
+    )
+
+    CertFingerprintDialog(
+        show = showCertDialog,
+        fingerprint = if (settings.useHttps) manager.getLocalDevice().fingerprint else "",
+        onDismissRequest = { showCertDialog = false },
+        onRegenerate = {
+            manager.regenerateCertificate()
+        }
+    )
 }
+

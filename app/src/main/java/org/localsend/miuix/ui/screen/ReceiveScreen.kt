@@ -66,8 +66,6 @@ fun ReceiveScreen(
     val settings by manager.settings.collectAsState()
     val activeSessions by manager.activeSessions.collectAsState()
     val incomingSessions = remember(activeSessions) { activeSessions.filter { it.isIncoming } }
-    val shares by manager.shares.collectAsState()
-    val selectedFiles by manager.selectedFiles.collectAsState()
 
     val localIps = remember { NetworkUtils.getLocalIpAddresses() }
     val primaryIp = localIps.firstOrNull() ?: "127.0.0.1"
@@ -100,14 +98,14 @@ fun ReceiveScreen(
         ) {
             // Section 1: Device Info Card
             item {
-                SmallTitle(text = "本机状态")
+                SmallTitle(text = "本机设备")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ArrowPreference(
                         title = settings.alias,
-                        summary = "本机名称 (点击可修改)",
+                        summary = "设备别名 (点击修改)",
                         startAction = {
                             Icon(
-                                imageVector = Icons.Default.Edit,
+                                imageVector = AppIcons.getDeviceIcon(settings.deviceType),
                                 contentDescription = null,
                                 tint = MiuixTheme.colorScheme.primary,
                                 modifier = Modifier.size(24.dp)
@@ -117,21 +115,37 @@ fun ReceiveScreen(
                     )
                     ArrowPreference(
                         title = "$primaryIp:${settings.port}",
-                        summary = if (localIps.size > 1) "所有 IP: ${localIps.joinToString(", ")}" else "局域网 IP 与服务端口",
+                        summary = if (localIps.size > 1) "所有网卡 IP: ${localIps.joinToString(", ")}" else "局域网 IPv4 地址与服务端口",
                         onClick = {}
                     )
+                }
+            }
+
+            // Section 2: Quick Receive Preferences
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                SmallTitle(text = "接收选项")
+                Card(modifier = Modifier.fillMaxWidth()) {
                     SwitchPreference(
                         title = "快速保存",
-                        summary = "自动接收所有传入的传输请求",
+                        summary = "自动接受同局域网所有设备的传输请求，无需每次手动确认",
                         checked = settings.quickSave,
                         onCheckedChange = { checked ->
                             manager.updateSettings { it.copy(quickSave = checked) }
                         }
                     )
+                    SwitchPreference(
+                        title = "自动复制文本",
+                        summary = "收到纯文本消息时自动写入系统剪贴板",
+                        checked = settings.autoCopyText,
+                        onCheckedChange = { checked ->
+                            manager.updateSettings { it.copy(autoCopyText = checked) }
+                        }
+                    )
                 }
             }
 
-            // Section 1.5: Incoming Transfer Progress（使用统一的高质感 TransferSessionCard）
+            // Section 3: Incoming Transfer Progress
             if (incomingSessions.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
@@ -143,100 +157,34 @@ fun ReceiveScreen(
                         onCancel = { manager.cancelTransfer(session.sessionId) }
                     )
                 }
-            }
-
-            // Section 2: Web Share（通过链接共享给局域网浏览器）
-            item {
-                Spacer(modifier = Modifier.height(4.dp))
-                SmallTitle(text = "通过链接分享")
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    if (shares.isEmpty()) {
+            } else {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Card(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(20.dp),
+                                .padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = "把选中的文件共享为可浏览/下载的链接，接收方无需安装应用",
-                                style = MiuixTheme.textStyles.footnote1,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = {
-                                    if (selectedFiles.isEmpty()) {
-                                        Toast.makeText(context, "请先在发送页添加待分享的文件", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        manager.startShare(selectedFiles)
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColorsPrimary()
-                            ) {
-                                Icon(imageVector = AppIcons.Link, contentDescription = null)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("开启链接共享")
-                            }
-                        }
-                    } else {
-                        // StateFlow 单例共享（empty↔single 原子切换），此处安全性对当前实现保证；
-                        // 用 firstOrNull 防御，避免未来引入多共享时抛 NoSuchElementException
-                        val session = shares.firstOrNull() ?: return@Card
-                        val device = manager.getLocalDevice()
-                        val link = session.downloadLink(device.protocol, device.ip, device.port)
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "收件人浏览器打开以下地址即可下载",
-                                style = MiuixTheme.textStyles.footnote1,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            Icon(
+                                imageVector = AppIcons.Wifi,
+                                contentDescription = null,
+                                modifier = Modifier.size(36.dp),
+                                tint = MiuixTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.1f))
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = link,
-                                    style = MiuixTheme.textStyles.body2,
-                                    color = MiuixTheme.colorScheme.primary,
-                                    maxLines = 1
-                                )
-                                Spacer(modifier = Modifier.weight(1f))
-                                Text(
-                                    text = "共 ${session.files.size} 个文件",
-                                    style = MiuixTheme.textStyles.footnote1,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = {
-                                        val clipboard = context.getSystemService(
-                                            android.content.Context.CLIPBOARD_SERVICE
-                                        ) as android.content.ClipboardManager
-                                        clipboard.setPrimaryClip(
-                                            android.content.ClipData.newPlainText("LocalSend", link)
-                                        )
-                                        Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
-                                    },
-                                    colors = ButtonDefaults.buttonColorsPrimary()
-                                ) {
-                                    Icon(imageVector = AppIcons.Copy, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("复制链接")
-                                }
-                                Button(
-                                    onClick = { manager.stopShare() },
-                                    colors = ButtonDefaults.buttonColors()
-                                ) {
-                                    Text("结束共享")
-                                }
-                            }
+                            Text(
+                                text = "等待接收中...",
+                                style = MiuixTheme.textStyles.body2,
+                                color = MiuixTheme.colorScheme.onSurfaceSecondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "确保发送端连接在同一 Wi-Fi 或局域网",
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            )
                         }
                     }
                 }

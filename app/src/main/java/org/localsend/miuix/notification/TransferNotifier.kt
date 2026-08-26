@@ -1,30 +1,28 @@
 package org.localsend.miuix.notification
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import org.localsend.miuix.R
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.ui.MainActivity
 
 /**
- * 传输通知。用于在应用退到后台 / 快速保存自动接收时，向用户提示接收进度与结果。
- *
- * 与官方 LocalSend 对齐：仅在发生接收时弹通知，不引入常驻前台服务。
+ * 传输通知。用于在后台或快速保存自动接收时，向用户提示传输进度与结果。
  */
 object TransferNotifier {
 
     const val CHANNEL_RECEIVE = "localsend_receive"
+    const val CHANNEL_SEND = "localsend_send"
 
-    /** 各加密会话的接收通知 id，互相独立。 */
-    const val NOTIF_ID_RECEIVE_START = 2001
-
-    /** 会话通知 id（进度/结果）。易造成通知堆积，故只保留最近若干 id。 */
-    private const val NOTIF_ID_PROGRESS = 3001
+    private const val NOTIF_ID_RECEIVE_BASE = 2000
+    private const val NOTIF_ID_SEND_BASE = 3000
 
     private var allowed = false
 
@@ -37,14 +35,22 @@ object TransferNotifier {
     private fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(
+        val receiveChannel = NotificationChannel(
             CHANNEL_RECEIVE,
-            "接收文件",
+            "接收通知",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "接收文件时的进度与结果提示"
+            description = "接收文件与文本时的进度与结果提示"
         }
-        nm.createNotificationChannel(channel)
+        val sendChannel = NotificationChannel(
+            CHANNEL_SEND,
+            "发送通知",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "发送文件与文本时的进度与结果提示"
+        }
+        nm.createNotificationChannel(receiveChannel)
+        nm.createNotificationChannel(sendChannel)
     }
 
     private fun hasPermission(context: Context): Boolean {
@@ -59,21 +65,46 @@ object TransferNotifier {
         return hasPermission(context)
     }
 
+    private fun sessionNotifId(session: TransferSession): Int {
+        val base = if (session.isIncoming) NOTIF_ID_RECEIVE_BASE else NOTIF_ID_SEND_BASE
+        return base + (session.sessionId.hashCode() and 0x7FFF) % 100
+    }
+
+    private fun appPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        return PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+        )
+    }
+
     fun notifyIncoming(context: Context, session: TransferSession) {
         if (!isAllowed(context)) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val title = "收到来自 ${session.device.alias} 的文件"
-        val text = if (session.files.size == 1) {
+        val title = if (session.isTextMessage) {
+            "收到来自 ${session.device.alias} 的文本"
+        } else {
+            "收到来自 ${session.device.alias} 的文件"
+        }
+        val text = if (session.isTextMessage) {
+            session.singleTextMessageContent?.take(80) ?: "纯文本消息"
+        } else if (session.files.size == 1) {
             "${session.files.first().name} (${session.formattedTotalSize})"
         } else {
             "共 ${session.files.size} 个文件 (${session.formattedTotalSize})"
         }
-        val builder = notif(context)
+        val builder = NotificationCompat.Builder(context, CHANNEL_RECEIVE)
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_stat_receive)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-        nm.notify(NOTIF_ID_RECEIVE_START, builder.build())
+            .setContentIntent(appPendingIntent(context))
+            .setAutoCancel(true)
+        nm.notify(sessionNotifId(session), builder.build())
     }
 
     fun updateProgress(context: Context, session: TransferSession) {
@@ -81,8 +112,10 @@ object TransferNotifier {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val speedText = if (session.speed > 0) " · ${session.formattedSpeed}" else ""
         val currentFileName = session.currentFile?.name
-        val builder = notif(context)
-            .setContentTitle("正在接收 ${session.device.alias} 的文件")
+        val actionText = if (session.isIncoming) "正在接收" else "正在发送"
+        val channel = if (session.isIncoming) CHANNEL_RECEIVE else CHANNEL_SEND
+        val builder = NotificationCompat.Builder(context, channel)
+            .setContentTitle("$actionText ${session.device.alias} 的内容")
             .setContentText("${session.progressPercent}% · ${session.formattedTransferredSize} / ${session.formattedTotalSize}$speedText")
             .apply {
                 if (!currentFileName.isNullOrEmpty()) {
@@ -92,30 +125,46 @@ object TransferNotifier {
             .setSmallIcon(R.drawable.ic_stat_receive)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOnlyAlertOnce(true)
+            .setContentIntent(appPendingIntent(context))
             .setProgress(100, session.progressPercent, session.totalBytes <= 0)
-        nm.notify(NOTIF_ID_PROGRESS, builder.build())
+        nm.notify(sessionNotifId(session), builder.build())
     }
 
     fun notifyResult(context: Context, session: TransferSession) {
         if (!isAllowed(context)) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channel = if (session.isIncoming) CHANNEL_RECEIVE else CHANNEL_SEND
         val (title, content) = when (session.status) {
-            TransferStatus.Completed -> "文件接收完成" to "已接收来自 ${session.device.alias} 的 ${session.files.size} 个文件"
-            TransferStatus.Canceled -> "文件接收已取消" to "来源：${session.device.alias}"
-            TransferStatus.Failed -> "文件接收失败" to "来源：${session.device.alias}"
+            TransferStatus.Completed -> {
+                if (session.isIncoming) {
+                    if (session.isTextMessage) {
+                        "已收到来自 ${session.device.alias} 的文本" to (session.singleTextMessageContent?.take(100) ?: "纯文本消息")
+                    } else {
+                        "文件接收完成" to "已成功接收来自 ${session.device.alias} 的 ${session.files.size} 个文件"
+                    }
+                } else {
+                    if (session.isTextMessage) {
+                        "文本消息已送达" to "已发送给 ${session.device.alias}"
+                    } else {
+                        "文件发送完成" to "已成功发送 ${session.files.size} 个文件给 ${session.device.alias}"
+                    }
+                }
+            }
+            TransferStatus.Canceled -> {
+                (if (session.isIncoming) "接收已取消" else "发送已取消") to "对端：${session.device.alias}"
+            }
+            TransferStatus.Failed -> {
+                (if (session.isIncoming) "接收失败" else "发送失败") to "${session.errorMessage ?: "传输异常"}"
+            }
             else -> return
         }
-        val builder = notif(context)
+        val builder = NotificationCompat.Builder(context, channel)
             .setContentTitle(title)
             .setContentText(content)
             .setSmallIcon(R.drawable.ic_stat_receive)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(appPendingIntent(context))
             .setAutoCancel(true)
-        nm.notify(NOTIF_ID_PROGRESS, builder.build())
-    }
-
-    private fun notif(context: Context): NotificationCompat.Builder {
-        return NotificationCompat.Builder(context, CHANNEL_RECEIVE)
-            .setContentIntent(null)
+        nm.notify(sessionNotifId(session), builder.build())
     }
 }

@@ -63,7 +63,7 @@ data class FileItem(
     val size: Long,
     val uri: Uri? = null,
     val path: String? = null,
-    val textContent: String? = null,
+    var textContent: String? = null,
     val mimeType: String = "application/octet-stream",
     val token: String? = null,
     // 发送方在 prepare-upload 中声明的 sha256（可选）；接收方写入后校验，不匹配则回 422
@@ -76,13 +76,17 @@ data class FileItem(
     // 通过 MediaStore 写入公共目录时，记录插入出的 Uri，用于完成后清除 IS_PENDING 标记
     var mediaStoreUri: Uri? = null
 ) {
+    val isTextMessage: Boolean
+        get() = textContent != null || mimeType.startsWith("text/")
+
     fun toDto(): FileDto {
         return FileDto(
             id = id,
             fileName = name,
             size = size,
             fileType = mimeType,
-            sha256 = expectedSha256
+            sha256 = expectedSha256,
+            preview = textContent?.take(2000)
         )
     }
 
@@ -116,6 +120,12 @@ data class TransferSession(
     var endTime: Long? = null,
     var errorMessage: String? = null
 ) {
+    val isTextMessage: Boolean
+        get() = files.size == 1 && files.first().isTextMessage
+
+    val singleTextMessageContent: String?
+        get() = if (isTextMessage) files.first().textContent else null
+
     val progress: Float
         get() = if (totalBytes > 0) (transferredBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
 
@@ -157,6 +167,14 @@ data class TransferSession(
         }
 }
 
+data class HistoryFileEntry(
+    val name: String,
+    val size: Long,
+    val uri: Uri? = null,
+    val path: String? = null,
+    val mimeType: String = "application/octet-stream"
+)
+
 data class TransferHistoryItem(
     val id: String = UUID.randomUUID().toString(),
     val deviceAlias: String,
@@ -166,7 +184,10 @@ data class TransferHistoryItem(
     val totalSize: Long,
     val status: TransferStatus,
     val timestamp: Long = System.currentTimeMillis(),
-    val fileNames: List<String>
+    val fileNames: List<String>,
+    val textContent: String? = null,
+    val isTextMessage: Boolean = false,
+    val fileEntries: List<HistoryFileEntry> = emptyList()
 ) {
     val formattedSize: String
         get() = FileItem.formatFileSize(totalSize)

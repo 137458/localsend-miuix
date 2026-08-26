@@ -206,7 +206,6 @@ class LocalSendServer(
      */
     private fun startHttps(port: Int) {
         val keystore = TlsStore.loadKeyStore(context)
-        val keyStoreFile = File(context.filesDir, TlsStore.KEYSTORE_FILENAME)
         val password = TlsStore.STORE_PASSWORD.toCharArray()
         val environment = applicationEngineEnvironment {
             sslConnector(
@@ -216,7 +215,6 @@ class LocalSendServer(
                 privateKeyPassword = { password }
             ) {
                 this.port = port
-                keyStorePath = keyStoreFile
             }
             module {
                 installCommon()
@@ -241,7 +239,7 @@ class LocalSendServer(
 
     fun stop() {
         try {
-            engine?.stop(500, 1000)
+            engine?.stop(200, 500)
         } catch (ignored: Exception) {}
         engine = null
         activeSessions.clear()
@@ -251,10 +249,11 @@ class LocalSendServer(
 
     /** 打开 Web Share 共享文件的源输入流（URI / 路径 / 文本内容）。 */
     private fun openShareStream(fileItem: FileItem): InputStream? = try {
+        val text = fileItem.textContent
         when {
             fileItem.uri != null -> context.contentResolver.openInputStream(fileItem.uri)
             fileItem.path != null -> File(fileItem.path).inputStream()
-            fileItem.textContent != null -> fileItem.textContent.byteInputStream(Charsets.UTF_8)
+            text != null -> text.byteInputStream(Charsets.UTF_8)
             else -> null
         }
     } catch (e: Exception) {
@@ -268,6 +267,120 @@ class LocalSendServer(
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
         .replace("'", "&#39;")
+
+    private fun buildWebShareHtml(alias: String, session: ShareSession?): String {
+        if (session == null || session.files.isEmpty()) {
+            return """
+                <!DOCTYPE html>
+                <html lang="zh-CN">
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>LocalSend - Web Share</title>
+                    <style>
+                        :root { --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --text-sec: #86868b; --primary: #0071e3; }
+                        @media (prefers-color-scheme: dark) { :root { --bg: #000000; --card: #1c1c1e; --text: #f5f5f7; --text-sec: #86868b; --primary: #2997ff; } }
+                        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px 16px; display: flex; justify-content: center; }
+                        .container { max-width: 600px; width: 100%; }
+                        .card { background: var(--card); border-radius: 18px; padding: 32px 24px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+                    </style>
+                </head>
+                <body>
+                    <div class="container"><div class="card"><h2>当前没有正在共享的文件</h2><p style="color:var(--text-sec)">发送端已停止共享或未添加内容</p></div></div>
+                </body>
+                </html>
+            """.trimIndent()
+        }
+
+        val textItems = session.files.filter { it.isTextMessage && !it.textContent.isNullOrEmpty() }
+        val binaryFiles = session.files.filterNot { it.isTextMessage && !it.textContent.isNullOrEmpty() }
+
+        val textSectionHtml = if (textItems.isNotEmpty()) {
+            val textCards = textItems.joinToString("") { textItem ->
+                val escapedText = escapeHtml(textItem.textContent ?: "")
+                """
+                <div class="text-card">
+                    <pre class="text-content" id="text-${textItem.id}">$escapedText</pre>
+                    <button class="btn btn-secondary" onclick="copyText('text-${textItem.id}')">📋 复制文本</button>
+                </div>
+                """.trimIndent()
+            }
+            """<h3 class="section-title">💬 共享文本</h3>$textCards"""
+        } else ""
+
+        val fileListHtml = if (binaryFiles.isNotEmpty()) {
+            val rows = binaryFiles.joinToString("") { file ->
+                val downloadUrl = "/api/localsend/v2/download?sessionId=${session.sessionId}&fileId=${file.id}"
+                """
+                <div class="file-row">
+                    <div class="file-info">
+                        <span class="file-name">${escapeHtml(file.name)}</span>
+                        <span class="file-size">${file.formattedSize}</span>
+                    </div>
+                    <a class="btn btn-primary" href="$downloadUrl" download="${escapeHtml(file.name)}">⬇️ 下载</a>
+                </div>
+                """.trimIndent()
+            }
+            """<h3 class="section-title">📦 共享文件 (${binaryFiles.size})</h3><div class="file-list">$rows</div>"""
+        } else ""
+
+        return """
+            <!DOCTYPE html>
+            <html lang="zh-CN">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>${escapeHtml(alias)} 分享的内容 - LocalSend</title>
+                <style>
+                    :root { --bg: #f4f4f6; --card: #ffffff; --text: #1a1a1c; --text-sec: #808084; --primary: #007aff; --primary-hover: #0062cc; --btn-sec: #e5e5ea; --btn-sec-text: #1a1a1c; --border: #e5e5ea; }
+                    @media (prefers-color-scheme: dark) { :root { --bg: #121214; --card: #1c1c1e; --text: #f2f2f7; --text-sec: #8e8e93; --primary: #0a84ff; --primary-hover: #0071e3; --btn-sec: #2c2c2e; --btn-sec-text: #f2f2f7; --border: #38383a; } }
+                    * { box-sizing: border-box; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px 16px; display: flex; justify-content: center; }
+                    .container { max-width: 580px; width: 100%; }
+                    .header { text-align: center; margin-bottom: 24px; }
+                    .header h1 { font-size: 22px; font-weight: 700; margin: 0 0 6px 0; }
+                    .header p { font-size: 14px; color: var(--text-sec); margin: 0; }
+                    .section-title { font-size: 15px; font-weight: 600; color: var(--text-sec); margin: 20px 8px 8px 8px; }
+                    .text-card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
+                    .text-content { font-family: inherit; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; margin: 0 0 12px 0; max-height: 240px; overflow-y: auto; }
+                    .file-list { background: var(--card); border-radius: 16px; overflow: hidden; border: 1px solid var(--border); }
+                    .file-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+                    .file-row:last-child { border-bottom: none; }
+                    .file-info { display: flex; flex-direction: column; max-width: 70%; }
+                    .file-name { font-size: 15px; font-weight: 500; word-break: break-all; }
+                    .file-size { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+                    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; transition: background 0.2s; }
+                    .btn-primary { background: var(--primary); color: #fff; }
+                    .btn-primary:hover { background: var(--primary-hover); }
+                    .btn-secondary { background: var(--btn-sec); color: var(--btn-sec-text); width: 100%; }
+                    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 10px 20px; border-radius: 24px; font-size: 14px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>📱 ${escapeHtml(alias)}</h1>
+                        <p>通过局域网直接向您分享内容</p>
+                    </div>
+                    $textSectionHtml
+                    $fileListHtml
+                </div>
+                <div id="toast" class="toast">已复制到剪贴板</div>
+                <script>
+                    function copyText(id) {
+                        const el = document.getElementById(id);
+                        if (!el) return;
+                        navigator.clipboard.writeText(el.innerText).then(() => {
+                            const toast = document.getElementById('toast');
+                            toast.style.opacity = '1';
+                            setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+                        });
+                    }
+                </script>
+            </body>
+            </html>
+        """.trimIndent()
+    }
 
     /** 校验 PIN：未配置 PIN 视为放行；配置后要求查询参数 ?pin= 精确匹配，否则回 401。 */
     private fun pinOk(pinFromRequest: String?): Boolean {
@@ -292,22 +405,12 @@ class LocalSendServer(
     private fun Application.configureRouting() {
         routing {
 
-            // 协议 §5.1：Web Share 浏览器入口页，展示待共享文件并允许逐个下载
+            // 协议 §5.1：Web Share 浏览器入口页，展示待共享文件并允许逐个下载与复制文本
             get("/") {
                 val shares = getShares()
-                if (shares.isEmpty()) {
-                    call.respondText("<html><body><h3>没有正在共享的文件</h3></body></html>", ContentType.Text.Html)
-                    return@get
-                }
-                val session = shares.first()
-                val rows = session.files.joinToString("") { file ->
-                    val url = "/api/localsend/v2/download?sessionId=${session.sessionId}&fileId=${file.id}"
-                    "<li><a href=\"$url\">${escapeHtml(file.name)} (${file.formattedSize})</a></li>"
-                }
-                call.respondText(
-                    "<html><body><h3>${escapeHtml(getLocalDevice().alias)} 分享的文件</h3><ul>$rows</ul></body></html>",
-                    ContentType.Text.Html
-                )
+                val session = shares.firstOrNull()
+                val html = buildWebShareHtml(getLocalDevice().alias, session)
+                call.respondText(html, ContentType.Text.Html)
             }
 
             // 协议 §5.2：接收方请求文件元数据（支持 ?sessionId= 避免刷新后丢失会话）
@@ -437,6 +540,7 @@ class LocalSendServer(
                         name = dto.fileName,
                         size = dto.size,
                         mimeType = dto.fileType,
+                        textContent = dto.preview,
                         token = UUID.randomUUID().toString(),
                         expectedSha256 = dto.sha256,
                         status = TransferStatus.WaitingApproval
@@ -528,6 +632,10 @@ class LocalSendServer(
                     } else {
                         null
                     }
+                    val textBuffer = if (fileItem.isTextMessage || fileItem.mimeType.startsWith("text/")) {
+                        java.io.ByteArrayOutputStream()
+                    } else null
+
                     openSaveStream(fileItem, saveTarget).buffered(128 * 1024).use { fos ->
                         val channel = call.receiveChannel()
                         val buffer = ByteArray(128 * 1024)
@@ -538,6 +646,7 @@ class LocalSendServer(
                             val read = channel.readAvailable(buffer, 0, buffer.size)
                             if (read <= 0) break
                             fos.write(buffer, 0, read)
+                            textBuffer?.write(buffer, 0, read)
                             digest?.update(buffer, 0, read)
                             fileItem.bytesTransferred += read
                             session.transferredBytes += read
@@ -558,6 +667,9 @@ class LocalSendServer(
                             }
                         }
                         fos.flush()
+                    }
+                    if (textBuffer != null && textBuffer.size() > 0) {
+                        fileItem.textContent = textBuffer.toString(Charsets.UTF_8.name())
                     }
                     // MediaStore 路径：写入完成后清除 IS_PENDING，使文件立即可见
                     confirmMediaStoreWrite(fileItem)
