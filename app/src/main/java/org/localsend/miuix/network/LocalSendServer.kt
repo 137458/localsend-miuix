@@ -42,6 +42,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
+import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.model.FileDto
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.PrepareDownloadResponseDto
@@ -266,10 +267,18 @@ class LocalSendServer(
         }
         install(CORS) {
             anyHost()
-            allowHeader("*")
+            allowHeaders { true }
+            allowNonSimpleContentTypes = true
             allowMethod(HttpMethod.Get)
             allowMethod(HttpMethod.Post)
             allowMethod(HttpMethod.Options)
+            allowMethod(HttpMethod.Put)
+            allowMethod(HttpMethod.Delete)
+            allowHeader(HttpHeaders.ContentType)
+            allowHeader(HttpHeaders.Authorization)
+            allowHeader(HttpHeaders.ContentLength)
+            allowHeader(HttpHeaders.ContentDisposition)
+            exposeHeader(HttpHeaders.ContentDisposition)
         }
     }
 
@@ -303,6 +312,43 @@ class LocalSendServer(
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
         .replace("'", "&#39;")
+
+    private fun getWebFileSvgIcon(mimeType: String, fileName: String): String {
+        val lowerName = fileName.lowercase()
+        val lowerMime = mimeType.lowercase()
+        return when {
+            lowerMime == "application/vnd.android.package-archive" || lowerName.endsWith(".apk") || lowerName.endsWith(".xapk") ->
+                """<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"></rect><path d="M9 4v4"></path><path d="M15 4v4"></path><circle cx="9" cy="13" r="1" fill="currentColor"></circle><circle cx="15" cy="13" r="1" fill="currentColor"></circle></svg>"""
+
+            lowerMime.startsWith("image/") || lowerName.endsWith(".png") || lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg") || lowerName.endsWith(".webp") || lowerName.endsWith(".gif") || lowerName.endsWith(".bmp") || lowerName.endsWith(".svg") ->
+                """<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>"""
+
+            lowerMime.startsWith("video/") || lowerName.endsWith(".mp4") || lowerName.endsWith(".mkv") || lowerName.endsWith(".mov") || lowerName.endsWith(".avi") ->
+                """<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>"""
+
+            lowerMime.startsWith("audio/") || lowerName.endsWith(".mp3") || lowerName.endsWith(".flac") || lowerName.endsWith(".wav") || lowerName.endsWith(".m4a") ->
+                """<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>"""
+
+            lowerMime.contains("zip") || lowerMime.contains("tar") || lowerMime.contains("compressed") || lowerName.endsWith(".zip") || lowerName.endsWith(".rar") || lowerName.endsWith(".7z") || lowerName.endsWith(".tar") || lowerName.endsWith(".gz") ->
+                """<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>"""
+
+            lowerMime.startsWith("text/") || lowerMime == "application/json" || lowerName.endsWith(".txt") || lowerName.endsWith(".md") || lowerName.endsWith(".json") || lowerName.endsWith(".kt") || lowerName.endsWith(".java") || lowerName.endsWith(".py") || lowerName.endsWith(".js") ->
+                """<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>"""
+
+            else ->
+                """<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>"""
+        }
+    }
+
+    private fun isSameIp(ip1: String, ip2: String): Boolean {
+        if (ip1 == ip2) return true
+        val clean1 = ip1.removePrefix("::ffff:").removePrefix("/").trim()
+        val clean2 = ip2.removePrefix("::ffff:").removePrefix("/").trim()
+        if (clean1 == clean2) return true
+        val loopbacks = setOf("127.0.0.1", "::1", "localhost", "0:0:0:0:0:0:0:1")
+        if (clean1 in loopbacks && clean2 in loopbacks) return true
+        return false
+    }
 
     private fun buildWebShareHtml(alias: String, session: ShareSession?): String {
         val hasSessionFiles = session != null && session.files.isNotEmpty()
@@ -339,11 +385,17 @@ class LocalSendServer(
         val fileListHtml = if (binaryFiles.isNotEmpty()) {
             val rows = binaryFiles.joinToString("") { file ->
                 val downloadUrl = "/api/localsend/v2/download?sessionId=${session?.sessionId}&fileId=${file.id}"
+                val iconSvg = getWebFileSvgIcon(file.mimeType, file.name)
                 """
                 <div class="file-item">
-                    <div class="file-details">
-                        <span class="file-name">${escapeHtml(file.name)}</span>
-                        <span class="file-meta">${file.formattedSize}</span>
+                    <div style="display:flex; align-items:center; gap:12px; max-width:70%;">
+                        <div style="flex-shrink:0; display:flex; align-items:center;">
+                            $iconSvg
+                        </div>
+                        <div class="file-details">
+                            <span class="file-name">${escapeHtml(file.name)}</span>
+                            <span class="file-meta">${file.formattedSize}</span>
+                        </div>
                     </div>
                     <a class="btn btn-primary" href="$downloadUrl" download="${escapeHtml(file.name)}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -910,6 +962,33 @@ class LocalSendServer(
                         detailText.innerText = msg;
                         showToast(msg);
                     }
+
+                    function registerBrowserDevice() {
+                        var fp = getFingerprint();
+                        var model = 'Web 浏览器';
+                        var ua = navigator.userAgent;
+                        if (ua.indexOf('Mac') !== -1) model = 'Mac 浏览器';
+                        else if (ua.indexOf('Windows') !== -1) model = 'PC 浏览器';
+                        else if (ua.indexOf('iPhone') !== -1) model = 'iPhone 浏览器';
+                        else if (ua.indexOf('iPad') !== -1) model = 'iPad 浏览器';
+                        else if (ua.indexOf('Android') !== -1) model = 'Android 浏览器';
+
+                        var reqBody = {
+                            alias: '浏览器 Web 端',
+                            version: '2.1',
+                            deviceModel: model,
+                            deviceType: 'web',
+                            fingerprint: fp,
+                            port: 0,
+                            protocol: location.protocol.replace(':', ''),
+                            download: false
+                        };
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('POST', '/api/localsend/v2/register', true);
+                        xhr.setRequestHeader('Content-Type', 'application/json');
+                        xhr.send(JSON.stringify(reqBody));
+                    }
+                    try { registerBrowserDevice(); } catch(e) {}
                 </script>
             </body>
             </html>
@@ -941,6 +1020,31 @@ class LocalSendServer(
 
             // 协议 §5.1：Web Share 浏览器入口页，展示待共享文件并允许逐个下载与复制文本
             get("/") {
+                val rawIp = call.request.origin.remoteHost
+                val remoteIp = rawIp.removePrefix("::ffff:").removePrefix("/").trim()
+                val userAgent = call.request.headers[HttpHeaders.UserAgent] ?: ""
+                val model = when {
+                    userAgent.contains("Macintosh") || userAgent.contains("Mac OS") -> "Mac 浏览器"
+                    userAgent.contains("Windows") -> "PC 浏览器"
+                    userAgent.contains("iPhone") -> "iPhone 浏览器"
+                    userAgent.contains("iPad") -> "iPad 浏览器"
+                    userAgent.contains("Android") -> "Android 浏览器"
+                    userAgent.contains("Linux") -> "Linux 浏览器"
+                    else -> "Web 浏览器"
+                }
+                val webDevice = Device(
+                    alias = "浏览器 Web 端 ($remoteIp)",
+                    version = "2.1",
+                    deviceModel = model,
+                    deviceType = DeviceType.web,
+                    fingerprint = "web-$remoteIp",
+                    port = 0,
+                    protocol = if (getUseHttps()) "https" else "http",
+                    download = false,
+                    ip = remoteIp
+                )
+                onDeviceDiscovered(webDevice)
+
                 val shares = getShares()
                 val session = shares.firstOrNull()
                 val html = buildWebShareHtml(getLocalDevice().alias, session)
@@ -1144,10 +1248,10 @@ class LocalSendServer(
                 }
 
                 val expectedToken = sessionTokens[sessionId]?.get(fileId)
+                val requestIp = call.request.origin.remoteHost
+                val isIpMatch = isSameIp(requestIp, session.device.ip)
                 // 403：令牌缺失/错误，或来源 IP 与会话所属设备不一致均拒绝
-                if (token == null || expectedToken == null || token != expectedToken ||
-                    call.request.origin.remoteHost != session.device.ip
-                ) {
+                if (token == null || expectedToken == null || token != expectedToken || !isIpMatch) {
                     call.respond(HttpStatusCode.Forbidden, "Invalid token or IP address")
                     return@post
                 }

@@ -328,7 +328,7 @@ private fun FileTransferCardContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = AppIcons.getFileIcon(current.mimeType, current.name),
+                    imageVector = if (current.isTextMessage) AppIcons.Text else AppIcons.getFileIcon(current.mimeType, current.name),
                     contentDescription = null,
                     tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp)
@@ -449,7 +449,7 @@ private fun FileDetailItem(file: FileItem) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = AppIcons.getFileIcon(file.mimeType, file.name),
+            imageVector = if (file.isTextMessage) AppIcons.Text else AppIcons.getFileIcon(file.mimeType, file.name),
             contentDescription = null,
             modifier = Modifier.size(20.dp),
             tint = MiuixTheme.colorScheme.primary

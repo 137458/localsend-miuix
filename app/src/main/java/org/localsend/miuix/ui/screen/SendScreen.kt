@@ -226,7 +226,7 @@ fun SendScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Icon(
-                                                imageVector = AppIcons.getFileIcon(file.mimeType, file.name),
+                                                imageVector = if (file.isTextMessage) AppIcons.Text else AppIcons.getFileIcon(file.mimeType, file.name),
                                                 contentDescription = null,
                                                 modifier = Modifier.size(24.dp),
                                                 tint = MiuixTheme.colorScheme.primary

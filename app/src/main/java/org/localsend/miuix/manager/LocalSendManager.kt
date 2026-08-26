@@ -319,6 +319,12 @@ class LocalSendManager(private val context: Context) {
     fun sendFilesTo(targetDevice: Device, filesToSend: List<FileItem> = _selectedFiles.value) {
         if (filesToSend.isEmpty()) return
 
+        if (targetDevice.deviceType == DeviceType.web || targetDevice.port == 0) {
+            startShare(filesToSend)
+            _sessionMessage.value = "已将 ${filesToSend.size} 项内容发布到 Web 共享，浏览器端刷新即可下载"
+            return
+        }
+
         val sessionId = UUID.randomUUID().toString()
         val totalBytes = filesToSend.sumOf { it.size }
         val session = TransferSession(

@@ -2,6 +2,8 @@ package org.localsend.miuix.ui.component
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
@@ -52,11 +54,49 @@ object AppIcons {
     }
 
     fun getFileIcon(mimeType: String, fileName: String): ImageVector {
+        val lowerName = fileName.lowercase()
+        val lowerMime = mimeType.lowercase()
         return when {
-            mimeType.startsWith("image/") || fileName.endsWith(".png", true) || fileName.endsWith(".jpg", true) || fileName.endsWith(".jpeg", true) || fileName.endsWith(".webp", true) -> Icons.Default.Image
-            mimeType.startsWith("video/") || fileName.endsWith(".mp4", true) || fileName.endsWith(".mkv", true) || fileName.endsWith(".mov", true) -> Icons.Default.Movie
-            mimeType.startsWith("audio/") || fileName.endsWith(".mp3", true) || fileName.endsWith(".flac", true) || fileName.endsWith(".wav", true) -> Icons.Default.MusicNote
-            mimeType.startsWith("text/") || fileName.endsWith(".txt", true) || fileName.endsWith(".md", true) -> Icons.Default.TextFields
+            // Android APK 安装包
+            lowerMime == "application/vnd.android.package-archive" || lowerName.endsWith(".apk") || lowerName.endsWith(".xapk") || lowerName.endsWith(".apks") -> Icons.Default.Android
+
+            // 图片类型
+            lowerMime.startsWith("image/") || lowerName.endsWith(".png") || lowerName.endsWith(".jpg") ||
+                lowerName.endsWith(".jpeg") || lowerName.endsWith(".webp") || lowerName.endsWith(".gif") ||
+                lowerName.endsWith(".bmp") || lowerName.endsWith(".heic") || lowerName.endsWith(".svg") ||
+                lowerName.endsWith(".ico") -> Icons.Default.Image
+
+            // 视频类型
+            lowerMime.startsWith("video/") || lowerName.endsWith(".mp4") || lowerName.endsWith(".mkv") ||
+                lowerName.endsWith(".mov") || lowerName.endsWith(".avi") || lowerName.endsWith(".flv") ||
+                lowerName.endsWith(".wmv") || lowerName.endsWith(".webm") || lowerName.endsWith(".3gp") -> Icons.Default.Movie
+
+            // 音频类型
+            lowerMime.startsWith("audio/") || lowerName.endsWith(".mp3") || lowerName.endsWith(".flac") ||
+                lowerName.endsWith(".wav") || lowerName.endsWith(".m4a") || lowerName.endsWith(".aac") ||
+                lowerName.endsWith(".ogg") || lowerName.endsWith(".wma") -> Icons.Default.MusicNote
+
+            // 文件夹 / 目录
+            lowerMime == "directory" || lowerMime == "folder" || lowerName.endsWith("/") || lowerName.contains("/") -> Icons.Default.Folder
+
+            // 压缩包归档
+            lowerMime.contains("zip") || lowerMime.contains("tar") || lowerMime.contains("compressed") ||
+                lowerMime.contains("7z") || lowerMime.contains("rar") ||
+                lowerName.endsWith(".zip") || lowerName.endsWith(".rar") || lowerName.endsWith(".7z") ||
+                lowerName.endsWith(".tar") || lowerName.endsWith(".gz") || lowerName.endsWith(".bz2") ||
+                lowerName.endsWith(".xz") -> Icons.Default.Archive
+
+            // 文本与代码文档
+            lowerMime.startsWith("text/") || lowerMime == "application/json" || lowerMime == "application/xml" ||
+                lowerMime == "application/javascript" || lowerMime == "application/x-sh" ||
+                lowerName.endsWith(".txt") || lowerName.endsWith(".md") || lowerName.endsWith(".log") ||
+                lowerName.endsWith(".json") || lowerName.endsWith(".xml") || lowerName.endsWith(".kt") ||
+                lowerName.endsWith(".java") || lowerName.endsWith(".py") || lowerName.endsWith(".js") ||
+                lowerName.endsWith(".ts") || lowerName.endsWith(".html") || lowerName.endsWith(".css") ||
+                lowerName.endsWith(".c") || lowerName.endsWith(".cpp") || lowerName.endsWith(".h") ||
+                lowerName.endsWith(".sh") || lowerName.endsWith(".bat") || lowerName.endsWith(".sql") -> Icons.Default.TextFields
+
+            // 通用文档类型
             else -> Icons.Default.Description
         }
     }
