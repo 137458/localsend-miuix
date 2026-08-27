@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.ui.animation
+package org.localsend.miuix.ui.animation
 
 import android.annotation.SuppressLint
 import android.graphics.RuntimeShader
@@ -60,7 +60,7 @@ class InteractiveHighlight(
     val modifier: Modifier =
         Modifier.drawWithContent {
             val progress = pressProgressAnimation.value
-            if (progress > 0f) {
+            if (progress > 0f && size.width > 0f && size.height > 0f) {
                 drawRect(
                     Color.White.copy(0.06f * progress),
                     blendMode = BlendMode.Plus
@@ -73,8 +73,8 @@ class InteractiveHighlight(
                         setFloatUniform("radius", size.minDimension * 1.2f)
                         setFloatUniform(
                             "position",
-                            pos.x.fastCoerceIn(0f, size.width),
-                            pos.y.fastCoerceIn(0f, size.height)
+                            pos.x.fastCoerceIn(0f, size.width.coerceAtLeast(1f)),
+                            pos.y.fastCoerceIn(0f, size.height.coerceAtLeast(1f))
                         )
                     }
                     drawRect(

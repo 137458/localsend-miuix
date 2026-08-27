@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.ui.libs.liquid
+package org.localsend.miuix.ui.libs.liquid
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
@@ -95,6 +95,7 @@ private class InnerShadowNode(
     override fun ContentDrawScope.draw() {
         drawContent()
 
+        if (size.width <= 0f || size.height <= 0f) return
         val shadow = shadow() ?: return
         val layer = shadowLayer ?: return
 

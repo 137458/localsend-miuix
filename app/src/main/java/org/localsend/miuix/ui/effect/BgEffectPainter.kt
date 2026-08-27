@@ -53,6 +53,7 @@ class BgEffectPainter(
     }
 
     fun updateResolution(width: Float, height: Float) {
+        if (width <= 0f || height <= 0f) return
         if (resolution[0] == width && resolution[1] == height) return
         resolution[0] = width
         resolution[1] = height
@@ -112,6 +113,7 @@ class BgEffectPainter(
         totalHeight: Float,
         totalWidth: Float,
     ) {
+        if (totalHeight <= 0f || totalWidth <= 0f) return
         if (cachedLogoHeight == logoHeight &&
             cachedTotalHeight == totalHeight &&
             cachedTotalWidth == totalWidth
@@ -150,14 +152,22 @@ class BgEffectPainter(
         totalHeight: Float,
         totalWidth: Float,
     ) {
-        val heightRatio = logoHeight / totalHeight
+        if (totalHeight <= 0f || totalWidth <= 0f) {
+            bound[0] = 0f
+            bound[1] = 0f
+            bound[2] = 1f
+            bound[3] = 1f
+            return
+        }
+        val safeLogo = if (logoHeight.isNaN() || logoHeight <= 0f) totalHeight * 0.3f else logoHeight
+        val heightRatio = (safeLogo / totalHeight).coerceIn(0.05f, 1f)
         if (totalWidth <= totalHeight) {
             bound[0] = 0f
             bound[1] = 1f - heightRatio
             bound[2] = 1f
             bound[3] = heightRatio
         } else {
-            val aspectRatio = totalWidth / totalHeight
+            val aspectRatio = (totalWidth / totalHeight).coerceAtLeast(0.01f)
             val contentCenterY = 1f - heightRatio / 2f
             bound[0] = 0f
             bound[1] = contentCenterY - aspectRatio / 2f

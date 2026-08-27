@@ -153,7 +153,7 @@ private class BgEffectNode(
 
     override fun ContentDrawScope.draw() {
         drawRect(surface)
-        if (effectBackground) {
+        if (effectBackground && size.width > 0f && size.height > 0f) {
             val alphaValue = alpha()
             if (alphaValue <= 0f) {
                 animationJob?.cancel()

@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.ui.animation
+package org.localsend.miuix.ui.animation
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
@@ -102,7 +102,7 @@ class DampedDragAnimation(
         animationScope.launch {
             awaitFrame()
             if (value != targetValue) {
-                val threshold = (valueRange.endInclusive - valueRange.start) * 0.025f
+                val threshold = ((valueRange.endInclusive - valueRange.start) * 0.025f).coerceAtLeast(0.001f)
                 snapshotFlow { valueAnimation.value }
                     .filter { abs(it - valueAnimation.targetValue) < threshold }
                     .first()
@@ -139,7 +139,10 @@ class DampedDragAnimation(
             System.currentTimeMillis(),
             Offset(value, 0f)
         )
-        val targetVelocity = velocityTracker.calculateVelocity().x / (valueRange.endInclusive - valueRange.start)
+        val rangeDelta = valueRange.endInclusive - valueRange.start
+        val targetVelocity = if (rangeDelta > 0f) {
+            velocityTracker.calculateVelocity().x / rangeDelta
+        } else 0f
         animationScope.launch {
             velocityAnimation.animateTo(targetVelocity, velocityAnimationSpec)
         }

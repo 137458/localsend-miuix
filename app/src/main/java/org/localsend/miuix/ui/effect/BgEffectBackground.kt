@@ -36,7 +36,8 @@ fun BgEffectBackground(
         modifier = modifier,
     ) {
         val surface = MiuixTheme.colorScheme.surface
-        val deviceType = DeviceType.PHONE
+        val isTablet = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
+        val deviceType = if (isTablet) DeviceType.PAD else DeviceType.PHONE
         val isDarkTheme = isSystemInDarkTheme()
         val painter = remember(isOs3Effect) { BgEffectPainter(isOs3Effect) }
 

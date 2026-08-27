@@ -394,8 +394,10 @@ fun LiquidGlassBottomBar(
                                 scaleX = dampedDragAnimation.scaleX
                                 scaleY = dampedDragAnimation.scaleY
                                 val velocity = dampedDragAnimation.velocity / 10f
-                                scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
-                                scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
+                                val denomX = 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
+                                val denomY = 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
+                                if (denomX != 0f) scaleX /= denomX
+                                scaleY *= denomY
                             },
                             onDrawSurface = {
                                 val progress = dampedDragAnimation.pressProgress
@@ -437,7 +439,7 @@ fun LiquidGlassBottomBar(
                             Modifier
                                 .clearAndSetSemantics {}
                                 .wrapContentWidth(align = Alignment.Start, unbounded = true)
-                                .requiredWidth(with(density) { (totalWidthPx - 8.dp.toPx()).toDp() })
+                                .requiredWidth(with(density) { (totalWidthPx - 8.dp.toPx()).coerceAtLeast(0f).toDp() })
                                 .height(56.dp)
                                 .graphicsLayer {
                                     val progressOffset = dampedDragAnimation.value * tabWidthPx
