@@ -103,7 +103,7 @@ fun LiquidGlassBottomBar(
     val contentColor = MiuixTheme.colorScheme.onSurfaceVariantSummary
     val containerColor = if (isLiquidGlassMode) surfaceContainer.copy(0.4f) else surfaceContainer
 
-    val tabsBackdrop = rememberLayerBackdrop()
+    val tabsBackdrop = if (isLiquidGlassMode) rememberLayerBackdrop() else null
     val density = LocalDensity.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val animationScope = rememberCoroutineScope()
@@ -196,7 +196,7 @@ fun LiquidGlassBottomBar(
         }
     } else null
 
-    val combinedBackdrop = if (backdrop != null) {
+    val combinedBackdrop = if (isLiquidGlassMode && tabsBackdrop != null) {
         rememberCombinedBackdrop(backdrop, tabsBackdrop)
     } else null
 
@@ -299,7 +299,7 @@ fun LiquidGlassBottomBar(
                         onClick = {}
                     )
                     .then(
-                        if (isLiquidGlassMode && backdrop != null) {
+                        if (isLiquidGlassMode) {
                             Modifier.drawBackdrop(
                                 backdrop = backdrop,
                                 shape = { pillShape },
@@ -320,17 +320,6 @@ fun LiquidGlassBottomBar(
                                 },
                                 onDrawSurface = { drawRect(containerColor) },
                             )
-                        } else if (backdrop != null) {
-                            Modifier.drawBackdrop(
-                                backdrop = backdrop,
-                                shape = { pillShape },
-                                effects = {
-                                    blur(blur25Px, blur25Px)
-                                },
-                                onDrawSurface = {
-                                    drawRect(containerColor.copy(alpha = 0.65f))
-                                },
-                            )
                         } else {
                             Modifier.background(containerColor, pillShape)
                         }
@@ -344,7 +333,7 @@ fun LiquidGlassBottomBar(
         }
 
         // ── 2. Active Layer: 离屏高亮 Tab 采样层（供 tabsBackdrop 记录） ──
-        if (isLiquidGlassMode && backdrop != null && combinedBackdrop != null) {
+        if (isLiquidGlassMode && combinedBackdrop != null && tabsBackdrop != null) {
             CompositionLocalProvider(
                 LocalLiquidBarTabScale provides {
                     lerp(1f, 1.2f, dampedDragAnimation.pressProgress)

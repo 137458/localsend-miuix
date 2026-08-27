@@ -267,10 +267,12 @@ fun App(manager: LocalSendManager) {
 
     MiuixTheme(controller = themeController) {
         val surfaceColor = MiuixTheme.colorScheme.surface
-        val backdrop = rememberLayerBackdrop {
-            drawRect(surfaceColor)
-            drawContent()
-        }
+        val backdrop = if (org.localsend.miuix.ui.effect.isRuntimeShaderSupported()) {
+            rememberLayerBackdrop {
+                drawRect(surfaceColor)
+                drawContent()
+            }
+        } else null
 
         val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val bottomBarTotalPadding = 84.dp + navBarBottomPadding
@@ -322,7 +324,7 @@ fun App(manager: LocalSendManager) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .layerBackdrop(backdrop)
+                            .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
                     ) {
                         HorizontalPager(
                             state = pagerState,

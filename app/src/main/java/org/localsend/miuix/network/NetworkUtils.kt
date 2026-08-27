@@ -1,4 +1,4 @@
-﻿package org.localsend.miuix.network
+package org.localsend.miuix.network
 
 import java.net.Inet4Address
 import java.net.InterfaceAddress
@@ -12,13 +12,13 @@ object NetworkUtils {
         val otherAddresses = mutableListOf<String>()
 
         try {
-            val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
+            val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
             for (intf in interfaces) {
                 if (intf.isLoopback || !intf.isUp) continue
                 val name = intf.name.lowercase()
                 val isWifi = name.startsWith("wlan") || name.startsWith("eth") || name.startsWith("ap") || name.startsWith("en")
 
-                val addrs = Collections.list(intf.inetAddresses)
+                val addrs = intf.inetAddresses?.toList().orEmpty()
                 for (addr in addrs) {
                     if (!addr.isLoopbackAddress && addr is Inet4Address) {
                         val host = addr.hostAddress ?: continue
@@ -43,10 +43,10 @@ object NetworkUtils {
     fun getBroadcastAddresses(): List<String> {
         val broadcasts = mutableListOf<String>()
         try {
-            val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
+            val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
             for (intf in interfaces) {
                 if (intf.isLoopback || !intf.isUp) continue
-                for (ia in intf.interfaceAddresses) {
+                for (ia in intf.interfaceAddresses.orEmpty()) {
                     val broadcast = ia.broadcast
                     if (broadcast != null && broadcast is Inet4Address) {
                         val host = broadcast.hostAddress
