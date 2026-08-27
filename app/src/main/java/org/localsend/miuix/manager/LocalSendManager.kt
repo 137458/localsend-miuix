@@ -245,7 +245,7 @@ class LocalSendManager(private val context: Context) {
             deviceType = _settings.value.deviceType,
             // HTTPS 模式下指纹 = 自签名证书的 SHA-256 哈希（协议 §2），否则用稳定的随机 UUID
             fingerprint = if (useHttps) TlsStore.fingerprint(context) else fingerprint,
-            port = _settings.value.port,
+            port = server.getBoundPort(),
             protocol = if (useHttps) "https" else "http",
             // Web Share 启用时按协议 §2 announce download=true；否则沿用设置
             download = _shares.value.isNotEmpty() || _settings.value.download,

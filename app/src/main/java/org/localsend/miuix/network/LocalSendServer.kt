@@ -212,27 +212,82 @@ class LocalSendServer(
         } catch (ignored: Exception) {}
     }
 
+    @Volatile
+    private var boundPort: Int = 53317
+
+    fun getBoundPort(): Int = boundPort
+
+    private val startLock = Any()
+    @Volatile
+    private var isStarting = false
+
     fun isRunning(): Boolean = engine != null
 
     fun ensureStarted() {
-        if (engine == null) {
+        if (engine == null && !isStarting) {
             start()
         }
     }
 
-    fun start() {
-        if (engine != null) return
-        val port = getPort()
-        try {
-            if (getUseHttps()) startHttps(port) else startHttp(port)
+    private fun isPortAvailable(port: Int): Boolean {
+        return try {
+            java.net.ServerSocket().use { socket ->
+                socket.reuseAddress = true
+                socket.bind(java.net.InetSocketAddress("0.0.0.0", port))
+                true
+            }
         } catch (e: Exception) {
-            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun findAvailablePort(preferredPort: Int): Int {
+        if (isPortAvailable(preferredPort)) return preferredPort
+        for (candidate in (preferredPort + 1)..(preferredPort + 20)) {
+            if (isPortAvailable(candidate)) return candidate
+        }
+        return preferredPort
+    }
+
+    fun start() {
+        synchronized(startLock) {
+            if (engine != null || isStarting) return
+            isStarting = true
+        }
+        try {
+            val requestedPort = getPort()
+            val portToUse = findAvailablePort(requestedPort)
+            boundPort = portToUse
+            try {
+                if (getUseHttps()) startHttps(portToUse) else startHttp(portToUse)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // Retry with a fallback port if needed
+                val fallbackPort = findAvailablePort(portToUse + 1)
+                boundPort = fallbackPort
+                try {
+                    if (getUseHttps()) startHttps(fallbackPort) else startHttp(fallbackPort)
+                } catch (retryEx: Exception) {
+                    retryEx.printStackTrace()
+                }
+            }
+        } finally {
+            synchronized(startLock) {
+                isStarting = false
+            }
         }
     }
 
     /** 纯 HTTP 模式：CIO 引擎直接监听指定端口。 */
     private fun startHttp(port: Int) {
-        engine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
+        engine = embeddedServer(
+            factory = CIO,
+            port = port,
+            host = "0.0.0.0",
+            configure = {
+                reuseAddress = true
+            }
+        ) {
             installCommon()
             configureRouting()
         }.start(wait = false)
@@ -283,13 +338,16 @@ class LocalSendServer(
     }
 
     fun stop() {
-        try {
-            engine?.stop(200, 500)
-        } catch (ignored: Exception) {}
-        engine = null
-        activeSessions.clear()
-        sessionTokens.clear()
-        requestHits.clear()
+        synchronized(startLock) {
+            try {
+                engine?.stop(200, 500)
+            } catch (ignored: Exception) {}
+            engine = null
+            isStarting = false
+            activeSessions.clear()
+            sessionTokens.clear()
+            requestHits.clear()
+        }
     }
 
     /** 打开 Web Share 共享文件的源输入流（URI / 路径 / 文本内容）。 */
