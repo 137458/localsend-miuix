@@ -69,7 +69,7 @@ import java.io.File
 
 /**
  * 官方 Miuix / HyperOS 视觉规范系统与应用更新页。
- * 对齐 pixez-flutter-MIUIX 架构与全套动效实现。
+ * 集成 HyperOS 动态流光背景、Markdown 更新日志与官方 UpdateDialog 弹窗体系。
  */
 @Composable
 fun UpdateScreen(

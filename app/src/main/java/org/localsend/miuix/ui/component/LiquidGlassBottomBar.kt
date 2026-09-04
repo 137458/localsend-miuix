@@ -82,7 +82,7 @@ val LocalLiquidBarTabScale = staticCompositionLocalOf { { 1f } }
 
 /**
  * 官方 Miuix / HyperOS 规范液态玻璃（Liquid Glass）悬浮胶囊底栏。
- * 深度参考 InstallerX-Revived、TiebaLite-MIUIX 与 compose-miuix-ui 生产级标准规范。
+ * 具备双重背景采样、SDF 透镜物理折射、色散彩虹晕与阻尼拖拽弹性交互。
  */
 @Composable
 fun LiquidGlassBottomBar(
