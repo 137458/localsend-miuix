@@ -39,11 +39,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.ui.component.AppIcons
+import org.localsend.miuix.ui.component.FilePreviewDialog
+import org.localsend.miuix.ui.component.FileThumbnail
 import org.localsend.miuix.ui.component.TransferSessionCard
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -84,6 +87,7 @@ fun SendScreen(
     val totalSelectedSize = remember(selectedFiles) { selectedFiles.sumOf { it.size } }
 
     var isRefreshing by remember { mutableStateOf(false) }
+    var previewingFile by remember { mutableStateOf<FileItem?>(null) }
     val pullToRefreshState = rememberPullToRefreshState()
     val scrollBehavior = MiuixScrollBehavior()
 
@@ -222,26 +226,34 @@ fun SendScreen(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(vertical = 6.dp),
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable { previewingFile = file }
+                                                .padding(vertical = 6.dp, horizontal = 4.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(
-                                                imageVector = if (file.isTextMessage) AppIcons.Text else AppIcons.getFileIcon(file.mimeType, file.name),
-                                                contentDescription = null,
-                                                modifier = Modifier.size(24.dp),
-                                                tint = MiuixTheme.colorScheme.primary
+                                            FileThumbnail(
+                                                file = file,
+                                                size = 44.dp
                                             )
                                             Spacer(modifier = Modifier.width(12.dp))
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = file.name,
+                                                    text = if (file.isTextMessage) "纯文本消息" else file.name,
                                                     style = MiuixTheme.textStyles.body1,
-                                                    maxLines = 1
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
+                                                Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
-                                                    text = file.formattedSize,
+                                                    text = if (file.isTextMessage) {
+                                                        "${file.textContent?.take(30)?.replace("\n", " ") ?: ""} • ${file.formattedSize}"
+                                                    } else {
+                                                        file.formattedSize
+                                                    },
                                                     style = MiuixTheme.textStyles.footnote1,
-                                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                             IconButton(
@@ -295,8 +307,10 @@ fun SendScreen(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 LinearProgressIndicator(
-                                    progress = 0.5f,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp))
                                 )
                             }
                         }
@@ -355,6 +369,13 @@ fun SendScreen(
                 }
             }
         }
+    }
+
+    previewingFile?.let { file ->
+        FilePreviewDialog(
+            file = file,
+            onDismissRequest = { previewingFile = null }
+        )
     }
 }
 

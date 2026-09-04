@@ -575,11 +575,9 @@ fun IncomingTransferDialog(
                                         .padding(vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = if (file.isTextMessage) AppIcons.Text else AppIcons.getFileIcon(file.mimeType, file.name),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(20.dp),
-                                        tint = MiuixTheme.colorScheme.primary
+                                    FileThumbnail(
+                                        file = file,
+                                        size = 28.dp
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(

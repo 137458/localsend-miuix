@@ -3,6 +3,9 @@ package org.localsend.miuix.ui.component
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -50,7 +53,7 @@ import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.ContentCopy
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -109,7 +112,7 @@ private fun TextMessageCardContent(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.Chat,
+                    imageVector = Icons.AutoMirrored.Filled.Chat,
                     contentDescription = null,
                     tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
@@ -153,6 +156,16 @@ private fun TextMessageCardContent(
                 )
             }
         }
+    }
+
+    if (session.status == TransferStatus.InProgress || session.status == TransferStatus.WaitingApproval) {
+        Spacer(modifier = Modifier.height(8.dp))
+        LinearProgressIndicator(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+        )
     }
 
     Spacer(modifier = Modifier.height(10.dp))
@@ -250,6 +263,8 @@ private fun FileTransferCardContent(
     onToggleExpanded: () -> Unit,
     onCancel: () -> Unit
 ) {
+    var previewingFile by remember { mutableStateOf<FileItem?>(null) }
+
     // 1. 顶部状态栏（方向图标 + 对端别名 + 状态文本 + 取消按钮）
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -324,16 +339,15 @@ private fun FileTransferCardContent(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
+                    .clickable { previewingFile = current }
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (current.isTextMessage) AppIcons.Text else AppIcons.getFileIcon(current.mimeType, current.name),
-                    contentDescription = null,
-                    tint = MiuixTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
+                FileThumbnail(
+                    file = current,
+                    size = 28.dp
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (session.files.size > 1) {
                         "正在传输 (${session.currentFileIndex + 1}/${session.files.size}): ${current.name}"
@@ -355,12 +369,30 @@ private fun FileTransferCardContent(
         }
     }
 
-    // 3. 总体进度条
-    Spacer(modifier = Modifier.height(10.dp))
-    LinearProgressIndicator(
-        progress = session.progress,
-        modifier = Modifier.fillMaxWidth()
+    // 3. 总体进度条（平滑动画过渡与状态自适应）
+    val animatedSessionProgress by animateFloatAsState(
+        targetValue = if (session.status == TransferStatus.Completed) 1f else session.progress,
+        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
+        label = "SessionProgress"
     )
+
+    Spacer(modifier = Modifier.height(10.dp))
+    if (session.status == TransferStatus.WaitingApproval) {
+        LinearProgressIndicator(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+        )
+    } else {
+        LinearProgressIndicator(
+            progress = animatedSessionProgress,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+        )
+    }
 
     // 4. 传输指标行（左侧：已传输/总大小 (百分比)；右侧：实时速率 • 剩余时间）
     Spacer(modifier = Modifier.height(6.dp))
@@ -430,34 +462,46 @@ private fun FileTransferCardContent(
             ) {
                 session.files.forEach { file ->
                     androidx.compose.runtime.key(file.id) {
-                        FileDetailItem(file = file)
+                        FileDetailItem(
+                            file = file,
+                            onClick = { previewingFile = file }
+                        )
                     }
                 }
             }
         }
     }
+
+    previewingFile?.let { file ->
+        FilePreviewDialog(
+            file = file,
+            onDismissRequest = { previewingFile = null }
+        )
+    }
 }
 
 @Composable
-private fun FileDetailItem(file: FileItem) {
+private fun FileDetailItem(
+    file: FileItem,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.35f))
+            .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = if (file.isTextMessage) AppIcons.Text else AppIcons.getFileIcon(file.mimeType, file.name),
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = MiuixTheme.colorScheme.primary
+        FileThumbnail(
+            file = file,
+            size = 32.dp
         )
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = file.name,
+                text = if (file.isTextMessage) "纯文本消息" else file.name,
                 style = MiuixTheme.textStyles.body2,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -481,9 +525,17 @@ private fun FileDetailItem(file: FileItem) {
             }
             if (file.status == TransferStatus.InProgress) {
                 Spacer(modifier = Modifier.height(4.dp))
+                val animatedFileProgress by animateFloatAsState(
+                    targetValue = file.progress,
+                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                    label = "FileProgress"
+                )
                 LinearProgressIndicator(
-                    progress = file.progress,
-                    modifier = Modifier.fillMaxWidth()
+                    progress = animatedFileProgress,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
                 )
             }
         }
