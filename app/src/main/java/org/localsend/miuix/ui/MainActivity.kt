@@ -54,11 +54,41 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
         manager = LocalSendManager(applicationContext)
         manager.start()
 
+        // 仅在非配置变更（如首次冷启动）时处理外部调起的分享与打开文件意图
+        if (savedInstanceState == null) {
+            handleIncomingIntent(intent)
+        }
+
         setContent {
             CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides this) {
                 App(manager = manager)
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: android.content.Intent?) {
+        if (intent == null || !org.localsend.miuix.util.ShareIntentHelper.isShareIntent(intent)) return
+        if (intent.getBooleanExtra(EXTRA_INTENT_PROCESSED, false)) return
+
+        val items = org.localsend.miuix.util.ShareIntentHelper.extractShareItems(applicationContext, intent)
+        if (items.isNotEmpty()) {
+            manager.addFiles(items)
+            // 自动跳转至主界面的“发送”Tab（索引 1）
+            manager.requestNavigateToTab(1)
+            val msg = if (items.size == 1 && items[0].textContent != null) {
+                "已添加待发送文本"
+            } else {
+                "已添加 ${items.size} 个待发送文件"
+            }
+            android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
+        }
+        intent.putExtra(EXTRA_INTENT_PROCESSED, true)
     }
 
     override fun onResume() {
@@ -76,5 +106,6 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 
     companion object {
         private const val REQUEST_PERMISSIONS = 100
+        private const val EXTRA_INTENT_PROCESSED = "org.localsend.miuix.extra.INTENT_PROCESSED"
     }
 }

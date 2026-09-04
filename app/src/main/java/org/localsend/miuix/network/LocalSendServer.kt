@@ -354,7 +354,13 @@ class LocalSendServer(
     private fun openShareStream(fileItem: FileItem): InputStream? = try {
         val text = fileItem.textContent
         when {
-            fileItem.uri != null -> context.contentResolver.openInputStream(fileItem.uri)
+            fileItem.uri != null -> {
+                if (fileItem.uri.scheme == "file") {
+                    fileItem.uri.path?.let { File(it).inputStream() } ?: context.contentResolver.openInputStream(fileItem.uri)
+                } else {
+                    context.contentResolver.openInputStream(fileItem.uri)
+                }
+            }
             fileItem.path != null -> File(fileItem.path).inputStream()
             text != null -> text.byteInputStream(Charsets.UTF_8)
             else -> null

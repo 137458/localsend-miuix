@@ -208,7 +208,13 @@ class LocalSendClient(
     private fun openSourceStream(fileItem: FileItem): InputStream? {
         val text = fileItem.textContent
         return when {
-            fileItem.uri != null -> context.contentResolver.openInputStream(fileItem.uri)
+            fileItem.uri != null -> {
+                if (fileItem.uri.scheme == "file") {
+                    fileItem.uri.path?.let { File(it).inputStream() } ?: context.contentResolver.openInputStream(fileItem.uri)
+                } else {
+                    context.contentResolver.openInputStream(fileItem.uri)
+                }
+            }
             fileItem.path != null -> File(fileItem.path).inputStream()
             text != null -> text.byteInputStream(Charsets.UTF_8)
             else -> null

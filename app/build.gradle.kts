@@ -48,6 +48,12 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
+
     packaging {
         // Netty 多个模块 jar 内都含相同 META-INF/INDEX.LIST，打包时丢弃，避免 java resource 冲突
         resources {

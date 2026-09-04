@@ -76,6 +76,7 @@ fun App(manager: LocalSendManager) {
     val settings by manager.settings.collectAsState()
     val pendingIncomingSession by manager.pendingIncomingSession.collectAsState()
     val sessionMessage by manager.sessionMessage.collectAsState()
+    val requestedTabIndex by manager.requestedTabIndex.collectAsState()
 
     // 传输提示（如"对方拒绝接收"）以 Toast 呈现，显示后即消费
     LaunchedEffect(sessionMessage) {
@@ -279,6 +280,18 @@ fun App(manager: LocalSendManager) {
 
         // 6. miuix-nav 根导航栈管理
         val backStack = rememberNavBackStack<AppRoute>(AppRoute.Main)
+
+        // 外部意图（分享/查看文件）驱动的页面自动跳转
+        LaunchedEffect(requestedTabIndex) {
+            val targetTab = requestedTabIndex ?: return@LaunchedEffect
+            while (backStack.size > 1) {
+                backStack.removeLastOrNull()
+            }
+            if (pagerState.currentPage != targetTab) {
+                pagerState.scrollToPage(targetTab)
+            }
+            manager.consumeRequestedTab()
+        }
 
         // 全局拦截系统返回键与返回手势，当处于二级页面时优先返回主界面
         BackHandler(enabled = backStack.size > 1) {

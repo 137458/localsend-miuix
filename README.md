@@ -16,7 +16,7 @@ LocalSend Miuix 是基于 Xiaomi HyperOS 设计风格与 Miuix KMP 现代化组�
   - **HTTP REST 与流式传输**：基于 Ktor 异步引擎实现 `/api/localsend/v2/info`、`/api/localsend/v2/register`、`/api/localsend/v2/prepare-upload`、`/api/localsend/v2/upload` 与 `/api/localsend/v2/cancel` 完整生命周期。
   - **自签名 TLS/HTTPS**：HTTPS 模式下本机指纹对齐协议 §2（fingerprint=证书 SHA-256），启动时生成并持久化自签名证书，并通过指纹加固 TrustManager 校验对端证书，双向防中间人。
   - **Web Share（双向网页快传）**：把选中文件共享为局域网链接，对方浏览器打开即可预览并逐个下载；同时支持对方直接在浏览器中拖拽（Drag & Drop）或选择文件高速回传至手机端，无需安装 LocalSend。
-- **丰富的内容发送支持**：支持选择任意文件、多媒体图片/视频、纯文本消息录入及一键剪贴板文本提取。
+- **丰富的内容发送与系统级分享支持**：支持系统相册、文件管理与第三方应用通过 Android 系统分享菜单（ACTION_SEND / ACTION_SEND_MULTIPLE）直接分享文件/文本至应用，支持从文件管理器“打开方式”（ACTION_VIEW）唤起；同时支持在应用内选择任意文件、多媒体图片/视频、应用 APK 提取、纯文本录入及一键剪贴板文本提取。
 - **完善的交互与控制**：
   - 快速保存模式（无需确认自动接收信任传输）。
   - 实时传输进度、传输速度（MB/s）与剩余时间监控。

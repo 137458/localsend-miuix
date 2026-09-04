@@ -169,6 +169,18 @@ class LocalSendManager(private val context: Context) {
     private val _shares = MutableStateFlow<List<ShareSession>>(emptyList())
     val shares: StateFlow<List<ShareSession>> = _shares.asStateFlow()
 
+    // 外部 Intent（如分享或打开文件）驱动的主界面 Tab 切换请求（0: 接收, 1: 发送, 2: 设置），消费后置空
+    private val _requestedTabIndex = MutableStateFlow<Int?>(null)
+    val requestedTabIndex: StateFlow<Int?> = _requestedTabIndex.asStateFlow()
+
+    fun requestNavigateToTab(index: Int) {
+        _requestedTabIndex.value = index
+    }
+
+    fun consumeRequestedTab() {
+        _requestedTabIndex.value = null
+    }
+
     private val incomingApprovalDeferreds = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
     private val notifiedIncoming = ConcurrentHashMap.newKeySet<String>()
 
