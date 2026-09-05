@@ -12,14 +12,23 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.localsend.miuix.R
+import org.localsend.miuix.model.Device
+import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.ui.MainActivity
 
 /**
  * 传输通知管理器。用于在后台或快速保存自动接收时，向用户提示传输进度与结果，
- * 并接入 ColorOS 流体云（Aqua Dynamics）与 Android 16+ Live Updates 胶囊显示。
+ * 并接入 ColorOS 流体云（Aqua Dynamics）与原生 Android 16+ Live Updates 胶囊显示。
  */
 object TransferNotifier {
 
@@ -30,6 +39,10 @@ object TransferNotifier {
     const val NOTIF_ID_FOREGROUND_SERVICE = 1001
     private const val NOTIF_ID_RECEIVE_BASE = 2000
     private const val NOTIF_ID_SEND_BASE = 3000
+
+    const val TEST_SESSION_ID = "test-live-notification-session"
+    private var testJob: Job? = null
+    val isTestRunning = MutableStateFlow(false)
 
     @Volatile
     private var allowed = false
@@ -194,33 +207,19 @@ object TransferNotifier {
     fun updateProgress(context: Context, session: TransferSession) {
         if (!isAllowed(context)) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val speedText = if (session.speed > 0) " · ${session.formattedSpeed}" else ""
-        val currentFileName = session.currentFile?.name
         val actionText = if (session.isIncoming) "正在接收" else "正在发送"
         val channel = if (session.isIncoming) CHANNEL_RECEIVE else CHANNEL_SEND
-        val builder = NotificationCompat.Builder(context, channel)
-            .setContentTitle("$actionText ${session.device.alias} 的内容")
-            .setContentText("${session.progressPercent}% · ${session.formattedTransferredSize} / ${session.formattedTotalSize}$speedText")
-            .apply {
-                if (!currentFileName.isNullOrEmpty()) {
-                    setSubText(currentFileName)
-                }
-            }
-            .setSmallIcon(R.drawable.ic_stat_receive)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOnlyAlertOnce(true)
-            .setContentIntent(appPendingIntent(context))
-            .setProgress(100, session.progressPercent, session.totalBytes <= 0)
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                "取消传输",
-                cancelPendingIntent(context, session.sessionId)
-            )
 
-        // 接入 ColorOS 流体云（Aqua Dynamics）与 Android 16+ Live Updates
-        LiveUpdatesCompat.applyLiveUpdates(context, builder, session, actionText)
+        val notification = LiveUpdatesCompat.buildLiveNotification(
+            context = context,
+            channelId = channel,
+            session = session,
+            actionText = actionText,
+            contentIntent = appPendingIntent(context),
+            cancelIntent = cancelPendingIntent(context, session.sessionId)
+        )
 
-        nm.notify(sessionNotifId(session), builder.build())
+        nm.notify(sessionNotifId(session), notification)
     }
 
     fun notifyResult(context: Context, session: TransferSession) {
@@ -264,5 +263,122 @@ object TransferNotifier {
             .setOngoing(false)
             .setAutoCancel(true)
         nm.notify(notifId, builder.build())
+    }
+
+    /**
+     * 启动实时通知 / 流体云胶囊模拟传输测试。
+     * 在单机状态下模拟 5 秒持续传输，验证状态栏胶囊、锁屏卡片与通知栏 Live Updates 进度。
+     */
+    fun startTestSimulation(context: Context) {
+        if (isTestRunning.value) {
+            stopTestSimulation(context)
+            return
+        }
+        ensure(context)
+        val mockDevice = Device(
+            alias = "测试设备 (Live Updates)",
+            fingerprint = "test-fingerprint",
+            port = 53317,
+            protocol = "http",
+            ip = "192.168.1.88",
+            deviceModel = "Pixel / ColorOS"
+        )
+        val mockFiles = listOf(
+            FileItem(name = "nature_landscape_4k.jpg", size = 18 * 1024 * 1024),
+            FileItem(name = "presentation_demo.mp4", size = 72 * 1024 * 1024),
+            FileItem(name = "firmware_update.apk", size = 30 * 1024 * 1024)
+        )
+        val totalBytes = mockFiles.sumOf { it.size }
+        val testSession = TransferSession(
+            sessionId = TEST_SESSION_ID,
+            device = mockDevice,
+            isIncoming = false,
+            files = mockFiles,
+            totalBytes = totalBytes,
+            transferredBytes = 0L,
+            speed = 0L,
+            status = TransferStatus.InProgress
+        )
+
+        isTestRunning.value = true
+        testJob = CoroutineScope(Dispatchers.Default).launch {
+            try {
+                val totalSteps = 50
+                for (step in 1..totalSteps) {
+                    if (!isActive || !isTestRunning.value) break
+                    val currentProgress = step.toFloat() / totalSteps
+                    testSession.transferredBytes = (totalBytes * currentProgress).toLong()
+                    testSession.speed = (26L * 1024 * 1024) + ((step % 6) * 1024 * 1024)
+
+                    val file1Size = mockFiles[0].size
+                    val file2Size = mockFiles[1].size
+                    when {
+                        testSession.transferredBytes < file1Size -> {
+                            mockFiles[0].status = TransferStatus.InProgress
+                            mockFiles[0].bytesTransferred = testSession.transferredBytes
+                        }
+                        testSession.transferredBytes < file1Size + file2Size -> {
+                            mockFiles[0].status = TransferStatus.Completed
+                            mockFiles[0].bytesTransferred = file1Size
+                            mockFiles[1].status = TransferStatus.InProgress
+                            mockFiles[1].bytesTransferred = testSession.transferredBytes - file1Size
+                        }
+                        else -> {
+                            mockFiles[0].status = TransferStatus.Completed
+                            mockFiles[0].bytesTransferred = file1Size
+                            mockFiles[1].status = TransferStatus.Completed
+                            mockFiles[1].bytesTransferred = file2Size
+                            mockFiles[2].status = TransferStatus.InProgress
+                            mockFiles[2].bytesTransferred = testSession.transferredBytes - file1Size - file2Size
+                        }
+                    }
+
+                    updateProgress(context, testSession)
+                    delay(100L)
+                }
+
+                if (isActive && isTestRunning.value) {
+                    mockFiles.forEach {
+                        it.status = TransferStatus.Completed
+                        it.bytesTransferred = it.size
+                    }
+                    testSession.transferredBytes = totalBytes
+                    testSession.status = TransferStatus.Completed
+                    notifyResult(context, testSession)
+                }
+            } catch (_: Exception) {
+            } finally {
+                isTestRunning.value = false
+                testJob = null
+            }
+        }
+    }
+
+    /**
+     * 终止实时通知模拟测试，撤销胶囊并发送取消提示。
+     */
+    fun stopTestSimulation(context: Context) {
+        val job = testJob
+        testJob = null
+        isTestRunning.value = false
+        job?.cancel()
+
+        val mockDevice = Device(
+            alias = "测试设备 (Live Updates)",
+            fingerprint = "test-fingerprint",
+            port = 53317,
+            protocol = "http",
+            ip = "192.168.1.88",
+            deviceModel = "Pixel / ColorOS"
+        )
+        val cancelSession = TransferSession(
+            sessionId = TEST_SESSION_ID,
+            device = mockDevice,
+            isIncoming = false,
+            files = emptyList(),
+            totalBytes = 0L,
+            status = TransferStatus.Canceled
+        )
+        notifyResult(context, cancelSession)
     }
 }

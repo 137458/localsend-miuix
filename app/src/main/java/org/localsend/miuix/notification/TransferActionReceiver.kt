@@ -17,7 +17,11 @@ class TransferActionReceiver : BroadcastReceiver() {
         val sessionId = intent.getStringExtra(EXTRA_SESSION_ID)
 
         if (action == ACTION_CANCEL_TRANSFER && !sessionId.isNullOrEmpty()) {
-            LocalSendManager.getInstance()?.cancelTransfer(sessionId)
+            if (sessionId == TransferNotifier.TEST_SESSION_ID) {
+                TransferNotifier.stopTestSimulation(context)
+            } else {
+                LocalSendManager.getInstance()?.cancelTransfer(sessionId)
+            }
         }
     }
 
