@@ -35,6 +35,7 @@ object TransferNotifier {
     const val CHANNEL_RECEIVE = "localsend_receive"
     const val CHANNEL_SEND = "localsend_send"
     const val CHANNEL_SERVICE = "localsend_service"
+    const val CHANNEL_LIVE = "localsend_live_channel"
 
     const val NOTIF_ID_FOREGROUND_SERVICE = 1001
     private const val NOTIF_ID_RECEIVE_BASE = 2000
@@ -56,12 +57,23 @@ object TransferNotifier {
     private fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val liveChannel = NotificationChannel(
+            CHANNEL_LIVE,
+            "传输实时进度",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "显示流体云胶囊与实时传输进度"
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setShowBadge(false)
+            enableVibration(false)
+            setSound(null, null)
+        }
         val receiveChannel = NotificationChannel(
             CHANNEL_RECEIVE,
             "接收通知",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "接收文件与文本时的进度、流体云胶囊与结果提示"
+            description = "接收文件与文本时的结果提示"
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             setShowBadge(false)
         }
@@ -70,7 +82,7 @@ object TransferNotifier {
             "发送通知",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "发送文件与文本时的进度、流体云胶囊与结果提示"
+            description = "发送文件与文本时的结果提示"
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             setShowBadge(false)
         }
@@ -82,6 +94,7 @@ object TransferNotifier {
             description = "保持后台传输连接与防杀保活"
             setShowBadge(false)
         }
+        nm.createNotificationChannel(liveChannel)
         nm.createNotificationChannel(receiveChannel)
         nm.createNotificationChannel(sendChannel)
         nm.createNotificationChannel(serviceChannel)
@@ -126,31 +139,40 @@ object TransferNotifier {
     }
 
     /**
-     * 跳转至系统当前应用的通知设置页面，以便用户手动授权或开启各渠道通知。
+     * 跳转至系统当前应用的通知设置页面，以便用户手动授权或开启各渠道通知与流体云开关。
      */
     fun openNotificationSettings(context: Context) {
+        if (Build.VERSION.SDK_INT >= 36) {
+            try {
+                val promotionIntent = Intent("android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS").apply {
+                    putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (promotionIntent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(promotionIntent)
+                    return
+                }
+            } catch (_: Exception) {}
+        }
+
         try {
-            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
                     putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-            } else {
-                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", context.packageName, null)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+                context.startActivity(intent)
+                return
             }
-            context.startActivity(intent)
-        } catch (_: Exception) {
-            try {
-                val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", context.packageName, null)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(fallbackIntent)
-            } catch (_: Exception) {}
-        }
+        } catch (_: Exception) {}
+
+        try {
+            val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(fallbackIntent)
+        } catch (_: Exception) {}
     }
 
     private fun sessionNotifId(session: TransferSession): Int {
@@ -208,11 +230,10 @@ object TransferNotifier {
         if (!isAllowed(context)) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val actionText = if (session.isIncoming) "正在接收" else "正在发送"
-        val channel = if (session.isIncoming) CHANNEL_RECEIVE else CHANNEL_SEND
 
         val notification = LiveUpdatesCompat.buildLiveNotification(
             context = context,
-            channelId = channel,
+            channelId = CHANNEL_LIVE,
             session = session,
             actionText = actionText,
             contentIntent = appPendingIntent(context),
