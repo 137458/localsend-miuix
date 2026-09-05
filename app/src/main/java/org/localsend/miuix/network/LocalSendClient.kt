@@ -163,6 +163,7 @@ class LocalSendClient(
             var bytesWritten = 0L
             var lastTime = System.currentTimeMillis()
             var bytesSinceLast = 0L
+            var smoothedSpeed = 0L
 
             var read: Int
             while (inputStream.read(buffer).also { read = it } != -1) {
@@ -172,15 +173,19 @@ class LocalSendClient(
 
                 val now = System.currentTimeMillis()
                 val delta = now - lastTime
-                if (delta >= 500) {
-                    val currentSpeed = (bytesSinceLast * 1000) / delta
-                    onProgress(bytesWritten, currentSpeed)
+                if (delta >= 64) {
+                    val instantSpeed = (bytesSinceLast * 1000) / delta
+                    smoothedSpeed = if (smoothedSpeed == 0L) instantSpeed else (smoothedSpeed * 3 + instantSpeed) / 4
+                    onProgress(bytesWritten, smoothedSpeed)
                     bytesSinceLast = 0
                     lastTime = now
                 }
             }
             outputStream.flush()
             outputStream.close()
+            if (bytesSinceLast > 0 || bytesWritten == fileItem.size) {
+                onProgress(bytesWritten, smoothedSpeed)
+            }
 
             val responseCode = connection.responseCode
             if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {

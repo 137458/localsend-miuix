@@ -119,8 +119,16 @@ data class TransferSession(
     var status: TransferStatus = TransferStatus.WaitingApproval,
     val startTime: Long = System.currentTimeMillis(),
     var endTime: Long? = null,
-    var errorMessage: String? = null
+    var errorMessage: String? = null,
+    val updateSeq: Long = 0L
 ) {
+    fun createSnapshot(seq: Long = System.nanoTime()): TransferSession {
+        return copy(
+            files = files.map { it.copy() },
+            updateSeq = seq
+        )
+    }
+
     val isTextMessage: Boolean
         get() = files.size == 1 && files.first().isTextMessage
 

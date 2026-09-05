@@ -1411,6 +1411,7 @@ class LocalSendServer(
                             val buffer = ByteArray(128 * 1024)
                             var lastTime = System.currentTimeMillis()
                             var bytesSinceLast = 0L
+                            var smoothedSpeed = 0L
 
                             while (!channel.isClosedForRead) {
                                 val read = channel.readAvailable(buffer, 0, buffer.size)
@@ -1424,10 +1425,11 @@ class LocalSendServer(
 
                                 val now = System.currentTimeMillis()
                                 val delta = now - lastTime
-                                if (delta >= 500) {
-                                    val currentSpeed = (bytesSinceLast * 1000) / delta
-                                    fileItem.speed = currentSpeed
-                                    session.speed = currentSpeed
+                                if (delta >= 64) {
+                                    val instantSpeed = (bytesSinceLast * 1000) / delta
+                                    smoothedSpeed = if (smoothedSpeed == 0L) instantSpeed else (smoothedSpeed * 3 + instantSpeed) / 4
+                                    fileItem.speed = smoothedSpeed
+                                    session.speed = smoothedSpeed
                                     if (fileItem.size > 0) {
                                         fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
                                     }
@@ -1437,6 +1439,14 @@ class LocalSendServer(
                                 }
                             }
                             fos.flush()
+                            if (bytesSinceLast > 0 || fileItem.bytesTransferred == fileItem.size) {
+                                if (fileItem.size > 0) {
+                                    fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
+                                }
+                                fileItem.speed = smoothedSpeed
+                                session.speed = smoothedSpeed
+                                onSessionUpdated(session)
+                            }
                         }
                         if (textBuffer != null && textBuffer.size() > 0) {
                             fileItem.textContent = textBuffer.toString(Charsets.UTF_8.name())

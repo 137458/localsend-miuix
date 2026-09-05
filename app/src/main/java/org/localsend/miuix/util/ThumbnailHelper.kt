@@ -13,8 +13,14 @@ import java.io.File
 
 object ThumbnailHelper {
 
-    // 内存缓存最大保留 60 张缩略图
-    private val memoryCache = LruCache<String, Bitmap>(60)
+    // 内存缓存以 KB 为单位，限制最大使用可用堆内存的 1/8（通常在 16MB ~ 64MB 之间），防止 OOM
+    private val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024).toInt()
+    private val cacheSizeKb = (maxMemoryKb / 8).coerceIn(16 * 1024, 64 * 1024)
+    private val memoryCache = object : LruCache<String, Bitmap>(cacheSizeKb) {
+        override fun sizeOf(key: String, bitmap: Bitmap): Int {
+            return (bitmap.byteCount / 1024).coerceAtLeast(1)
+        }
+    }
 
     fun isImage(name: String, mimeType: String): Boolean {
         val mime = mimeType.lowercase()
@@ -51,14 +57,18 @@ object ThumbnailHelper {
      * 加载用于列表展示的紧凑缩略图 (约 128x128 像素)。
      */
     fun loadThumbnail(context: Context, file: FileItem, targetSize: Int = 128): Bitmap? {
-        val cacheKey = "thumb_${file.id}_${file.uri?.toString() ?: file.path ?: file.name}"
+        val cacheKey = "thumb_${file.id}_${file.uri?.toString() ?: file.path ?: file.name}_$targetSize"
         memoryCache.get(cacheKey)?.let { return it }
 
-        val bitmap: Bitmap? = when {
-            isImage(file) -> loadImageThumbnail(context, file, targetSize)
-            isVideo(file) -> loadVideoThumbnail(context, file, targetSize)
-            isApk(file) -> loadApkIcon(context, file, targetSize)
-            else -> null
+        val bitmap: Bitmap? = try {
+            when {
+                isImage(file) -> loadImageThumbnail(context, file, targetSize)
+                isVideo(file) -> loadVideoThumbnail(context, file, targetSize)
+                isApk(file) -> loadApkIcon(context, file, targetSize)
+                else -> null
+            }
+        } catch (t: Throwable) {
+            null
         }
 
         if (bitmap != null) {
@@ -92,11 +102,15 @@ object ThumbnailHelper {
         val cacheKey = "preview_${file.id}_${file.uri?.toString() ?: file.path ?: file.name}"
         memoryCache.get(cacheKey)?.let { return it }
 
-        val bitmap = if (isImage(file)) {
-            loadImageThumbnail(context, file, maxDimension)
-        } else if (isVideo(file)) {
-            loadVideoThumbnail(context, file, maxDimension)
-        } else {
+        val bitmap = try {
+            if (isImage(file)) {
+                loadImageThumbnail(context, file, maxDimension)
+            } else if (isVideo(file)) {
+                loadVideoThumbnail(context, file, maxDimension)
+            } else {
+                null
+            }
+        } catch (t: Throwable) {
             null
         }
 
@@ -107,37 +121,71 @@ object ThumbnailHelper {
     }
 
     private fun loadImageThumbnail(context: Context, file: FileItem, targetSize: Int): Bitmap? {
-        val uri = file.uri
+        val uri = file.uri ?: file.mediaStoreUri
         val path = file.path
 
         if (uri != null) {
-            // Android 10+ (API 29+) 原生 loadThumbnail 高速硬件解码
+            // 1. 优先使用 openFileDescriptor：原生支持 seek，解码超大图、RAW/HEIC 时不会多次打开流且无额外内存开销
+            try {
+                context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                    val fd = pfd.fileDescriptor
+                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFileDescriptor(fd, null, options)
+                    if (options.outWidth > 0 && options.outHeight > 0) {
+                        options.inSampleSize = calculateInSampleSize(options, targetSize, targetSize)
+                        options.inJustDecodeBounds = false
+                        if (targetSize <= 256) {
+                            options.inPreferredConfig = Bitmap.Config.RGB_565
+                        }
+                        try {
+                            android.system.Os.lseek(fd, 0, android.system.OsConstants.SEEK_SET)
+                        } catch (ignored: Throwable) {}
+                        val bitmap = BitmapFactory.decodeFileDescriptor(fd, null, options)
+                        if (bitmap != null) return bitmap
+                    }
+                }
+            } catch (t: Throwable) {}
+
+            // 2. Android 10+ (API 29+) 原生 loadThumbnail 高速硬件解码降级
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && uri.scheme == "content") {
                 try {
                     return context.contentResolver.loadThumbnail(uri, Size(targetSize, targetSize), null)
-                } catch (ignored: Exception) {}
+                } catch (t: Throwable) {}
             }
 
-            // 通用解码降级
-            try {
-                if (uri.scheme == "file") {
-                    val filePath = uri.path
-                    if (!filePath.isNullOrEmpty()) {
-                        return decodeSampledBitmapFromFile(filePath, targetSize, targetSize)
-                    }
+            // 3. 本地 file:// 路径降级
+            if (uri.scheme == "file") {
+                val filePath = uri.path
+                if (!filePath.isNullOrEmpty()) {
+                    val bitmap = decodeSampledBitmapFromFile(filePath, targetSize, targetSize)
+                    if (bitmap != null) return bitmap
                 }
+            }
 
-                context.contentResolver.openInputStream(uri)?.use { stream ->
+            // 4. 通用带缓冲流式解码降级（支持 mark/reset）
+            try {
+                context.contentResolver.openInputStream(uri)?.buffered(128 * 1024)?.use { stream ->
+                    stream.mark(128 * 1024)
                     val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeStream(stream, null, options)
-                    options.inSampleSize = calculateInSampleSize(options, targetSize, targetSize)
-                    options.inJustDecodeBounds = false
-
-                    context.contentResolver.openInputStream(uri)?.use { secondStream ->
-                        return BitmapFactory.decodeStream(secondStream, null, options)
+                    if (options.outWidth > 0 && options.outHeight > 0) {
+                        options.inSampleSize = calculateInSampleSize(options, targetSize, targetSize)
+                        options.inJustDecodeBounds = false
+                        if (targetSize <= 256) {
+                            options.inPreferredConfig = Bitmap.Config.RGB_565
+                        }
+                        try {
+                            stream.reset()
+                            val bitmap = BitmapFactory.decodeStream(stream, null, options)
+                            if (bitmap != null) return bitmap
+                        } catch (e: Exception) {
+                            context.contentResolver.openInputStream(uri)?.buffered(128 * 1024)?.use { secondStream ->
+                                return BitmapFactory.decodeStream(secondStream, null, options)
+                            }
+                        }
                     }
                 }
-            } catch (ignored: Exception) {}
+            } catch (t: Throwable) {}
         } else if (!path.isNullOrEmpty()) {
             return decodeSampledBitmapFromFile(path, targetSize, targetSize)
         }
@@ -145,14 +193,14 @@ object ThumbnailHelper {
     }
 
     private fun loadVideoThumbnail(context: Context, file: FileItem, targetSize: Int): Bitmap? {
-        val uri = file.uri
+        val uri = file.uri ?: file.mediaStoreUri
         val path = file.path
 
         if (uri != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && uri.scheme == "content") {
                 try {
                     return context.contentResolver.loadThumbnail(uri, Size(targetSize, targetSize), null)
-                } catch (ignored: Exception) {}
+                } catch (t: Throwable) {}
             }
             try {
                 val retriever = MediaMetadataRetriever()
@@ -162,7 +210,7 @@ object ThumbnailHelper {
                 if (frame != null) {
                     return Bitmap.createScaledBitmap(frame, targetSize, targetSize, true)
                 }
-            } catch (ignored: Exception) {}
+            } catch (t: Throwable) {}
         } else if (!path.isNullOrEmpty()) {
             try {
                 val retriever = MediaMetadataRetriever()
@@ -172,7 +220,7 @@ object ThumbnailHelper {
                 if (frame != null) {
                     return Bitmap.createScaledBitmap(frame, targetSize, targetSize, true)
                 }
-            } catch (ignored: Exception) {}
+            } catch (t: Throwable) {}
         }
         return null
     }
@@ -187,7 +235,7 @@ object ThumbnailHelper {
             appInfo.publicSourceDir = path
             val icon = appInfo.loadIcon(pm)
             icon.toBitmap(width = targetSize, height = targetSize, config = Bitmap.Config.ARGB_8888)
-        } catch (ignored: Exception) {
+        } catch (t: Throwable) {
             null
         }
     }
@@ -198,24 +246,34 @@ object ThumbnailHelper {
         return try {
             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(path, options)
+            if (options.outWidth <= 0 || options.outHeight <= 0) return null
             options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
             options.inJustDecodeBounds = false
+            if (reqWidth <= 256 && reqHeight <= 256) {
+                options.inPreferredConfig = Bitmap.Config.RGB_565
+            }
             BitmapFactory.decodeFile(path, options)
-        } catch (ignored: Exception) {
+        } catch (t: Throwable) {
             null
         }
     }
 
     private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
-        val (height: Int, width: Int) = options.outHeight to options.outWidth
+        val height = options.outHeight
+        val width = options.outWidth
+        if (height <= 0 || width <= 0) return 1
+
         var inSampleSize = 1
         if (height > reqHeight || width > reqWidth) {
-            val halfHeight: Int = height / 2
-            val halfWidth: Int = width / 2
-            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
-                inSampleSize *= 2
-            }
+            val heightRatio = Math.round(height.toFloat() / reqHeight.toFloat())
+            val widthRatio = Math.round(width.toFloat() / reqWidth.toFloat())
+            // 采用 maxOf 确保长边与短边都不会过大，彻底防止大尺寸全景/超高像素图片溢出内存
+            inSampleSize = maxOf(heightRatio, widthRatio).coerceAtLeast(1)
         }
-        return inSampleSize.coerceAtLeast(1)
+        var powerOf2 = 1
+        while (powerOf2 * 2 <= inSampleSize) {
+            powerOf2 *= 2
+        }
+        return powerOf2.coerceAtLeast(1)
     }
 }

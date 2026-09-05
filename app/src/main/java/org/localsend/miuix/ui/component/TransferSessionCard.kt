@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -372,7 +373,7 @@ private fun FileTransferCardContent(
     // 3. 总体进度条（平滑动画过渡与状态自适应）
     val animatedSessionProgress by animateFloatAsState(
         targetValue = if (session.status == TransferStatus.Completed) 1f else session.progress,
-        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 80, easing = LinearEasing),
         label = "SessionProgress"
     )
 
@@ -527,7 +528,7 @@ private fun FileDetailItem(
                 Spacer(modifier = Modifier.height(4.dp))
                 val animatedFileProgress by animateFloatAsState(
                     targetValue = file.progress,
-                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                    animationSpec = tween(durationMillis = 80, easing = LinearEasing),
                     label = "FileProgress"
                 )
                 LinearProgressIndicator(

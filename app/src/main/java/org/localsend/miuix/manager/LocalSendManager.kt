@@ -393,7 +393,7 @@ class LocalSendManager(private val context: Context) {
             status = TransferStatus.InProgress
         )
 
-        _activeSessions.update { it + session }
+        _activeSessions.update { it + session.createSnapshot() }
         syncForegroundServiceState(_activeSessions.value.size)
 
         scope.launch(Dispatchers.IO) {
@@ -551,12 +551,13 @@ class LocalSendManager(private val context: Context) {
                     addHistory(historyItem)
                 }
             } else {
+                val snapshot = session.createSnapshot()
                 _activeSessions.update { list ->
                     val index = list.indexOfFirst { it.sessionId == session.sessionId }
                     if (index >= 0) {
-                        list.toMutableList().apply { set(index, session) }
+                        list.toMutableList().apply { set(index, snapshot) }
                     } else {
-                        list + session
+                        list + snapshot
                     }
                 }
                 syncForegroundServiceState(_activeSessions.value.size)
@@ -573,13 +574,19 @@ class LocalSendManager(private val context: Context) {
             status == TransferStatus.Failed ||
             status == TransferStatus.Canceled
 
+    private var lastNotifTime = 0L
+
     private fun updateTransferNotification(session: TransferSession) {
         if (isTerminal(session.status)) {
             TransferNotifier.notifyResult(context, session)
         } else if (session.isIncoming && notifiedIncoming.add(session.sessionId)) {
             TransferNotifier.notifyIncoming(context, session)
         } else {
-            TransferNotifier.updateProgress(context, session)
+            val now = System.currentTimeMillis()
+            if (now - lastNotifTime >= 500) {
+                lastNotifTime = now
+                TransferNotifier.updateProgress(context, session)
+            }
         }
     }
 
