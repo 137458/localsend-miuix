@@ -16,30 +16,36 @@ object ThumbnailHelper {
     // 内存缓存最大保留 60 张缩略图
     private val memoryCache = LruCache<String, Bitmap>(60)
 
-    fun isImage(file: FileItem): Boolean {
-        val mime = file.mimeType.lowercase()
-        val name = file.name.lowercase()
+    fun isImage(name: String, mimeType: String): Boolean {
+        val mime = mimeType.lowercase()
+        val n = name.lowercase()
         return mime.startsWith("image/") ||
-                name.endsWith(".jpg") || name.endsWith(".jpeg") ||
-                name.endsWith(".png") || name.endsWith(".webp") ||
-                name.endsWith(".gif") || name.endsWith(".heic") ||
-                name.endsWith(".bmp")
+                n.endsWith(".jpg") || n.endsWith(".jpeg") ||
+                n.endsWith(".png") || n.endsWith(".webp") ||
+                n.endsWith(".gif") || n.endsWith(".heic") ||
+                n.endsWith(".bmp")
     }
 
-    fun isVideo(file: FileItem): Boolean {
-        val mime = file.mimeType.lowercase()
-        val name = file.name.lowercase()
+    fun isVideo(name: String, mimeType: String): Boolean {
+        val mime = mimeType.lowercase()
+        val n = name.lowercase()
         return mime.startsWith("video/") ||
-                name.endsWith(".mp4") || name.endsWith(".mkv") ||
-                name.endsWith(".mov") || name.endsWith(".3gp") ||
-                name.endsWith(".webm") || name.endsWith(".avi")
+                n.endsWith(".mp4") || n.endsWith(".mkv") ||
+                n.endsWith(".mov") || n.endsWith(".3gp") ||
+                n.endsWith(".webm") || n.endsWith(".avi")
     }
 
-    fun isApk(file: FileItem): Boolean {
-        val mime = file.mimeType.lowercase()
-        val name = file.name.lowercase()
-        return mime == "application/vnd.android.package-archive" || name.endsWith(".apk")
+    fun isApk(name: String, mimeType: String): Boolean {
+        val mime = mimeType.lowercase()
+        val n = name.lowercase()
+        return mime == "application/vnd.android.package-archive" || n.endsWith(".apk")
     }
+
+    fun isImage(file: FileItem): Boolean = isImage(file.name, file.mimeType)
+
+    fun isVideo(file: FileItem): Boolean = isVideo(file.name, file.mimeType)
+
+    fun isApk(file: FileItem): Boolean = isApk(file.name, file.mimeType)
 
     /**
      * 加载用于列表展示的紧凑缩略图 (约 128x128 像素)。
@@ -59,6 +65,24 @@ object ThumbnailHelper {
             memoryCache.put(cacheKey, bitmap)
         }
         return bitmap
+    }
+
+    fun loadThumbnail(
+        context: Context,
+        name: String,
+        mimeType: String,
+        uri: android.net.Uri?,
+        path: String?,
+        targetSize: Int = 128
+    ): Bitmap? {
+        val dummy = FileItem(
+            name = name,
+            size = 0L,
+            mimeType = mimeType,
+            uri = uri,
+            path = path
+        )
+        return loadThumbnail(context, dummy, targetSize)
     }
 
     /**

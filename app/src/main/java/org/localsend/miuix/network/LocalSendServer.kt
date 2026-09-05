@@ -475,7 +475,10 @@ class LocalSendServer(
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
                         共享文件
                     </span>
-                    <span class="section-tag">${binaryFiles.size} 个</span>
+                    <div style="display:inline-flex;align-items:center;gap:8px;">
+                        ${if (binaryFiles.size > 1 && session != null) """<a href="/api/localsend/v2/download-zip?sessionId=${session.sessionId}" class="btn-zip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> 打包下载全部 (.zip)</a>""" else ""}
+                        <span class="section-tag">${binaryFiles.size} 个</span>
+                    </div>
                 </div>
                 <div class="file-list">$rows</div>
             </div>
@@ -593,6 +596,20 @@ class LocalSendServer(
                         border-radius: 10px;
                         font-weight: 500;
                     }
+                    .btn-zip {
+                        font-size: 12px;
+                        background: var(--primary);
+                        color: #ffffff !important;
+                        padding: 2px 10px;
+                        border-radius: 12px;
+                        font-weight: 600;
+                        text-decoration: none;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        transition: opacity 0.2s;
+                    }
+                    .btn-zip:hover { opacity: 0.88; }
                     .text-card { margin-bottom: 10px; }
                     .text-card:last-child { margin-bottom: 0; }
                     .text-content {
@@ -1184,6 +1201,53 @@ class LocalSendServer(
                             write(buffer, 0, bytesRead)
                         }
                         flush()
+                    }
+                }
+            }
+
+            // Web Share 增强：多文件一键打包流式下载为 ZIP
+            get("/api/localsend/v2/download-zip") {
+                val sessionId = call.request.queryParameters["sessionId"]
+                val session = if (sessionId != null) {
+                    getShares().firstOrNull { it.sessionId == sessionId }
+                } else {
+                    getShares().firstOrNull()
+                }
+                if (session == null || session.files.isEmpty()) {
+                    call.respond(HttpStatusCode.NotFound, "No files found in share session")
+                    return@get
+                }
+                val zipFileName = "LocalSend_${session.files.size}_Files.zip"
+                call.response.header(
+                    HttpHeaders.ContentDisposition,
+                    "attachment; filename=\"$zipFileName\""
+                )
+                call.respondOutputStream(contentType = ContentType("application", "zip"), status = HttpStatusCode.OK) {
+                    java.util.zip.ZipOutputStream(this).use { zipOut ->
+                        val buffer = ByteArray(128 * 1024)
+                        val addedNames = mutableSetOf<String>()
+                        for (file in session.files) {
+                            val input = openShareStream(file) ?: continue
+                            var entryName = file.name
+                            var counter = 1
+                            while (entryName in addedNames) {
+                                val base = file.name.substringBeforeLast('.', "").ifEmpty { file.name }
+                                val ext = if (file.name.contains('.')) ".${file.name.substringAfterLast('.')}" else ""
+                                entryName = "$base ($counter)$ext"
+                                counter++
+                            }
+                            addedNames.add(entryName)
+                            val zipEntry = java.util.zip.ZipEntry(entryName)
+                            zipOut.putNextEntry(zipEntry)
+                            input.use { src ->
+                                var bytesRead: Int
+                                while (src.read(buffer).also { bytesRead = it } != -1) {
+                                    zipOut.write(buffer, 0, bytesRead)
+                                }
+                            }
+                            zipOut.closeEntry()
+                        }
+                        zipOut.finish()
                     }
                 }
             }

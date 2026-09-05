@@ -65,9 +65,21 @@ object NetworkUtils {
         return broadcasts
     }
 
-    fun getSubnetBaseIp(): String? {
-        val ip = getLocalIpAddresses().firstOrNull() ?: return null
-        val parts = ip.split(".")
-        return if (parts.size == 4) "${parts[0]}.${parts[1]}.${parts[2]}" else null
+    fun getSubnetBaseIps(): List<String> {
+        val ips = getLocalIpAddresses()
+        val bases = mutableListOf<String>()
+        for (ip in ips) {
+            if (ip == "127.0.0.1") continue
+            val parts = ip.split(".")
+            if (parts.size == 4) {
+                val base = "${parts[0]}.${parts[1]}.${parts[2]}"
+                if (!bases.contains(base)) {
+                    bases.add(base)
+                }
+            }
+        }
+        return bases
     }
+
+    fun getSubnetBaseIp(): String? = getSubnetBaseIps().firstOrNull()
 }

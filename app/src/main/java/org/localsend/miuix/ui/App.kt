@@ -77,6 +77,7 @@ fun App(manager: LocalSendManager) {
     val pendingIncomingSession by manager.pendingIncomingSession.collectAsState()
     val sessionMessage by manager.sessionMessage.collectAsState()
     val requestedTabIndex by manager.requestedTabIndex.collectAsState()
+    val recentManualIps by manager.recentManualIps.collectAsState()
 
     // 传输提示（如"对方拒绝接收"）以 Toast 呈现，显示后即消费
     LaunchedEffect(sessionMessage) {
@@ -493,6 +494,7 @@ fun App(manager: LocalSendManager) {
 
         org.localsend.miuix.ui.component.ManualIpDialog(
             show = showManualIpDialog,
+            recentIps = recentManualIps,
             onDismissRequest = { showManualIpDialog = false },
             onSend = { ip, port ->
                 manager.sendToIp(ip, port)

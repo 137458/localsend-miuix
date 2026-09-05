@@ -60,9 +60,11 @@ class LocalSendClient(
         files: List<FileItem>
     ): Result<PrepareUploadResponseDto> = withContext(Dispatchers.IO) {
         try {
-            // 发送方按规范计算每个文件的 sha256（可选字段），供接收方校验
+            // 发送方按规范计算小文件（<= 20MB）或文本的 sha256（协议中为可选字段）
+            // 大文件跳过全盘预读，消除握手前数十秒卡顿并避免闪存双重读盘与发热
+            val maxSha256PrecomputeBytes = 20 * 1024 * 1024L
             for (fileItem in files) {
-                if (fileItem.expectedSha256 == null) {
+                if (fileItem.expectedSha256 == null && (fileItem.size in 1..maxSha256PrecomputeBytes || fileItem.textContent != null)) {
                     fileItem.expectedSha256 = computeSha256(fileItem)
                 }
             }

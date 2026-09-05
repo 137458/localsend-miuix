@@ -20,7 +20,9 @@ object TransferNotifier {
 
     const val CHANNEL_RECEIVE = "localsend_receive"
     const val CHANNEL_SEND = "localsend_send"
+    const val CHANNEL_SERVICE = "localsend_service"
 
+    const val NOTIF_ID_FOREGROUND_SERVICE = 1001
     private const val NOTIF_ID_RECEIVE_BASE = 2000
     private const val NOTIF_ID_SEND_BASE = 3000
 
@@ -49,8 +51,30 @@ object TransferNotifier {
         ).apply {
             description = "发送文件与文本时的进度与结果提示"
         }
+        val serviceChannel = NotificationChannel(
+            CHANNEL_SERVICE,
+            "后台传输服务",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "保持后台传输连接与防杀保活"
+            setShowBadge(false)
+        }
         nm.createNotificationChannel(receiveChannel)
         nm.createNotificationChannel(sendChannel)
+        nm.createNotificationChannel(serviceChannel)
+    }
+
+    fun buildForegroundNotification(context: Context, sessionCount: Int = 1): android.app.Notification {
+        val title = "LocalSend 正在后台传输"
+        val text = if (sessionCount > 1) "正在进行 $sessionCount 个传输任务，保持局域网连接..." else "正在进行文件传输，保持局域网连接..."
+        return NotificationCompat.Builder(context, CHANNEL_SERVICE)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSmallIcon(R.drawable.ic_stat_receive)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setContentIntent(appPendingIntent(context))
+            .build()
     }
 
     private fun hasPermission(context: Context): Boolean {

@@ -246,43 +246,46 @@ class DiscoveryService(
     fun scanSubnet(onScanProgress: ((current: Int, total: Int) -> Unit)? = null) {
         scanJob?.cancel()
         scanJob = scope.launch(scanDispatcher) {
-            val baseIp = NetworkUtils.getSubnetBaseIp() ?: return@launch
+            val baseIps = NetworkUtils.getSubnetBaseIps()
+            if (baseIps.isEmpty()) return@launch
             val localIps = NetworkUtils.getLocalIpAddresses()
             val localDevice = getLocalDevice()
-            val total = 254
+            val total = baseIps.size * 254
             val current = AtomicInteger(0)
 
-            val deferreds = (1..total).map { i ->
-                async {
-                    val targetIp = "$baseIp.$i"
-                    if (!localIps.contains(targetIp)) {
-                        // Try HTTPS first (LocalSend default), then HTTP
-                        var found = false
-                        for (proto in listOf("https", "http")) {
-                            if (found) break
-                            for (route in listOf("/api/localsend/v2/info", "/api/localsend/v1/info")) {
+            val deferreds = baseIps.flatMap { baseIp ->
+                (1..254).map { i ->
+                    async {
+                        val targetIp = "$baseIp.$i"
+                        if (!localIps.contains(targetIp)) {
+                            // Try HTTPS first (LocalSend default), then HTTP
+                            var found = false
+                            for (proto in listOf("https", "http")) {
                                 if (found) break
-                                try {
-                                    val url = "$proto://$targetIp:53317$route"
-                                    val response = httpClient.get(url)
-                                    val dto = response.body<DeviceDto>()
-                                    if (dto.fingerprint != localDevice.fingerprint) {
-                                        val device = Device.fromDto(dto, targetIp)
-                                        if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
-                                            FingerprintTrust.trust(device.fingerprint)
+                                for (route in listOf("/api/localsend/v2/info", "/api/localsend/v1/info")) {
+                                    if (found) break
+                                    try {
+                                        val url = "$proto://$targetIp:53317$route"
+                                        val response = httpClient.get(url)
+                                        val dto = response.body<DeviceDto>()
+                                        if (dto.fingerprint != localDevice.fingerprint) {
+                                            val device = Device.fromDto(dto, targetIp)
+                                            if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
+                                                FingerprintTrust.trust(device.fingerprint)
+                                            }
+                                            onDeviceDiscovered(device)
+                                            sendDirectResponse(device)
+                                            found = true
                                         }
-                                        onDeviceDiscovered(device)
-                                        sendDirectResponse(device)
-                                        found = true
+                                    } catch (ignored: Exception) {
+                                        // Target not responding on this proto/route
                                     }
-                                } catch (ignored: Exception) {
-                                    // Target not responding on this proto/route
                                 }
                             }
                         }
+                        val progress = current.incrementAndGet()
+                        onScanProgress?.invoke(progress, total)
                     }
-                    val progress = current.incrementAndGet()
-                    onScanProgress?.invoke(progress, total)
                 }
             }
             deferreds.awaitAll()

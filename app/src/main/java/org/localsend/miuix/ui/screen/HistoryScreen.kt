@@ -67,6 +67,7 @@ fun HistoryScreen(
     val history by manager.transferHistory.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
     var selectedItem by remember { mutableStateOf<TransferHistoryItem?>(null) }
+    var showClearConfirmDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -80,7 +81,7 @@ fun HistoryScreen(
                 },
                 actions = {
                     if (history.isNotEmpty()) {
-                        IconButton(onClick = { manager.clearHistory() }) {
+                        IconButton(onClick = { showClearConfirmDialog = true }) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = "清空历史",
@@ -149,6 +150,52 @@ fun HistoryScreen(
         onDismissRequest = { selectedItem = null },
         onDelete = { id -> manager.deleteHistoryItem(id) }
     )
+
+    if (showClearConfirmDialog) {
+        top.yukonga.miuix.kmp.window.WindowDialog(
+            show = true,
+            title = "清空传输历史",
+            onDismissRequest = { showClearConfirmDialog = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text(
+                    text = "确定要清空全部 ${history.size} 条传输历史记录吗？此操作无法撤销。",
+                    style = MiuixTheme.textStyles.body1,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = { showClearConfirmDialog = false },
+                        colors = ButtonDefaults.buttonColors(),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("取消")
+                    }
+                    Button(
+                        onClick = {
+                            manager.clearHistory()
+                            showClearConfirmDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            color = MiuixTheme.colorScheme.error,
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("清空")
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

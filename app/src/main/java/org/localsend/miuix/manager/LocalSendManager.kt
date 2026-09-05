@@ -173,6 +173,25 @@ class LocalSendManager(private val context: Context) {
     private val _requestedTabIndex = MutableStateFlow<Int?>(null)
     val requestedTabIndex: StateFlow<Int?> = _requestedTabIndex.asStateFlow()
 
+    // 手动输入 IP 历史记录（最多保留最近 5 个不同 IP）
+    private val _recentManualIps = MutableStateFlow<List<String>>(loadRecentManualIps())
+    val recentManualIps: StateFlow<List<String>> = _recentManualIps.asStateFlow()
+
+    private fun loadRecentManualIps(): List<String> {
+        val raw = prefs.getString(KEY_RECENT_MANUAL_IPS, null) ?: return emptyList()
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    fun addRecentIp(ip: String) {
+        val trimmed = ip.trim()
+        if (trimmed.isEmpty()) return
+        _recentManualIps.update { current ->
+            val updated = (listOf(trimmed) + current.filterNot { it == trimmed }).take(5)
+            prefs.edit().putString(KEY_RECENT_MANUAL_IPS, updated.joinToString(",")).apply()
+            updated
+        }
+    }
+
     fun requestNavigateToTab(index: Int) {
         _requestedTabIndex.value = index
     }
@@ -245,6 +264,15 @@ class LocalSendManager(private val context: Context) {
     fun stop() {
         discoveryService.stop()
         server.stop()
+        org.localsend.miuix.service.TransferService.stop(context)
+    }
+
+    private fun syncForegroundServiceState(activeCount: Int) {
+        if (activeCount > 0) {
+            org.localsend.miuix.service.TransferService.start(context, activeCount)
+        } else {
+            org.localsend.miuix.service.TransferService.stop(context)
+        }
     }
 
     fun getLocalDevice(): Device {
@@ -349,6 +377,7 @@ class LocalSendManager(private val context: Context) {
         )
 
         _activeSessions.update { it + session }
+        syncForegroundServiceState(_activeSessions.value.size)
 
         scope.launch(Dispatchers.IO) {
             val prepResult = client.prepareUpload(targetDevice, filesToSend)
@@ -443,6 +472,7 @@ class LocalSendManager(private val context: Context) {
                 protocol = "http",
                 ip = ip
             )
+            addRecentIp(ip)
             withContext(Dispatchers.Main) {
                 sendFilesTo(finalDevice, filesToSend)
             }
@@ -455,6 +485,7 @@ class LocalSendManager(private val context: Context) {
 
             if (isTerminal(session.status)) {
                 _activeSessions.update { list -> list.filterNot { it.sessionId == session.sessionId } }
+                syncForegroundServiceState(_activeSessions.value.size)
                 
                 // 处理文本接收与反馈
                 if (session.isIncoming && session.status == TransferStatus.Completed) {
@@ -505,6 +536,7 @@ class LocalSendManager(private val context: Context) {
                         list + session
                     }
                 }
+                syncForegroundServiceState(_activeSessions.value.size)
             }
         }
     }
@@ -542,10 +574,12 @@ class LocalSendManager(private val context: Context) {
                 val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 vm?.defaultVibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
             } else {
+                @Suppress("DEPRECATION")
                 val v = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     v?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
                 } else {
+                    @Suppress("DEPRECATION")
                     v?.vibrate(50)
                 }
             }
@@ -829,5 +863,6 @@ class LocalSendManager(private val context: Context) {
         private const val KEY_DOWNLOAD_DISPLAY = "download_display"
         private const val KEY_VIBRATE = "vibrate_on_complete"
         private const val KEY_LAST_TAB = "last_selected_tab"
+        private const val KEY_RECENT_MANUAL_IPS = "recent_manual_ips"
     }
 }

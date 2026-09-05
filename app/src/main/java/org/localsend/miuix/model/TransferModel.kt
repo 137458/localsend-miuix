@@ -61,7 +61,7 @@ enum class TransferStatus {
 data class FileItem(
     val id: String = UUID.randomUUID().toString(),
     var name: String,
-    val size: Long,
+    val size: Long = 0L,
     val uri: Uri? = null,
     val path: String? = null,
     var textContent: String? = null,

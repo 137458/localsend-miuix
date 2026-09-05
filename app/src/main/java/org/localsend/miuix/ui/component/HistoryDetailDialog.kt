@@ -4,10 +4,14 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,20 +23,32 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.model.HistoryFileEntry
 import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.util.ThumbnailHelper
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -266,14 +282,12 @@ fun HistoryDetailDialog(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.InsertDriveFile,
-                                    contentDescription = null,
-                                    tint = MiuixTheme.colorScheme.primary,
-                                    modifier = Modifier.size(22.dp)
+                                HistoryFileThumbnailView(
+                                    file = file,
+                                    size = 36.dp
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -325,6 +339,76 @@ fun HistoryDetailDialog(
                     Text("关闭")
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HistoryFileThumbnailView(
+    file: HistoryFileEntry,
+    modifier: Modifier = Modifier,
+    size: Dp = 36.dp
+) {
+    val context = LocalContext.current
+    val isMediaOrApk = ThumbnailHelper.isImage(file.name, file.mimeType) ||
+            ThumbnailHelper.isVideo(file.name, file.mimeType) ||
+            ThumbnailHelper.isApk(file.name, file.mimeType)
+
+    val thumbnailBitmap by produceState<Bitmap?>(initialValue = null, file.name) {
+        if (isMediaOrApk) {
+            value = withContext(Dispatchers.IO) {
+                ThumbnailHelper.loadThumbnail(
+                    context,
+                    file.name,
+                    file.mimeType,
+                    file.uri,
+                    file.path,
+                    (size.value * 2.5f).toInt().coerceAtLeast(96)
+                )
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (thumbnailBitmap != null) {
+            Image(
+                bitmap = thumbnailBitmap!!.asImageBitmap(),
+                contentDescription = file.name,
+                modifier = Modifier
+                    .size(size)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
+            )
+            if (ThumbnailHelper.isVideo(file.name, file.mimeType)) {
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.55f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(10.dp)
+                    )
+                }
+            }
+        } else {
+            val icon = AppIcons.getFileIcon(file.mimeType, file.name)
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MiuixTheme.colorScheme.primary,
+                modifier = Modifier.size(size * 0.55f)
+            )
         }
     }
 }
