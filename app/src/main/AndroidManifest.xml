@@ -89,6 +89,11 @@
             android:name=".service.TransferService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- 传输通知与流体云胶囊快捷操作接收器 -->
+        <receiver
+            android:name=".notification.TransferActionReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

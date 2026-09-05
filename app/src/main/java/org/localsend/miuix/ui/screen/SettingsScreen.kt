@@ -31,6 +31,9 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import org.localsend.miuix.notification.TransferNotifier
+
 @Composable
 fun SettingsScreen(
     manager: LocalSendManager,
@@ -46,6 +49,12 @@ fun SettingsScreen(
 
     var showPinDialog by remember { mutableStateOf(false) }
     var showCertDialog by remember { mutableStateOf(false) }
+    var isNotificationEnabled by remember { mutableStateOf(TransferNotifier.isNotificationsEnabled(context)) }
+
+    LifecycleResumeEffect(Unit) {
+        isNotificationEnabled = TransferNotifier.isNotificationsEnabled(context)
+        onPauseOrDispose {}
+    }
 
     val themeOptions = remember {
         listOf(
@@ -129,6 +138,20 @@ fun SettingsScreen(
                         checked = settings.vibrateOnComplete,
                         onCheckedChange = { checked ->
                             manager.updateSettings { it.copy(vibrateOnComplete = checked) }
+                        }
+                    )
+                    ArrowPreference(
+                        title = "系统通知与流体云权限",
+                        summary = if (isNotificationEnabled) "已开启 (传输进度与流体云胶囊提示正常)" else "未开启 (点击授权或前往系统设置开启通知)",
+                        onClick = {
+                            val activity = context as? org.localsend.miuix.ui.MainActivity
+                            if (activity != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+                                activity.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                            ) {
+                                activity.requestNecessaryPermissions()
+                            } else {
+                                org.localsend.miuix.notification.TransferNotifier.openNotificationSettings(context)
+                            }
                         }
                     )
                 }

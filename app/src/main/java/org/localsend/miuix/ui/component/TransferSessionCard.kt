@@ -568,3 +568,330 @@ private fun FileDetailItem(
         }
     }
 }
+
+/**
+ * 内嵌在设备 Card 下方的传输进度组件（直接在同一个设备 Card 内部渲染）。
+ */
+@Composable
+fun InlineTransferProgress(
+    session: TransferSession,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 2.dp)
+    ) {
+        // 分割线
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+
+        if (session.isTextMessage) {
+            InlineTextMessageProgress(session = session, onCancel = onCancel)
+        } else {
+            InlineFileTransferProgress(
+                session = session,
+                isExpanded = isExpanded,
+                onToggleExpanded = { isExpanded = !isExpanded },
+                onCancel = onCancel
+            )
+        }
+    }
+}
+
+@Composable
+private fun InlineTextMessageProgress(
+    session: TransferSession,
+    onCancel: () -> Unit
+) {
+    val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: "纯文本消息"
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Chat,
+                contentDescription = null,
+                tint = MiuixTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = when (session.status) {
+                    TransferStatus.WaitingApproval -> "等待对方确认接收..."
+                    TransferStatus.InProgress -> "正在同步文本..."
+                    TransferStatus.Completed -> "文本已送达"
+                    TransferStatus.Failed -> "发送失败: ${session.errorMessage ?: "对方拒绝"}"
+                    TransferStatus.Canceled -> "传输已取消"
+                },
+                style = MiuixTheme.textStyles.footnote1,
+                color = when (session.status) {
+                    TransferStatus.Failed -> MiuixTheme.colorScheme.error
+                    TransferStatus.Completed -> Color(0xFF4CAF50)
+                    TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
+                    else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (session.status == TransferStatus.InProgress || session.status == TransferStatus.WaitingApproval) {
+            IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "取消传输",
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+
+    if (session.status == TransferStatus.InProgress || session.status == TransferStatus.WaitingApproval) {
+        Spacer(modifier = Modifier.height(6.dp))
+        LinearProgressIndicator(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+        )
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = previewText,
+            style = MiuixTheme.textStyles.footnote1,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            color = MiuixTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun InlineFileTransferProgress(
+    session: TransferSession,
+    isExpanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onCancel: () -> Unit
+) {
+    var previewingFile by remember { mutableStateOf<FileItem?>(null) }
+
+    // 1. 状态行（状态描述 + 取消按钮）
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            when (session.status) {
+                TransferStatus.Completed -> Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(16.dp)
+                )
+                TransferStatus.Failed -> Icon(
+                    imageVector = Icons.Default.Error,
+                    contentDescription = null,
+                    tint = MiuixTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp)
+                )
+                TransferStatus.WaitingApproval -> Icon(
+                    imageVector = Icons.Default.HourglassEmpty,
+                    contentDescription = null,
+                    tint = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                TransferStatus.InProgress -> Icon(
+                    imageVector = Icons.Default.Upload,
+                    contentDescription = null,
+                    tint = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                TransferStatus.Canceled -> Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = null,
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = when (session.status) {
+                    TransferStatus.WaitingApproval -> "等待对方同意接收..."
+                    TransferStatus.InProgress -> {
+                        val current = session.currentFile
+                        if (current != null && session.files.size > 1) {
+                            "(${session.currentFileIndex + 1}/${session.files.size}) 正在传输: ${current.name}"
+                        } else if (current != null) {
+                            "正在传输: ${current.name}"
+                        } else {
+                            "正在准备传输..."
+                        }
+                    }
+                    TransferStatus.Completed -> "✓ 传输完成 (共 ${session.files.size} 个文件，${session.formattedTotalSize})"
+                    TransferStatus.Failed -> "传输失败: ${session.errorMessage ?: "未知错误"}"
+                    TransferStatus.Canceled -> "传输已取消"
+                },
+                style = MiuixTheme.textStyles.footnote1,
+                color = when (session.status) {
+                    TransferStatus.Completed -> Color(0xFF4CAF50)
+                    TransferStatus.Failed -> MiuixTheme.colorScheme.error
+                    TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
+                    else -> MiuixTheme.colorScheme.onSurface
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (session.status == TransferStatus.InProgress || session.status == TransferStatus.WaitingApproval) {
+            IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "取消传输",
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+
+    // 2. 动态平滑进度条
+    val animatedSessionProgress by animateFloatAsState(
+        targetValue = if (session.status == TransferStatus.Completed) 1f else session.progress,
+        animationSpec = tween(durationMillis = 80, easing = LinearEasing),
+        label = "InlineSessionProgress"
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+    if (session.status == TransferStatus.WaitingApproval) {
+        LinearProgressIndicator(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(5.dp)
+                .clip(RoundedCornerShape(2.5.dp))
+        )
+    } else {
+        LinearProgressIndicator(
+            progress = animatedSessionProgress,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(5.dp)
+                .clip(RoundedCornerShape(2.5.dp))
+        )
+    }
+
+    // 3. 传输指标行（左：已传/总大小 (百分比)；右：实时速率 • 剩余时间）
+    Spacer(modifier = Modifier.height(6.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "${session.formattedTransferredSize} / ${session.formattedTotalSize} (${session.progressPercent}%)",
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+        )
+        if (session.status == TransferStatus.InProgress) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = session.formattedSpeed,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.primary
+                )
+                if (session.remainingTimeFormatted.isNotEmpty()) {
+                    Text(
+                        text = " • ${session.remainingTimeFormatted}",
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                }
+            }
+        }
+    }
+
+    // 4. 可折叠清单
+    if (session.files.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(6.dp))
+                .clickable { onToggleExpanded() }
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "文件清单 (${session.files.count { it.status == TransferStatus.Completed }}/${session.files.size})",
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+            )
+            Icon(
+                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = if (isExpanded) "收起" else "展开",
+                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                session.files.forEach { file ->
+                    androidx.compose.runtime.key(file.id) {
+                        FileDetailItem(
+                            file = file,
+                            onClick = { previewingFile = file }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    previewingFile?.let { file ->
+        FilePreviewDialog(
+            file = file,
+            onDismissRequest = { previewingFile = null }
+        )
+    }
+}

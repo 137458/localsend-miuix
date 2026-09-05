@@ -47,7 +47,7 @@ import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.FilePreviewDialog
 import org.localsend.miuix.ui.component.FileThumbnail
-import org.localsend.miuix.ui.component.TransferSessionCard
+import org.localsend.miuix.ui.component.InlineTransferProgress
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -84,6 +84,13 @@ fun SendScreen(
     val activeSessions by manager.activeSessions.collectAsState()
     val shares by manager.shares.collectAsState()
     val outgoingSessions = remember(activeSessions) { activeSessions.filter { !it.isIncoming } }
+    val nonNearbySessions = remember(outgoingSessions, nearbyDevices) {
+        outgoingSessions.filter { session ->
+            nearbyDevices.none {
+                (it.fingerprint.isNotEmpty() && it.fingerprint == session.device.fingerprint) || it.ip == session.device.ip
+            }
+        }
+    }
     val totalSelectedSize = remember(selectedFiles) { selectedFiles.sumOf { it.size } }
 
     var isRefreshing by remember { mutableStateOf(false) }
@@ -273,28 +280,16 @@ fun SendScreen(
                     }
                 }
 
-                // Section 2.5: Active Outgoing Sessions (发送进度)
-                if (outgoingSessions.isNotEmpty()) {
-                    item {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        SmallTitle(
-                            text = "正在传输 (${outgoingSessions.count { it.status == TransferStatus.InProgress }})"
-                        )
-                    }
-                    items(outgoingSessions, key = { it.sessionId }) { session ->
-                        TransferSessionCard(
-                            session = session,
-                            onCancel = { manager.cancelTransfer(session.sessionId) }
-                        )
-                    }
-                }
-
                 // Section 3: Nearby Devices
+                val totalDeviceCount = nearbyDevices.size + nonNearbySessions.size
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = "附近设备 (${nearbyDevices.size})")
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        if (isScanning) {
+                    SmallTitle(text = "附近设备 ($totalDeviceCount)")
+                }
+
+                if (isScanning) {
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth()) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -314,8 +309,12 @@ fun SendScreen(
                                 )
                             }
                         }
+                    }
+                }
 
-                        if (nearbyDevices.isEmpty() && !isScanning) {
+                if (nearbyDevices.isEmpty() && nonNearbySessions.isEmpty() && !isScanning) {
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth()) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -341,13 +340,20 @@ fun SendScreen(
                                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                 )
                             }
+                        }
+                    }
+                } else {
+                    items(nearbyDevices, key = { if (it.fingerprint.isNotEmpty()) it.fingerprint else "${it.ip}:${it.port}" }) { device ->
+                        val deviceSessions = outgoingSessions.filter {
+                            (it.device.fingerprint.isNotEmpty() && it.device.fingerprint == device.fingerprint) || it.device.ip == device.ip
+                        }
+                        val networkLabel = if (device.alternateIps.isNotEmpty()) {
+                            " (+${device.alternateIps.size}个网段)"
                         } else {
-                            nearbyDevices.forEach { device ->
-                                val networkLabel = if (device.alternateIps.isNotEmpty()) {
-                                    " (+${device.alternateIps.size}个网段)"
-                                } else {
-                                    ""
-                                }
+                            ""
+                        }
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
                                 ArrowPreference(
                                     title = device.alias,
                                     summary = "${device.ip}:${device.port}$networkLabel • ${device.deviceModel ?: device.deviceType.value}",
@@ -368,6 +374,43 @@ fun SendScreen(
                                         }
                                     }
                                 )
+                                if (deviceSessions.isNotEmpty()) {
+                                    deviceSessions.forEach { session ->
+                                        InlineTransferProgress(
+                                            session = session,
+                                            onCancel = { manager.cancelTransfer(session.sessionId) },
+                                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 针对手动输入 IP 发起、不在扫描列表中的目标设备，同样在同 Card 下内嵌进度
+                    if (nonNearbySessions.isNotEmpty()) {
+                        items(nonNearbySessions, key = { it.sessionId }) { session ->
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    ArrowPreference(
+                                        title = session.device.alias,
+                                        summary = "${session.device.ip}:${session.device.port} • ${session.device.deviceModel ?: session.device.deviceType.value}",
+                                        startAction = {
+                                            Icon(
+                                                imageVector = AppIcons.getDeviceIcon(session.device.deviceType),
+                                                contentDescription = null,
+                                                tint = MiuixTheme.colorScheme.primary,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        },
+                                        onClick = {}
+                                    )
+                                    InlineTransferProgress(
+                                        session = session,
+                                        onCancel = { manager.cancelTransfer(session.sessionId) },
+                                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                                    )
+                                }
                             }
                         }
                     }

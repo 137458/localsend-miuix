@@ -1,20 +1,25 @@
 package org.localsend.miuix.notification
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import org.localsend.miuix.R
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.ui.MainActivity
 
 /**
- * 传输通知。用于在后台或快速保存自动接收时，向用户提示传输进度与结果。
+ * 传输通知管理器。用于在后台或快速保存自动接收时，向用户提示传输进度与结果，
+ * 并接入 ColorOS 流体云（Aqua Dynamics）与 Android 16+ Live Updates 胶囊显示。
  */
 object TransferNotifier {
 
@@ -26,12 +31,13 @@ object TransferNotifier {
     private const val NOTIF_ID_RECEIVE_BASE = 2000
     private const val NOTIF_ID_SEND_BASE = 3000
 
+    @Volatile
     private var allowed = false
 
-    /** 创建通知渠道，并请求/确认通知权限（Android 13+）。 */
+    /** 创建通知渠道，并确认通知权限。 */
     fun ensure(context: Context) = synchronized(this) {
         createChannel(context)
-        allowed = hasPermission(context)
+        allowed = isNotificationsEnabled(context)
     }
 
     private fun createChannel(context: Context) {
@@ -42,14 +48,18 @@ object TransferNotifier {
             "接收通知",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "接收文件与文本时的进度与结果提示"
+            description = "接收文件与文本时的进度、流体云胶囊与结果提示"
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setShowBadge(false)
         }
         val sendChannel = NotificationChannel(
             CHANNEL_SEND,
             "发送通知",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "发送文件与文本时的进度与结果提示"
+            description = "发送文件与文本时的进度、流体云胶囊与结果提示"
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setShowBadge(false)
         }
         val serviceChannel = NotificationChannel(
             CHANNEL_SERVICE,
@@ -77,16 +87,57 @@ object TransferNotifier {
             .build()
     }
 
-    private fun hasPermission(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
-        return context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
+    /**
+     * 检查系统通知是否对本应用全局可用：
+     * 1. 系统通知开关是否开启（NotificationManagerCompat.areNotificationsEnabled）；
+     * 2. 若为 Android 13+ (API 33+)，是否已授予 POST_NOTIFICATIONS 运行时权限。
+     */
+    fun isNotificationsEnabled(context: Context): Boolean {
+        val managerCompat = NotificationManagerCompat.from(context)
+        if (!managerCompat.areNotificationsEnabled()) {
+            return false
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val hasRuntimePerm = context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+            if (!hasRuntimePerm) return false
+        }
+        return true
     }
 
-    /** 是否已获取通知权限（用于决定是否踢通知）。 */
+    /** 是否已获取通知权限（用于决定是否发布通知）。 */
     fun isAllowed(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
-        return hasPermission(context)
+        val currentAllowed = isNotificationsEnabled(context)
+        allowed = currentAllowed
+        return currentAllowed
+    }
+
+    /**
+     * 跳转至系统当前应用的通知设置页面，以便用户手动授权或开启各渠道通知。
+     */
+    fun openNotificationSettings(context: Context) {
+        try {
+            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            } else {
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            try {
+                val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(fallbackIntent)
+            } catch (_: Exception) {}
+        }
     }
 
     private fun sessionNotifId(session: TransferSession): Int {
@@ -104,6 +155,15 @@ object TransferNotifier {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
         )
+    }
+
+    private fun cancelPendingIntent(context: Context, sessionId: String): PendingIntent {
+        val intent = Intent(context, TransferActionReceiver::class.java).apply {
+            action = TransferActionReceiver.ACTION_CANCEL_TRANSFER
+            putExtra(TransferActionReceiver.EXTRA_SESSION_ID, sessionId)
+        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+        return PendingIntent.getBroadcast(context, sessionId.hashCode(), intent, flags)
     }
 
     fun notifyIncoming(context: Context, session: TransferSession) {
@@ -151,12 +211,25 @@ object TransferNotifier {
             .setOnlyAlertOnce(true)
             .setContentIntent(appPendingIntent(context))
             .setProgress(100, session.progressPercent, session.totalBytes <= 0)
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                "取消传输",
+                cancelPendingIntent(context, session.sessionId)
+            )
+
+        // 接入 ColorOS 流体云（Aqua Dynamics）与 Android 16+ Live Updates
+        LiveUpdatesCompat.applyLiveUpdates(context, builder, session, actionText)
+
         nm.notify(sessionNotifId(session), builder.build())
     }
 
     fun notifyResult(context: Context, session: TransferSession) {
         if (!isAllowed(context)) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notifId = sessionNotifId(session)
+        // 传输已终结，先清除进行中的流体云胶囊/进度通知
+        nm.cancel(notifId)
+
         val channel = if (session.isIncoming) CHANNEL_RECEIVE else CHANNEL_SEND
         val (title, content) = when (session.status) {
             TransferStatus.Completed -> {
@@ -188,7 +261,8 @@ object TransferNotifier {
             .setSmallIcon(R.drawable.ic_stat_receive)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(appPendingIntent(context))
+            .setOngoing(false)
             .setAutoCancel(true)
-        nm.notify(sessionNotifId(session), builder.build())
+        nm.notify(notifId, builder.build())
     }
 }

@@ -6,8 +6,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.core.app.ActivityCompat
 import androidx.navigationevent.NavigationEventDispatcher
 import androidx.navigationevent.NavigationEventDispatcherOwner
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
@@ -22,12 +22,37 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 
     private lateinit var manager: LocalSendManager
 
+    // 现代 Activity Result API 申请权限（包含 Android 13+ 通知与 Android 17+ 局域网前瞻性权限）
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        TransferNotifier.ensure(applicationContext)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // 接收文件需要系统通知，Android 13+ 需运行时授予 POST_NOTIFICATIONS 权限
+        // 初始化通知渠道并检测当前通知开关与权限
         TransferNotifier.ensure(applicationContext)
+        requestNecessaryPermissions()
+
+        manager = LocalSendManager(applicationContext)
+        manager.start()
+
+        // 仅在非配置变更（如首次冷启动）时处理外部调起的分享与打开文件意图
+        if (savedInstanceState == null) {
+            handleIncomingIntent(intent)
+        }
+
+        setContent {
+            CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides this) {
+                App(manager = manager)
+            }
+        }
+    }
+
+    fun requestNecessaryPermissions() {
         val permissionsToRequest = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
@@ -44,25 +69,7 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
             }
         }
         if (permissionsToRequest.isNotEmpty()) {
-            ActivityCompat.requestPermissions(
-                this,
-                permissionsToRequest.toTypedArray(),
-                REQUEST_PERMISSIONS
-            )
-        }
-
-        manager = LocalSendManager(applicationContext)
-        manager.start()
-
-        // 仅在非配置变更（如首次冷启动）时处理外部调起的分享与打开文件意图
-        if (savedInstanceState == null) {
-            handleIncomingIntent(intent)
-        }
-
-        setContent {
-            CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides this) {
-                App(manager = manager)
-            }
+            permissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
     }
 
@@ -93,6 +100,7 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 
     override fun onResume() {
         super.onResume()
+        TransferNotifier.ensure(applicationContext)
         if (::manager.isInitialized) {
             manager.onResume()
         }
@@ -105,7 +113,6 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     }
 
     companion object {
-        private const val REQUEST_PERMISSIONS = 100
         private const val EXTRA_INTENT_PROCESSED = "org.localsend.miuix.extra.INTENT_PROCESSED"
     }
 }

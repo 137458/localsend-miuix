@@ -26,6 +26,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -71,6 +72,10 @@ data class AppInfoItem(
 )
 
 class LocalSendManager(private val context: Context) {
+
+    init {
+        instance = this
+    }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val fingerprint = UUID.randomUUID().toString()
@@ -507,9 +512,17 @@ class LocalSendManager(private val context: Context) {
             updateTransferNotification(session)
 
             if (isTerminal(session.status)) {
-                _activeSessions.update { list -> list.filterNot { it.sessionId == session.sessionId } }
-                syncForegroundServiceState(_activeSessions.value.size)
-                
+                // 先更新快照，让界面展示最终完成/失败/取消状态
+                val snapshot = session.createSnapshot()
+                _activeSessions.update { list ->
+                    val index = list.indexOfFirst { it.sessionId == session.sessionId }
+                    if (index >= 0) {
+                        list.toMutableList().apply { set(index, snapshot) }
+                    } else {
+                        list + snapshot
+                    }
+                }
+
                 // 处理文本接收与反馈
                 if (session.isIncoming && session.status == TransferStatus.Completed) {
                     if (session.isTextMessage && !session.singleTextMessageContent.isNullOrEmpty()) {
@@ -550,6 +563,11 @@ class LocalSendManager(private val context: Context) {
                     )
                     addHistory(historyItem)
                 }
+
+                // 终结状态保留 2 秒，以便用户在设备 Card 内看清完成反馈动效，随后自动清理
+                delay(2000L)
+                _activeSessions.update { list -> list.filterNot { it.sessionId == session.sessionId } }
+                syncForegroundServiceState(_activeSessions.value.size)
             } else {
                 val snapshot = session.createSnapshot()
                 _activeSessions.update { list ->
@@ -878,6 +896,11 @@ class LocalSendManager(private val context: Context) {
     }
 
     companion object {
+        @Volatile
+        private var instance: LocalSendManager? = null
+
+        fun getInstance(): LocalSendManager? = instance
+
         private const val DEVICE_TTL_MS = 90_000L
         private const val KEY_ALIAS = "alias"
         private const val KEY_PORT = "port"
