@@ -343,9 +343,14 @@ fun SendScreen(
                             }
                         } else {
                             nearbyDevices.forEach { device ->
+                                val networkLabel = if (device.alternateIps.isNotEmpty()) {
+                                    " (+${device.alternateIps.size}个网段)"
+                                } else {
+                                    ""
+                                }
                                 ArrowPreference(
                                     title = device.alias,
-                                    summary = "${device.ip}:${device.port} • ${device.deviceModel ?: device.deviceType.value}",
+                                    summary = "${device.ip}:${device.port}$networkLabel • ${device.deviceModel ?: device.deviceType.value}",
                                     startAction = {
                                         Icon(
                                             imageVector = AppIcons.getDeviceIcon(device.deviceType),

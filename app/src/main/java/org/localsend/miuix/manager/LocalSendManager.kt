@@ -319,8 +319,12 @@ class LocalSendManager(private val context: Context) {
         }
     }
 
-    private fun sameIdentity(a: Device, b: Device): Boolean =
-        a.fingerprint == b.fingerprint && a.port == b.port && a.protocol == b.protocol
+    private fun isSameDevice(a: Device, b: Device): Boolean {
+        if (a.fingerprint.isNotBlank() && b.fingerprint.isNotBlank()) {
+            return a.fingerprint == b.fingerprint
+        }
+        return a.ip == b.ip && a.port == b.port
+    }
 
     private fun upsertDevice(device: Device) {
         if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
@@ -330,19 +334,32 @@ class LocalSendManager(private val context: Context) {
             _nearbyDevices.update { current ->
                 val now = System.currentTimeMillis()
                 val alive = current.filter { now - it.lastSeen < DEVICE_TTL_MS }
-                val index = alive.indexOfFirst {
-                    it.ip == device.ip && it.port == device.port
-                }
+                val index = alive.indexOfFirst { isSameDevice(it, device) }
+
                 if (index < 0) {
                     alive + device
-                } else if (sameIdentity(alive[index], device)) {
-                    if (alive.size == current.size && alive[index].lastSeen == device.lastSeen) {
-                        current
-                    } else {
-                        alive.toMutableList().apply { set(index, device) }
-                    }
                 } else {
-                    alive.toMutableList().apply { set(index, device) }
+                    val known = alive[index]
+                    // 融合多网卡地址：合并已知所有 IP
+                    val allConfirmedIps = (known.allIps + device.allIps).distinct()
+                    val primaryLocalIp = NetworkUtils.getPrimaryIp()
+
+                    // 选择最优主显示 IP：优先选择与本机主要活跃网卡同子网的 IP，兜底保留最新响应的 IP
+                    val bestIp = if (primaryLocalIp != null && allConfirmedIps.any { NetworkUtils.isSameSubnet(it, primaryLocalIp) }) {
+                        allConfirmedIps.first { NetworkUtils.isSameSubnet(it, primaryLocalIp) }
+                    } else {
+                        device.ip
+                    }
+                    val altIps = allConfirmedIps.filter { it != bestIp }
+
+                    val merged = device.copy(
+                        ip = bestIp,
+                        alternateIps = altIps,
+                        deviceModel = device.deviceModel ?: known.deviceModel,
+                        lastSeen = maxOf(known.lastSeen, device.lastSeen)
+                    )
+
+                    alive.toMutableList().apply { set(index, merged) }
                 }
             }
         }
@@ -389,16 +406,22 @@ class LocalSendManager(private val context: Context) {
                 return@launch
             }
 
-            val responseDto = prepResult.getOrNull()!!
+            val handshake = prepResult.getOrNull()!!
+            val responseDto = handshake.response
+            val activeDevice = handshake.activeDevice
             val remoteSessionId = responseDto.sessionId
             val fileTokens = responseDto.files
+
+            if (activeDevice.ip != targetDevice.ip) {
+                upsertDevice(activeDevice)
+            }
 
             for (fileItem in filesToSend) {
                 val token = fileTokens[fileItem.id] ?: fileItem.id
                 fileItem.status = TransferStatus.InProgress
 
                 val uploadResult = client.uploadFile(
-                    targetDevice = targetDevice,
+                    targetDevice = activeDevice,
                     sessionId = remoteSessionId,
                     fileItem = fileItem,
                     token = token

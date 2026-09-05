@@ -41,8 +41,12 @@ data class Device(
     val protocol: String = "http",
     val download: Boolean = false,
     val ip: String,
+    val alternateIps: List<String> = emptyList(),
     val lastSeen: Long = System.currentTimeMillis()
 ) {
+    val allIps: List<String>
+        get() = (listOf(ip) + alternateIps).distinct()
+
     fun toDto(announce: Boolean? = null): DeviceDto {
         return DeviceDto(
             alias = alias,

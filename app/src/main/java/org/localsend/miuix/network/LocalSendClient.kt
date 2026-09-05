@@ -55,10 +55,15 @@ class LocalSendClient(
         }
     }
 
+    data class HandshakeResult(
+        val response: PrepareUploadResponseDto,
+        val activeDevice: Device
+    )
+
     suspend fun prepareUpload(
         targetDevice: Device,
         files: List<FileItem>
-    ): Result<PrepareUploadResponseDto> = withContext(Dispatchers.IO) {
+    ): Result<HandshakeResult> = withContext(Dispatchers.IO) {
         try {
             // 发送方按规范计算小文件（<= 20MB）或文本的 sha256（协议中为可选字段）
             // 大文件跳过全盘预读，消除握手前数十秒卡顿并避免闪存双重读盘与发热
@@ -75,26 +80,37 @@ class LocalSendClient(
                 files = filesMap
             )
 
-            val urlBuilder = StringBuilder("${targetDevice.url}/api/localsend/v2/prepare-upload")
-            getPin()?.takeIf { it.isNotEmpty() }?.let { urlBuilder.append("?pin=").append(it) }
-            val url = urlBuilder.toString()
-            FingerprintTrust.pin(targetDevice.fingerprint)
-            val response = try {
-                httpClient.post(url) {
-                    contentType(ContentType.Application.Json)
-                    setBody(requestDto)
-                }
-            } finally {
-                FingerprintTrust.unpin(targetDevice.fingerprint)
-            }
+            val candidateHosts = targetDevice.allIps.ifEmpty { listOf(targetDevice.ip) }
+            var lastException: Exception? = null
 
-            if (response.status == HttpStatusCode.OK) {
-                val responseDto = response.body<PrepareUploadResponseDto>()
-                Result.success(responseDto)
-            } else {
-                val text = response.bodyAsText()
-                Result.failure(Exception(prepareErrorText(response.status.value, text)))
+            for (host in candidateHosts) {
+                try {
+                    val candidateDevice = if (host == targetDevice.ip) targetDevice else targetDevice.copy(ip = host)
+                    val urlBuilder = StringBuilder("${candidateDevice.url}/api/localsend/v2/prepare-upload")
+                    getPin()?.takeIf { it.isNotEmpty() }?.let { urlBuilder.append("?pin=").append(it) }
+                    val url = urlBuilder.toString()
+                    FingerprintTrust.pin(targetDevice.fingerprint)
+                    val response = try {
+                        httpClient.post(url) {
+                            contentType(ContentType.Application.Json)
+                            setBody(requestDto)
+                        }
+                    } finally {
+                        FingerprintTrust.unpin(targetDevice.fingerprint)
+                    }
+
+                    if (response.status == HttpStatusCode.OK) {
+                        val responseDto = response.body<PrepareUploadResponseDto>()
+                        return@withContext Result.success(HandshakeResult(responseDto, candidateDevice))
+                    } else {
+                        val text = response.bodyAsText()
+                        return@withContext Result.failure(Exception(prepareErrorText(response.status.value, text)))
+                    }
+                } catch (e: Exception) {
+                    lastException = e
+                }
             }
+            Result.failure(lastException ?: Exception("无法连接到目标设备"))
         } catch (e: Exception) {
             Result.failure(e)
         }

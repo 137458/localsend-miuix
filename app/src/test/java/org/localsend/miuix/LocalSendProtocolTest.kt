@@ -116,4 +116,27 @@ class LocalSendProtocolTest {
         assertEquals("http://192.168.1.10:53317", share.downloadLink("http", "192.168.1.10", 53317))
         assertEquals("https://192.168.1.10:53317", share.downloadLink("https", "192.168.1.10", 53317))
     }
+
+    @Test
+    fun testDeviceMultiHomedAllIps() {
+        val device = Device(
+            alias = "Multi-homed Device",
+            fingerprint = "fp-multi-1",
+            ip = "192.168.1.100",
+            alternateIps = listOf("192.168.43.15", "192.168.1.100")
+        )
+        assertEquals(listOf("192.168.1.100", "192.168.43.15"), device.allIps)
+    }
+
+    @Test
+    fun testNetworkUtilsPrivateIpv4AndSubnet() {
+        assertTrue(org.localsend.miuix.network.NetworkUtils.isPrivateIpv4("192.168.1.5"))
+        assertTrue(org.localsend.miuix.network.NetworkUtils.isPrivateIpv4("10.0.0.1"))
+        assertTrue(org.localsend.miuix.network.NetworkUtils.isPrivateIpv4("172.20.10.2"))
+        org.junit.Assert.assertFalse(org.localsend.miuix.network.NetworkUtils.isPrivateIpv4("8.8.8.8"))
+        org.junit.Assert.assertFalse(org.localsend.miuix.network.NetworkUtils.isPrivateIpv4("100.64.0.1"))
+
+        assertTrue(org.localsend.miuix.network.NetworkUtils.isSameSubnet("192.168.1.5", "192.168.1.100"))
+        org.junit.Assert.assertFalse(org.localsend.miuix.network.NetworkUtils.isSameSubnet("192.168.1.5", "192.168.43.15"))
+    }
 }
