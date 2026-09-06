@@ -289,7 +289,7 @@ object TransferNotifier {
 
     /**
      * 启动实时通知 / 流体云胶囊模拟传输测试。
-     * 在单机状态下模拟 5 秒持续传输，验证状态栏胶囊、锁屏卡片与通知栏 Live Updates 进度。
+     * 在单机状态下模拟 20 秒持续传输（每秒步进 1 次），验证状态栏胶囊、锁屏卡片与通知栏 Live Updates 进度。
      */
     fun startTestSimulation(context: Context) {
         if (isTestRunning.value) {
@@ -325,7 +325,7 @@ object TransferNotifier {
         isTestRunning.value = true
         testJob = CoroutineScope(Dispatchers.Default).launch {
             try {
-                val totalSteps = 50
+                val totalSteps = 20
                 for (step in 1..totalSteps) {
                     if (!isActive || !isTestRunning.value) break
                     val currentProgress = step.toFloat() / totalSteps
@@ -356,7 +356,7 @@ object TransferNotifier {
                     }
 
                     updateProgress(context, testSession)
-                    delay(100L)
+                    delay(1000L)
                 }
 
                 if (isActive && isTestRunning.value) {

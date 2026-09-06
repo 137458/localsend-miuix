@@ -157,7 +157,7 @@ fun SettingsScreen(
                     )
                     ArrowPreference(
                         title = if (isTestRunning) "停止实时通知测试" else "测试实时通知 / 胶囊",
-                        summary = if (isTestRunning) "正在模拟传输中 (约 5 秒)，点击立即停止" else "模拟 5 秒文件传输，立即在状态栏/锁屏检验 Live Updates 胶囊",
+                        summary = if (isTestRunning) "正在模拟传输中 (约 20 秒)，点击立即停止" else "模拟 20 秒文件传输，立即在状态栏/锁屏检验 Live Updates 胶囊",
                         onClick = {
                             if (isTestRunning) {
                                 TransferNotifier.stopTestSimulation(context)

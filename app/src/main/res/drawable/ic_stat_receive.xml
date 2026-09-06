@@ -4,8 +4,8 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- 向下箭头 + 底栏：接收文件语义，白色单色图标，用于状态栏通知 -->
+    <!-- 接收状态图标：纯白单色接收波束矢量，无底托横线，纯粹传达接收状态语义 -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M12,3a1,1 0,0 -1,1 1v9.586l3.293,-3.293a1,1 0,0 1,1.414 1.414l-5,5a1,1 0,0 1,-1.414 0l-5,-5a1,1 0,0 1,1.414 -1.414L11,13.586V4a1,1 0,0 1,1 -1zM5,20h14a1,1 0,0 1,0 2H5a1,1 0,0 1,0 -2z" />
+        android:pathData="M20,12l-1.41,-1.41L13,16.17V4h-2v12.17l-5.58,-5.59L4,12l8,8 8,-8z" />
 </vector>

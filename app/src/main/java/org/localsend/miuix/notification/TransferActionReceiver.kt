@@ -22,11 +22,14 @@ class TransferActionReceiver : BroadcastReceiver() {
             } else {
                 LocalSendManager.getInstance()?.cancelTransfer(sessionId)
             }
+        } else if (action == ACTION_START_TEST) {
+            TransferNotifier.startTestSimulation(context)
         }
     }
 
     companion object {
         const val ACTION_CANCEL_TRANSFER = "org.localsend.miuix.action.CANCEL_TRANSFER"
+        const val ACTION_START_TEST = "org.localsend.miuix.action.START_TEST"
         const val EXTRA_SESSION_ID = "extra_session_id"
     }
 }

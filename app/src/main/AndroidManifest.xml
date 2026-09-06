@@ -96,7 +96,7 @@
         <!-- 传输通知与流体云胶囊快捷操作接收器 -->
         <receiver
             android:name=".notification.TransferActionReceiver"
-            android:exported="false" />
+            android:exported="true" />
     </application>
 
 </manifest>
