@@ -2,21 +2,10 @@ package org.localsend.miuix.network
 
 import android.content.Context
 import android.util.Log
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
@@ -40,26 +29,6 @@ class LocalSendClient(
         private const val TAG = "LocalSendTransfer"
     }
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
-
-    private val httpClient by lazy {
-        HttpClient(CIO) {
-            followRedirects = false
-            engine {
-                https {
-                    // HTTPS 模式：仅信任已通过 FingerprintTrust.pin() 登记了证书指纹的对端
-                    trustManager = FingerprintTrust.trustManager
-                }
-            }
-            install(ContentNegotiation) {
-                json(this@LocalSendClient.json)
-            }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 60000
-                connectTimeoutMillis = 10000
-                socketTimeoutMillis = 60000
-            }
-        }
-    }
 
     data class HandshakeResult(
         val response: PrepareUploadResponseDto,
@@ -85,12 +54,14 @@ class LocalSendClient(
                 info = localDevice.toDto(),
                 files = filesMap
             )
+            val jsonPayload = json.encodeToString(requestDto)
 
             val candidateHosts = targetDevice.allIps.ifEmpty { listOf(targetDevice.ip) }
             Log.i(TAG, "prepareUpload: target='${targetDevice.alias}' (${targetDevice.url}), candidates=$candidateHosts, filesCount=${files.size}, totalBytes=${files.sumOf { it.size }}")
             var lastException: Exception? = null
 
             for (host in candidateHosts) {
+                var connection: HttpURLConnection? = null
                 try {
                     val candidateDevice = if (host == targetDevice.ip) targetDevice else targetDevice.copy(ip = host)
                     val urlBuilder = StringBuilder("${candidateDevice.url}/api/localsend/v2/prepare-upload")
@@ -98,25 +69,51 @@ class LocalSendClient(
                         urlBuilder.append("?pin=").append(URLEncoder.encode(it, "UTF-8")) 
                     }
                     val url = urlBuilder.toString()
-                    Log.d(TAG, "prepareUpload: sending handshake to $url (candidate host: $host)")
+                    Log.d(TAG, "prepareUpload: sending handshake via native TLS to $url (candidate host: $host)")
+
                     FingerprintTrust.pin(targetDevice.fingerprint)
-                    val response = try {
-                        httpClient.post(url) {
-                            contentType(ContentType.Application.Json)
-                            setBody(requestDto)
+                    try {
+                        connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                            if (this is HttpsURLConnection) {
+                                sslSocketFactory = FingerprintTrust.pinnedSslSocketFactory
+                                hostnameVerifier = SslHelper.trustAllHostnameVerifier
+                            }
+                            requestMethod = "POST"
+                            doOutput = true
+                            useCaches = false
+                            instanceFollowRedirects = false
+                            connectTimeout = 10000
+                            readTimeout = 60000
+                            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                            setRequestProperty("Accept", "application/json")
+                        }
+
+                        connection.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
+                            writer.write(jsonPayload)
+                            writer.flush()
+                        }
+
+                        val responseCode = connection.responseCode
+                        val responseMsg = connection.responseMessage
+                        Log.d(TAG, "prepareUpload: host $host returned HTTP $responseCode $responseMsg")
+
+                        if (responseCode == HttpURLConnection.HTTP_OK) {
+                            val responseBody = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                            val responseDto = json.decodeFromString<PrepareUploadResponseDto>(responseBody)
+                            Log.i(TAG, "prepareUpload: handshake successful with $host, sessionId=${responseDto.sessionId}, granted tokens count=${responseDto.files.size}/${files.size}")
+                            return@withContext Result.success(HandshakeResult(responseDto, candidateDevice))
+                        } else {
+                            val errorBody = try {
+                                connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                            } catch (ignored: Exception) { null }
+                            Log.e(TAG, "prepareUpload: rejected by $host, HTTP $responseCode: $errorBody")
+                            return@withContext Result.failure(Exception(prepareErrorText(responseCode, errorBody ?: "")))
                         }
                     } finally {
                         FingerprintTrust.unpin(targetDevice.fingerprint)
-                    }
-
-                    if (response.status == HttpStatusCode.OK) {
-                        val responseDto = response.body<PrepareUploadResponseDto>()
-                        Log.i(TAG, "prepareUpload: handshake successful with $host, sessionId=${responseDto.sessionId}, granted tokens count=${responseDto.files.size}/${files.size}")
-                        return@withContext Result.success(HandshakeResult(responseDto, candidateDevice))
-                    } else {
-                        val text = response.bodyAsText()
-                        Log.e(TAG, "prepareUpload: rejected by $host, HTTP ${response.status}: $text")
-                        return@withContext Result.failure(Exception(prepareErrorText(response.status.value, text)))
+                        try {
+                            connection?.disconnect()
+                        } catch (ignored: Exception) {}
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "prepareUpload: connection attempt to host $host failed: ${e.message}", e)
@@ -132,10 +129,10 @@ class LocalSendClient(
 
     /** 将 prepare-upload 的错误码映射为用户可读的中文提示。 */
     private fun prepareErrorText(code: Int, body: String): String = when (code) {
-        HttpStatusCode.Unauthorized.value -> "接收方要求输入正确的 PIN 码（401）"
-        HttpStatusCode.Conflict.value -> "对方正在处理其他传输会话，请稍后再试（409）"
-        HttpStatusCode.TooManyRequests.value -> "请求过于频繁，请稍后再试（429）"
-        else -> "对方拒绝了接收请求: $code ($body)"
+        HttpURLConnection.HTTP_UNAUTHORIZED -> "接收方要求输入正确的 PIN 码（401）"
+        HttpURLConnection.HTTP_CONFLICT -> "对方正在处理其他传输会话，请稍后再试（409）"
+        429 -> "请求过于频繁，请稍后再试（429）"
+        else -> "对方拒绝了接收请求: $code ($body)".trim()
     }
 
     suspend fun uploadFile(
@@ -325,15 +322,30 @@ class LocalSendClient(
     }
 
     suspend fun cancelUpload(targetDevice: Device, sessionId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        var connection: HttpURLConnection? = null
         try {
             val encodedSessionId = URLEncoder.encode(sessionId, "UTF-8")
             val url = "${targetDevice.url}/api/localsend/v2/cancel?sessionId=$encodedSessionId"
             Log.i(TAG, "cancelUpload: sending cancel for session $sessionId to $url")
             FingerprintTrust.pin(targetDevice.fingerprint)
             try {
-                httpClient.post(url)
+                connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                    if (this is HttpsURLConnection) {
+                        sslSocketFactory = FingerprintTrust.pinnedSslSocketFactory
+                        hostnameVerifier = SslHelper.trustAllHostnameVerifier
+                    }
+                    requestMethod = "POST"
+                    useCaches = false
+                    connectTimeout = 5000
+                    readTimeout = 5000
+                }
+                val code = connection.responseCode
+                Log.d(TAG, "cancelUpload: returned HTTP $code")
             } finally {
                 FingerprintTrust.unpin(targetDevice.fingerprint)
+                try {
+                    connection?.disconnect()
+                } catch (ignored: Exception) {}
             }
             Result.success(Unit)
         } catch (e: Exception) {

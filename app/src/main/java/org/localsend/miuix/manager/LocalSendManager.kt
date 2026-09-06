@@ -59,8 +59,11 @@ import org.localsend.miuix.network.SslHelper
 import org.localsend.miuix.network.TlsStore
 import org.localsend.miuix.notification.TransferNotifier
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.X509TrustManager
 
 data class AppInfoItem(
@@ -78,6 +81,7 @@ class LocalSendManager(private val context: Context) {
         instance = this
     }
 
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val fingerprint = UUID.randomUUID().toString()
 
@@ -496,30 +500,34 @@ class LocalSendManager(private val context: Context) {
         if (filesToSend.isEmpty()) return
         scope.launch(Dispatchers.IO) {
             var targetDevice: Device? = null
-            val rawHttpClient = HttpClient(CIO) {
-                engine {
-                    https {
-                        trustManager = SslHelper.trustAllCerts[0] as X509TrustManager
+            for (proto in listOf("https", "http")) {
+                var conn: HttpURLConnection? = null
+                try {
+                    val url = "$proto://$ip:$port/api/localsend/v2/info"
+                    conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                        if (this is HttpsURLConnection) {
+                            sslSocketFactory = SslHelper.sslSocketFactory
+                            hostnameVerifier = SslHelper.trustAllHostnameVerifier
+                        }
+                        requestMethod = "GET"
+                        useCaches = false
+                        connectTimeout = 3000
+                        readTimeout = 3000
+                        setRequestProperty("Accept", "application/json")
                     }
-                }
-                install(ContentNegotiation) {
-                    json(Json { ignoreUnknownKeys = true })
-                }
-            }
-            try {
-                for (proto in listOf("https", "http")) {
-                    try {
-                        val response = rawHttpClient.get("$proto://$ip:$port/api/localsend/v2/info")
-                        val dto = response.body<DeviceDto>()
+                    if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                        val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                        val dto = json.decodeFromString<DeviceDto>(body)
                         targetDevice = Device.fromDto(dto, ip)
                         if (targetDevice.protocol.equals("https", ignoreCase = true) && targetDevice.fingerprint.isNotBlank()) {
                             FingerprintTrust.trust(targetDevice.fingerprint)
                         }
                         break
-                    } catch (ignored: Exception) {}
+                    }
+                } catch (ignored: Exception) {
+                } finally {
+                    try { conn?.disconnect() } catch (ignored: Exception) {}
                 }
-            } finally {
-                rawHttpClient.close()
             }
 
             val finalDevice = targetDevice ?: Device(

@@ -32,7 +32,7 @@
 - 探测网段范围收敛：自动剔除蜂窝移动数据及虚拟隧道网卡，仅针对私有局域网网段进行探测，降低扫描超时与网络噪音。
 
 ### 修复
-- 修复批量多文件传输过程中偶发 connection reset by peer 的异常：上传请求参数严格执行 URL 编码，严格校验对端授予的上传令牌避免未授权请求引发对端重置连接，捕获对端 HTTP 状态码与详细错误信息，并在传输服务中引入 WakeLock 与 WifiLock 防御系统后台冻结。
+- 修复批量多文件传输过程中偶发 connection reset by peer 与握手失败的异常：将发送客户端握手（prepare-upload）及取消接口由 Ktor CIO 全面迁移至原生 HttpsURLConnection，彻底根除 Ktor CIO 纯 Kotlin TLS 引擎在 Android 平台出现的 Invalid TLS record type 116 与连接重置缺陷；上传参数严格执行 URL 编码，校验对端授予的上传令牌避免未授权请求引发对端重置连接，并在传输服务中引入 WakeLock 与 WifiLock 防御系统后台冻结。
 - 修复多文件传输过程频繁提示 Connection closed 的异常：优化 HTTP 客户端完整排空响应流以消除未读套接字引起的 TCP RST 重置，启用 HTTP Keep-Alive 连接池长连接复用，并增加针对瞬态连接异常的自动幂等重试机制。
 - 修复服务端单文件上传异常导致整批传输中断的问题：会话令牌仅在全部文件终态后释放，保障多文件并发传输与部分失败重试的容错能力。
 
