@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -264,7 +265,7 @@ private fun FileTransferCardContent(
     onToggleExpanded: () -> Unit,
     onCancel: () -> Unit
 ) {
-    var previewingFile by remember { mutableStateOf<FileItem?>(null) }
+    var previewInitialIndex by remember { mutableIntStateOf(-1) }
 
     // 1. 顶部状态栏（方向图标 + 对端别名 + 状态文本 + 取消按钮）
     Row(
@@ -340,7 +341,7 @@ private fun FileTransferCardContent(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
-                    .clickable { previewingFile = current }
+                    .clickable { previewInitialIndex = session.currentFileIndex.coerceIn(0, (session.files.size - 1).coerceAtLeast(0)) }
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -461,11 +462,11 @@ private fun FileTransferCardContent(
                     .padding(top = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                session.files.forEach { file ->
+                session.files.forEachIndexed { index, file ->
                     androidx.compose.runtime.key(file.id) {
                         FileDetailItem(
                             file = file,
-                            onClick = { previewingFile = file }
+                            onClick = { previewInitialIndex = index }
                         )
                     }
                 }
@@ -473,10 +474,11 @@ private fun FileTransferCardContent(
         }
     }
 
-    previewingFile?.let { file ->
+    if (previewInitialIndex >= 0 && previewInitialIndex < session.files.size) {
         FilePreviewDialog(
-            file = file,
-            onDismissRequest = { previewingFile = null }
+            files = session.files,
+            initialIndex = previewInitialIndex,
+            onDismissRequest = { previewInitialIndex = -1 }
         )
     }
 }
@@ -698,7 +700,7 @@ private fun InlineFileTransferProgress(
     onToggleExpanded: () -> Unit,
     onCancel: () -> Unit
 ) {
-    var previewingFile by remember { mutableStateOf<FileItem?>(null) }
+    var previewInitialIndex by remember { mutableIntStateOf(-1) }
 
     // 1. 状态行（状态描述 + 取消按钮）
     Row(
@@ -876,11 +878,11 @@ private fun InlineFileTransferProgress(
                     .padding(top = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                session.files.forEach { file ->
+                session.files.forEachIndexed { index, file ->
                     androidx.compose.runtime.key(file.id) {
                         FileDetailItem(
                             file = file,
-                            onClick = { previewingFile = file }
+                            onClick = { previewInitialIndex = index }
                         )
                     }
                 }
@@ -888,10 +890,11 @@ private fun InlineFileTransferProgress(
         }
     }
 
-    previewingFile?.let { file ->
+    if (previewInitialIndex >= 0 && previewInitialIndex < session.files.size) {
         FilePreviewDialog(
-            file = file,
-            onDismissRequest = { previewingFile = null }
+            files = session.files,
+            initialIndex = previewInitialIndex,
+            onDismissRequest = { previewInitialIndex = -1 }
         )
     }
 }

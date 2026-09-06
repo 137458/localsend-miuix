@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.util.ThumbnailHelper
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.FilePreviewDialog
 import org.localsend.miuix.ui.component.FileThumbnail
@@ -92,9 +94,25 @@ fun SendScreen(
         }
     }
     val totalSelectedSize = remember(selectedFiles) { selectedFiles.sumOf { it.size } }
+    val categoryBreakdown = remember(selectedFiles) {
+        val images = selectedFiles.count { ThumbnailHelper.isImage(it) }
+        val videos = selectedFiles.count { ThumbnailHelper.isVideo(it) }
+        val audios = selectedFiles.count { it.mimeType.startsWith("audio/") }
+        val texts = selectedFiles.count { it.isTextMessage }
+        val apks = selectedFiles.count { ThumbnailHelper.isApk(it) }
+        val others = selectedFiles.size - (images + videos + audios + texts + apks)
+        buildList {
+            if (images > 0) add("$images 张图片")
+            if (videos > 0) add("$videos 个视频")
+            if (audios > 0) add("$audios 首音频")
+            if (texts > 0) add("$texts 条文本")
+            if (apks > 0) add("$apks 个应用")
+            if (others > 0) add("$others 个文件")
+        }
+    }
 
     var isRefreshing by remember { mutableStateOf(false) }
-    var previewingFile by remember { mutableStateOf<FileItem?>(null) }
+    var previewingIndex by remember { mutableIntStateOf(-1) }
     val pullToRefreshState = rememberPullToRefreshState()
     val scrollBehavior = MiuixScrollBehavior()
 
@@ -204,11 +222,30 @@ fun SendScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "共 ${selectedFiles.size} 项 (${FileItem.formatFileSize(totalSelectedSize)})",
-                                        style = MiuixTheme.textStyles.headline1
-                                    )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "共 ${selectedFiles.size} 项 (${FileItem.formatFileSize(totalSelectedSize)})",
+                                            style = MiuixTheme.textStyles.headline1
+                                        )
+                                        if (categoryBreakdown.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = categoryBreakdown.joinToString(" · "),
+                                                style = MiuixTheme.textStyles.footnote1,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Button(
+                                            onClick = { previewingIndex = 0 },
+                                            colors = ButtonDefaults.buttonColors()
+                                        ) {
+                                            Text("预览")
+                                        }
                                         Button(
                                             onClick = onOpenAddSheet,
                                             colors = ButtonDefaults.buttonColorsPrimary()
@@ -228,13 +265,13 @@ fun SendScreen(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                selectedFiles.forEach { file ->
+                                selectedFiles.forEachIndexed { index, file ->
                                     androidx.compose.runtime.key(file.id) {
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .clickable { previewingFile = file }
+                                                .clickable { previewingIndex = index }
                                                 .padding(vertical = 6.dp, horizontal = 4.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
@@ -419,10 +456,14 @@ fun SendScreen(
         }
     }
 
-    previewingFile?.let { file ->
+    if (previewingIndex >= 0 && previewingIndex < selectedFiles.size) {
         FilePreviewDialog(
-            file = file,
-            onDismissRequest = { previewingFile = null }
+            files = selectedFiles,
+            initialIndex = previewingIndex,
+            onRemoveFile = { fileToRemove ->
+                manager.removeFile(fileToRemove.id)
+            },
+            onDismissRequest = { previewingIndex = -1 }
         )
     }
 }
