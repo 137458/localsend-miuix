@@ -12,16 +12,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import org.localsend.miuix.R
-import org.localsend.miuix.model.Device
-import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.ui.MainActivity
@@ -40,10 +31,6 @@ object TransferNotifier {
     const val NOTIF_ID_FOREGROUND_SERVICE = 1001
     private const val NOTIF_ID_RECEIVE_BASE = 2000
     private const val NOTIF_ID_SEND_BASE = 3000
-
-    const val TEST_SESSION_ID = "test-live-notification-session"
-    private var testJob: Job? = null
-    val isTestRunning = MutableStateFlow(false)
 
     @Volatile
     private var allowed = false
@@ -285,122 +272,5 @@ object TransferNotifier {
             .setOngoing(false)
             .setAutoCancel(true)
         nm.notify(notifId, builder.build())
-    }
-
-    /**
-     * 启动实时通知 / 流体云胶囊模拟传输测试。
-     * 在单机状态下模拟 20 秒持续传输（每秒步进 1 次），验证状态栏胶囊、锁屏卡片与通知栏 Live Updates 进度。
-     */
-    fun startTestSimulation(context: Context) {
-        if (isTestRunning.value) {
-            stopTestSimulation(context)
-            return
-        }
-        ensure(context)
-        val mockDevice = Device(
-            alias = "OnePlus Ace 3",
-            fingerprint = "test-fingerprint",
-            port = 53317,
-            protocol = "http",
-            ip = "192.168.1.88",
-            deviceModel = "Pixel / ColorOS"
-        )
-        val mockFiles = listOf(
-            FileItem(name = "nature_landscape_4k.jpg", size = 18 * 1024 * 1024),
-            FileItem(name = "presentation_demo.mp4", size = 72 * 1024 * 1024),
-            FileItem(name = "firmware_update.apk", size = 30 * 1024 * 1024)
-        )
-        val totalBytes = mockFiles.sumOf { it.size }
-        val testSession = TransferSession(
-            sessionId = TEST_SESSION_ID,
-            device = mockDevice,
-            isIncoming = false,
-            files = mockFiles,
-            totalBytes = totalBytes,
-            transferredBytes = 0L,
-            speed = 0L,
-            status = TransferStatus.InProgress
-        )
-
-        isTestRunning.value = true
-        testJob = CoroutineScope(Dispatchers.Default).launch {
-            try {
-                val totalSteps = 20
-                for (step in 1..totalSteps) {
-                    if (!isActive || !isTestRunning.value) break
-                    val currentProgress = step.toFloat() / totalSteps
-                    testSession.transferredBytes = (totalBytes * currentProgress).toLong()
-                    testSession.speed = (26L * 1024 * 1024) + ((step % 6) * 1024 * 1024)
-
-                    val file1Size = mockFiles[0].size
-                    val file2Size = mockFiles[1].size
-                    when {
-                        testSession.transferredBytes < file1Size -> {
-                            mockFiles[0].status = TransferStatus.InProgress
-                            mockFiles[0].bytesTransferred = testSession.transferredBytes
-                        }
-                        testSession.transferredBytes < file1Size + file2Size -> {
-                            mockFiles[0].status = TransferStatus.Completed
-                            mockFiles[0].bytesTransferred = file1Size
-                            mockFiles[1].status = TransferStatus.InProgress
-                            mockFiles[1].bytesTransferred = testSession.transferredBytes - file1Size
-                        }
-                        else -> {
-                            mockFiles[0].status = TransferStatus.Completed
-                            mockFiles[0].bytesTransferred = file1Size
-                            mockFiles[1].status = TransferStatus.Completed
-                            mockFiles[1].bytesTransferred = file2Size
-                            mockFiles[2].status = TransferStatus.InProgress
-                            mockFiles[2].bytesTransferred = testSession.transferredBytes - file1Size - file2Size
-                        }
-                    }
-
-                    updateProgress(context, testSession)
-                    delay(1000L)
-                }
-
-                if (isActive && isTestRunning.value) {
-                    mockFiles.forEach {
-                        it.status = TransferStatus.Completed
-                        it.bytesTransferred = it.size
-                    }
-                    testSession.transferredBytes = totalBytes
-                    testSession.status = TransferStatus.Completed
-                    notifyResult(context, testSession)
-                }
-            } catch (_: Exception) {
-            } finally {
-                isTestRunning.value = false
-                testJob = null
-            }
-        }
-    }
-
-    /**
-     * 终止实时通知模拟测试，撤销胶囊并发送取消提示。
-     */
-    fun stopTestSimulation(context: Context) {
-        val job = testJob
-        testJob = null
-        isTestRunning.value = false
-        job?.cancel()
-
-        val mockDevice = Device(
-            alias = "OnePlus Ace 3",
-            fingerprint = "test-fingerprint",
-            port = 53317,
-            protocol = "http",
-            ip = "192.168.1.88",
-            deviceModel = "Pixel / ColorOS"
-        )
-        val cancelSession = TransferSession(
-            sessionId = TEST_SESSION_ID,
-            device = mockDevice,
-            isIncoming = false,
-            files = emptyList(),
-            totalBytes = 0L,
-            status = TransferStatus.Canceled
-        )
-        notifyResult(context, cancelSession)
     }
 }

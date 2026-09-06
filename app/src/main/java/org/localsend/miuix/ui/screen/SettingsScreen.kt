@@ -1,6 +1,5 @@
 package org.localsend.miuix.ui.screen
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -50,7 +49,6 @@ fun SettingsScreen(
     var showPinDialog by remember { mutableStateOf(false) }
     var showCertDialog by remember { mutableStateOf(false) }
     var isNotificationEnabled by remember { mutableStateOf(TransferNotifier.isNotificationsEnabled(context)) }
-    val isTestRunning by TransferNotifier.isTestRunning.collectAsState()
 
     LifecycleResumeEffect(Unit) {
         isNotificationEnabled = TransferNotifier.isNotificationsEnabled(context)
@@ -152,22 +150,6 @@ fun SettingsScreen(
                                 activity.requestNecessaryPermissions()
                             } else {
                                 org.localsend.miuix.notification.TransferNotifier.openNotificationSettings(context)
-                            }
-                        }
-                    )
-                    ArrowPreference(
-                        title = if (isTestRunning) "停止实时通知测试" else "测试实时通知 / 胶囊",
-                        summary = if (isTestRunning) "正在模拟传输中 (约 20 秒)，点击立即停止" else "模拟 20 秒文件传输，立即在状态栏/锁屏检验 Live Updates 胶囊",
-                        onClick = {
-                            if (isTestRunning) {
-                                TransferNotifier.stopTestSimulation(context)
-                                Toast.makeText(context, "已停止实时通知测试", Toast.LENGTH_SHORT).show()
-                            } else {
-                                if (!isNotificationEnabled) {
-                                    Toast.makeText(context, "请先开启系统通知权限，以便查看测试效果", Toast.LENGTH_LONG).show()
-                                }
-                                TransferNotifier.startTestSimulation(context)
-                                Toast.makeText(context, "已启动模拟传输测试，请查看状态栏胶囊与通知中心", Toast.LENGTH_SHORT).show()
                             }
                         }
                     )

@@ -17,19 +17,12 @@ class TransferActionReceiver : BroadcastReceiver() {
         val sessionId = intent.getStringExtra(EXTRA_SESSION_ID)
 
         if (action == ACTION_CANCEL_TRANSFER && !sessionId.isNullOrEmpty()) {
-            if (sessionId == TransferNotifier.TEST_SESSION_ID) {
-                TransferNotifier.stopTestSimulation(context)
-            } else {
-                LocalSendManager.getInstance()?.cancelTransfer(sessionId)
-            }
-        } else if (action == ACTION_START_TEST) {
-            TransferNotifier.startTestSimulation(context)
+            LocalSendManager.getInstance()?.cancelTransfer(sessionId)
         }
     }
 
     companion object {
         const val ACTION_CANCEL_TRANSFER = "org.localsend.miuix.action.CANCEL_TRANSFER"
-        const val ACTION_START_TEST = "org.localsend.miuix.action.START_TEST"
         const val EXTRA_SESSION_ID = "extra_session_id"
     }
 }
