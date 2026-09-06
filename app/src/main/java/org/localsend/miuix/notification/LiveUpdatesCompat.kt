@@ -54,19 +54,28 @@ object LiveUpdatesCompat {
         val actionType = if (session.isIncoming) "接收中" else "发送中"
         val fileIndexInfo = if (session.files.size > 1) " (${session.currentFileIndex + 1}/${session.files.size})" else ""
 
-        // 胶囊收起态右侧：实时速度与剩余时间（例如：28M/s 3s）
-        val chipSpeedEta = formatChipSpeedEta(session)
+        // 展开态大标题：发送至 / 接收自 目标设备（简练纯粹，不折行）
+        val direction = if (session.isIncoming) "接收自" else "发送至"
+        val expandedTitle = "$direction ${session.device.alias}"
 
-        // 展开态大标题：正在接收 (1/3) · 目标设备
-        val fullActionType = if (session.isIncoming) "正在接收" else "正在发送"
-        val expandedTitle = "$fullActionType$fileIndexInfo · ${session.device.alias}"
-
-        // 展开态详细内容：45% · 54.2 MB / 120.5 MB · 28.5 MB/s · 剩余3秒
-        val contentText = "${session.progressPercent}% · ${session.formattedTransferredSize} / ${session.formattedTotalSize} · $speedText$etaPart"
-
-        // 展开态副标题：当前文件名或文本摘要
+        // 展开态核心内容：当前文件名 + 文件序号序号一体化（例如：presentation_demo.mp4 (2/3)）
         val currentFileName = session.currentFile?.name
-            ?: if (session.isTextMessage) "纯文本消息" else if (session.files.size > 1) "共 ${session.files.size} 个文件" else null
+            ?: if (session.isTextMessage) (session.singleTextMessageContent?.take(40) ?: "纯文本消息")
+            else if (session.files.size > 1) "共 ${session.files.size} 个文件"
+            else "文件传输"
+        val fileIndexStr = if (session.files.size > 1) " (${session.currentFileIndex + 1}/${session.files.size})" else ""
+        val contentText = "$currentFileName$fileIndexStr"
+
+        // 展开态辅助指标：紧贴进度条，展示数据量、速度与预计剩余时间（剔除多余冗余的百分比）
+        val sizeInfo = "${session.formattedTransferredSize} / ${session.formattedTotalSize}"
+        val metricsSubText = if (session.speed > 0) {
+            if (compactEta.isNotEmpty()) "$sizeInfo · $speedText · $compactEta" else "$sizeInfo · $speedText"
+        } else {
+            sizeInfo
+        }
+
+        // 胶囊收起态右侧：状态简字 + 实时速度与剩余时间（例如：发 28M/s 3s）
+        val chipSpeedEta = formatChipSpeedEta(session)
 
         val smallIconRes = if (session.isIncoming) R.drawable.ic_stat_receive else R.drawable.ic_stat_send
 
@@ -76,6 +85,7 @@ object LiveUpdatesCompat {
                 .setSmallIcon(smallIconRes)
                 .setContentTitle(expandedTitle)
                 .setContentText(contentText)
+                .setSubText(metricsSubText)
                 .setColor(0xFF00897B.toInt()) // LocalSend 经典 Teal 品牌主色
                 .setShowWhen(false)
                 .setOngoing(true)
@@ -96,10 +106,6 @@ object LiveUpdatesCompat {
 
             getLargeIcon(context)?.let {
                 nativeBuilder.setLargeIcon(android.graphics.drawable.Icon.createWithBitmap(it))
-            }
-
-            if (!currentFileName.isNullOrEmpty()) {
-                nativeBuilder.setSubText(currentFileName)
             }
 
             try {
@@ -130,6 +136,7 @@ object LiveUpdatesCompat {
             .setSmallIcon(smallIconRes)
             .setContentTitle(expandedTitle)
             .setContentText(contentText)
+            .setSubText(metricsSubText)
             .setColor(0xFF00897B.toInt())
             .setShowWhen(false)
             .setOngoing(true)
@@ -149,15 +156,11 @@ object LiveUpdatesCompat {
             builder.setLargeIcon(it)
         }
 
-        if (!currentFileName.isNullOrEmpty()) {
-            builder.setSubText(currentFileName)
-        }
-
         return builder.build()
     }
 
     /**
-     * 格式化胶囊芯片短文本：速度和剩余时间（控制在 8~10 字符内，适配状态栏芯片排版）。
+     * 格式化胶囊芯片短文本：状态简字 + 速度和剩余时间（控制在 8~10 字符内，适配状态栏芯片排版）。
      */
     fun formatChipSpeedEta(session: TransferSession): String {
         if (session.isTextMessage) return "文本"
@@ -183,7 +186,9 @@ object LiveUpdatesCompat {
             else -> "${etaSec / 3600L}h"
         }
 
-        return if (etaStr.isNotEmpty()) "$speedStr $etaStr" else speedStr
+        val prefix = if (session.isIncoming) "收 " else "发 "
+        val speedEta = if (etaStr.isNotEmpty()) "$speedStr $etaStr" else speedStr
+        return "$prefix$speedEta"
     }
 
     /**
@@ -197,13 +202,13 @@ object LiveUpdatesCompat {
         val seconds = remainingBytes / session.speed
         return when {
             seconds <= 0L -> "即将完成"
-            seconds < 60 -> "剩余${seconds}秒"
+            seconds < 60 -> "剩余 ${seconds} 秒"
             seconds < 3600 -> {
                 val min = seconds / 60
                 val sec = seconds % 60
-                if (sec == 0L) "剩余${min}分钟" else "剩余${min}分${sec}秒"
+                if (sec == 0L) "剩余 ${min} 分钟" else "剩余 ${min} 分 ${sec} 秒"
             }
-            else -> "剩余${seconds / 3600}小时"
+            else -> "剩余 ${seconds / 3600} 小时"
         }
     }
 

@@ -298,7 +298,7 @@ object TransferNotifier {
         }
         ensure(context)
         val mockDevice = Device(
-            alias = "测试设备 (Live Updates)",
+            alias = "OnePlus Ace 3",
             fingerprint = "test-fingerprint",
             port = 53317,
             protocol = "http",
@@ -386,7 +386,7 @@ object TransferNotifier {
         job?.cancel()
 
         val mockDevice = Device(
-            alias = "测试设备 (Live Updates)",
+            alias = "OnePlus Ace 3",
             fingerprint = "test-fingerprint",
             port = 53317,
             protocol = "http",

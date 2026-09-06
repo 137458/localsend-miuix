@@ -34,9 +34,14 @@ class LiveUpdatesCompatTest {
 
         val chipText = LiveUpdatesCompat.formatChipSpeedEta(session)
         // 50MB remaining at 25MB/s -> 2s ETA
+        assertTrue("Chip text should start with '发 ': $chipText", chipText.startsWith("发 "))
         assertTrue("Chip text should contain speed: $chipText", chipText.contains("25M/s") || chipText.contains("25"))
         assertTrue("Chip text should contain eta: $chipText", chipText.contains("2s"))
         assertTrue("Chip text should be compact (<= 12 chars): $chipText", chipText.length <= 12)
+
+        val incomingSession = session.copy(isIncoming = true)
+        val incomingChipText = LiveUpdatesCompat.formatChipSpeedEta(incomingSession)
+        assertTrue("Incoming chip text should start with '收 ': $incomingChipText", incomingChipText.startsWith("收 "))
     }
 
     @Test
