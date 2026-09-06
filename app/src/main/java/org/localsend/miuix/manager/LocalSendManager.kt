@@ -3,6 +3,7 @@ package org.localsend.miuix.manager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.util.Log
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -423,9 +424,20 @@ class LocalSendManager(private val context: Context) {
                     upsertDevice(activeDevice)
                 }
 
-                for (fileItem in filesToSend) {
-                    val token = fileTokens[fileItem.id] ?: fileItem.id
+                Log.i(TAG, "Starting transfer session $remoteSessionId to '${activeDevice.alias}' (${activeDevice.url}), ${filesToSend.size} files, ${fileTokens.size} tokens granted")
+
+                for ((index, fileItem) in filesToSend.withIndex()) {
+                    val token = fileTokens[fileItem.id]
+                    if (token == null) {
+                        Log.w(TAG, "File '${fileItem.name}' (id=${fileItem.id}) has no token from peer! Skipping upload.")
+                        fileItem.status = TransferStatus.Failed
+                        fileItem.error = "接收方未接受该文件（未授予上传令牌）"
+                        updateSessionState(session)
+                        continue
+                    }
+
                     fileItem.status = TransferStatus.InProgress
+                    Log.i(TAG, "Uploading [${index + 1}/${filesToSend.size}]: '${fileItem.name}' (${fileItem.size} bytes, id=${fileItem.id})")
 
                     val uploadResult = client.uploadFile(
                         targetDevice = activeDevice,
@@ -444,14 +456,21 @@ class LocalSendManager(private val context: Context) {
                     }
 
                     if (uploadResult.isSuccess) {
+                        Log.i(TAG, "File [${index + 1}/${filesToSend.size}] completed: '${fileItem.name}'")
                         fileItem.status = TransferStatus.Completed
                         fileItem.progress = 1f
                         fileItem.bytesTransferred = fileItem.size
                     } else {
+                        val errMsg = uploadResult.exceptionOrNull()?.message ?: "Upload failed"
+                        Log.e(TAG, "File [${index + 1}/${filesToSend.size}] failed: '${fileItem.name}', error: $errMsg")
                         fileItem.status = TransferStatus.Failed
-                        fileItem.error = uploadResult.exceptionOrNull()?.message ?: "Upload failed"
+                        fileItem.error = errMsg
                     }
                     updateSessionState(session)
+
+                    if (index < filesToSend.size - 1) {
+                        delay(30)
+                    }
                 }
 
                 val failedCount = filesToSend.count { it.status == TransferStatus.Failed }
@@ -906,6 +925,8 @@ class LocalSendManager(private val context: Context) {
     }
 
     companion object {
+        private const val TAG = "LocalSendTransfer"
+
         @Volatile
         private var instance: LocalSendManager? = null
 
