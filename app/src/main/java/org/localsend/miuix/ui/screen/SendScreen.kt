@@ -1,12 +1,14 @@
 package org.localsend.miuix.ui.screen
 
 import android.widget.Toast
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,6 +26,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TextFields
@@ -113,6 +117,7 @@ fun SendScreen(
 
     var isRefreshing by remember { mutableStateOf(false) }
     var previewingIndex by remember { mutableIntStateOf(-1) }
+    var isFileListExpanded by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
     val scrollBehavior = MiuixScrollBehavior()
 
@@ -216,7 +221,11 @@ fun SendScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         SmallTitle(text = "待发送内容 (${selectedFiles.size})")
                         Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(16.dp)) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .animateContentSize()
+                            ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -242,21 +251,22 @@ fun SendScreen(
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Button(
                                             onClick = { previewingIndex = 0 },
-                                            colors = ButtonDefaults.buttonColors()
+                                            colors = ButtonDefaults.buttonColors(),
+                                            modifier = Modifier.defaultMinSize(minWidth = 56.dp)
                                         ) {
                                             Text("预览")
                                         }
                                         Button(
                                             onClick = onOpenAddSheet,
-                                            colors = ButtonDefaults.buttonColorsPrimary()
+                                            colors = ButtonDefaults.buttonColors(),
+                                            modifier = Modifier.defaultMinSize(minWidth = 56.dp)
                                         ) {
-                                            Icon(imageVector = Icons.Default.Add, contentDescription = null)
-                                            Spacer(modifier = Modifier.width(4.dp))
                                             Text("添加")
                                         }
                                         Button(
                                             onClick = { manager.clearFiles() },
-                                            colors = ButtonDefaults.buttonColors()
+                                            colors = ButtonDefaults.buttonColors(),
+                                            modifier = Modifier.defaultMinSize(minWidth = 56.dp)
                                         ) {
                                             Text("清空")
                                         }
@@ -265,13 +275,20 @@ fun SendScreen(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                selectedFiles.forEachIndexed { index, file ->
+                                val filesToDisplay = if (selectedFiles.size > 3 && !isFileListExpanded) {
+                                    selectedFiles.take(3)
+                                } else {
+                                    selectedFiles
+                                }
+
+                                filesToDisplay.forEach { file ->
                                     androidx.compose.runtime.key(file.id) {
+                                        val actualIndex = selectedFiles.indexOfFirst { it.id == file.id }.coerceAtLeast(0)
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .clickable { previewingIndex = index }
+                                                .clickable { previewingIndex = actualIndex }
                                                 .padding(vertical = 6.dp, horizontal = 4.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
@@ -310,6 +327,32 @@ fun SendScreen(
                                                 )
                                             }
                                         }
+                                    }
+                                }
+
+                                if (selectedFiles.size > 3) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { isFileListExpanded = !isFileListExpanded }
+                                            .padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = if (isFileListExpanded) "收起待发送列表" else "展开其余 ${selectedFiles.size - 3} 项文件",
+                                            style = MiuixTheme.textStyles.footnote1,
+                                            color = if (isFileListExpanded) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            imageVector = if (isFileListExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                            contentDescription = if (isFileListExpanded) "收起" else "展开",
+                                            tint = if (isFileListExpanded) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                     }
                                 }
                             }

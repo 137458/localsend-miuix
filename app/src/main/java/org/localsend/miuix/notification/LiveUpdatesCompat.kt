@@ -51,14 +51,16 @@ object LiveUpdatesCompat {
         val compactEta = formatCompactEta(session)
         val etaPart = if (compactEta.isNotEmpty()) " · $compactEta" else ""
 
-        val actionType = if (session.isIncoming) "正在接收" else "正在发送"
+        val actionType = if (session.isIncoming) "接收中" else "发送中"
         val fileIndexInfo = if (session.files.size > 1) " (${session.currentFileIndex + 1}/${session.files.size})" else ""
 
-        // 胶囊收起态左侧：状态与进度（例如：正在发送 45% 或 传输完成）
+        // 胶囊收起态左侧：状态与进度（例如：发送中 45% 或 接收完成）
         val capsuleLeftStatus = if (session.isTextMessage) {
             actionType
         } else if (session.status == org.localsend.miuix.model.TransferStatus.Completed) {
-            "传输完成"
+            if (session.isIncoming) "接收完成" else "发送完成"
+        } else if (session.status == org.localsend.miuix.model.TransferStatus.WaitingApproval) {
+            "等待确认"
         } else {
             "$actionType ${session.progressPercent}%"
         }
@@ -77,7 +79,8 @@ object LiveUpdatesCompat {
         }
 
         // 展开态大标题：正在接收 (1/3) · 目标设备
-        val expandedTitle = "$actionType$fileIndexInfo · ${session.device.alias}"
+        val fullActionType = if (session.isIncoming) "正在接收" else "正在发送"
+        val expandedTitle = "$fullActionType$fileIndexInfo · ${session.device.alias}"
 
         // 展开态详细内容：45% · 54.2 MB / 120.5 MB · 28.5 MB/s · 剩余3秒
         val contentText = "${session.progressPercent}% · ${session.formattedTransferredSize} / ${session.formattedTotalSize} · $speedText$etaPart"
@@ -139,7 +142,7 @@ object LiveUpdatesCompat {
             builder.setProgress(100, session.progressPercent, session.totalBytes <= 0)
         }
 
-        // 注入 ColorOS / OxygenOS 泛在服务流体云专有参数与底层 Android 16 Promoted Extra
+        // 注入 ColorOS / OxygenOS 泛在服务流体云专有参数、小米 HyperOS 焦点通知与原生 Android 16 Promoted Extra
         val extras = Bundle().apply {
             // Android 16 显式标记
             putBoolean("android.requestPromotedOngoing", true)
@@ -148,11 +151,11 @@ object LiveUpdatesCompat {
             putBoolean("android.progressIndeterminate", session.totalBytes <= 0)
 
             // ColorOS 泛在服务 / 流体云胶囊核心参数 (Pantanal / Aqua Dynamics)
-            // 左边显示状态（例如：正在发送 45%），右边显示速度和剩余时间（例如：28.5 MB/s · 剩余3秒）
+            // 左边显示状态（例如：发送中 45%），右边显示速度和剩余时间（例如：28.5 MB/s · 剩余3秒）
             putString("oplus.view.type", "capsule")
             putBoolean("oplus.capsule.enable", true)
 
-            // 1. ColorOS 胶囊左右两侧标准规范字段（leftText / rightText）
+            // 1. ColorOS 胶囊左右两侧标准规范字段（leftText / rightText 双文本模式，不传 leftImg 避免覆盖状态文本）
             putString("oplus.capsule.leftText", capsuleLeftStatus)
             putString("oplus.capsule.rightText", capsuleRightSpeedEta)
             putString("oplus.capsule.left_text", capsuleLeftStatus)
@@ -162,10 +165,6 @@ object LiveUpdatesCompat {
             putString("oplus.capsule.status", if (session.progressPercent >= 100) "finished" else "running")
             putString("oplus.capsule.legacyText", "$capsuleLeftStatus · $capsuleRightSpeedEta")
             putString("oplus.capsule.legacy_text", "$capsuleLeftStatus · $capsuleRightSpeedEta")
-
-            // 抑制左侧强制默认图标，优先显示 leftText 状态文本
-            putString("oplus.capsule.leftImg", "")
-            putString("oplus.capsule.left_img", "")
 
             // 展开态卡片内容
             putString("oplus.capsule.ext_title", expandedTitle)
@@ -179,8 +178,6 @@ object LiveUpdatesCompat {
             putString("capsule_left_text", capsuleLeftStatus)
             putString("capsule_right_text", capsuleRightSpeedEta)
             putString("legacyText", "$capsuleLeftStatus · $capsuleRightSpeedEta")
-            putString("leftImg", "")
-            putString("left_img", "")
 
             // 3. 嵌套子 Bundle 结构兼容（针对 getBundle("oplus.capsule") 或 getBundle("capsule")）
             val capsuleSubBundle = Bundle().apply {
@@ -194,8 +191,6 @@ object LiveUpdatesCompat {
                 putString("ext_content", contentText)
                 putString("status", if (session.progressPercent >= 100) "finished" else "running")
                 putString("legacyText", "$capsuleLeftStatus · $capsuleRightSpeedEta")
-                putString("leftImg", "")
-                putString("left_img", "")
             }
             putBundle("oplus.capsule", capsuleSubBundle)
             putBundle("capsule", capsuleSubBundle)
@@ -214,6 +209,25 @@ object LiveUpdatesCompat {
             putString("intelligentIntent", intentJson)
             putString("android.substName", "LocalSend")
             putString("intelligent_intent_type", "local_transfer")
+
+            // 5. 小米 HyperOS 焦点通知 / 超级岛协议扩展参数
+            val safeTitle = expandedTitle.replace("\"", "\\\"")
+            val safeContent = contentText.replace("\"", "\\\"")
+            val safeLeft = capsuleLeftStatus.replace("\"", "\\\"")
+            val safeRight = capsuleRightSpeedEta.replace("\"", "\\\"")
+            val focusJson = """
+                {
+                    "param_v2": {
+                        "title": "$safeTitle",
+                        "content": "$safeContent",
+                        "sub_title": "$safeLeft",
+                        "summary": "$safeRight",
+                        "ticker": "$safeLeft · $safeRight"
+                    }
+                }
+            """.trimIndent()
+            putString("miui.focus.param", focusJson)
+            putBoolean("miui.focus.enable", true)
         }
         builder.addExtras(extras)
 
@@ -236,7 +250,8 @@ object LiveUpdatesCompat {
         content: String,
         isFinished: Boolean
     ): String {
-        val actionStatus = if (isFinished) 2 else 1
+        val intentAction = if (isFinished) 2 else 1
+        val timestamp = System.currentTimeMillis()
         val safeLeftText = leftText.replace("\"", "\\\"")
         val safeRightText = rightText.replace("\"", "\\\"")
         val safeTitle = title.replace("\"", "\\\"")
@@ -247,12 +262,13 @@ object LiveUpdatesCompat {
             {
                 "intentName": "local_transfer",
                 "identifier": "$sessionId",
-                "actionStatus": $actionStatus,
+                "intentAction": $intentAction,
+                "timestamp": $timestamp,
                 "serviceId": {
                     "fluidCloud": "transfer"
                 },
                 "intentEntity": {
-                    "entityName": "TRANSFER",
+                    "entityName": "SERVICE",
                     "entityId": "$sessionId",
                     "capsule": {
                         "leftText": "$safeLeftText",
