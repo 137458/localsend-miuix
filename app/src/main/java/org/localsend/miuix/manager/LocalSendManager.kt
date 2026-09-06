@@ -79,6 +79,7 @@ class LocalSendManager(private val context: Context) {
 
     init {
         instance = this
+        TlsStore.init(context)
     }
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
@@ -293,8 +294,8 @@ class LocalSendManager(private val context: Context) {
             version = "2.1",
             deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
             deviceType = _settings.value.deviceType,
-            // HTTPS 模式下指纹 = 自签名证书的 SHA-256 哈希（协议 §2），否则用稳定的随机 UUID
-            fingerprint = if (useHttps) TlsStore.fingerprint(context) else fingerprint,
+            // 始终与本机自签名证书 SHA-256 指纹保持一致（协议 §2），确保作为客户端连接 HTTPS 对端时证书与 DTO 指纹完全匹配
+            fingerprint = TlsStore.fingerprint(context),
             port = server.getBoundPort(),
             protocol = if (useHttps) "https" else "http",
             // Web Share 启用时按协议 §2 announce download=true；否则沿用设置

@@ -24,15 +24,41 @@ object SslHelper {
         }
     )
 
-    val sslContext: SSLContext by lazy {
-        SSLContext.getInstance("TLS").apply {
-            init(null, trustAllCerts, SecureRandom())
-        }
+    @Volatile
+    private var customSslContext: SSLContext? = null
+    @Volatile
+    private var customSslSocketFactory: SSLSocketFactory? = null
+
+    @Synchronized
+    fun resetSslContext() {
+        customSslContext = null
+        customSslSocketFactory = null
     }
 
-    val sslSocketFactory: SSLSocketFactory by lazy {
-        sslContext.socketFactory
-    }
+    val sslContext: SSLContext
+        get() {
+            customSslContext?.let { return it }
+            synchronized(this) {
+                customSslContext?.let { return it }
+                val km = try { TlsStore.getKeyManagers() } catch (e: Exception) { null }
+                val sc = SSLContext.getInstance("TLS").apply {
+                    init(km, trustAllCerts, SecureRandom())
+                }
+                customSslContext = sc
+                return sc
+            }
+        }
+
+    val sslSocketFactory: SSLSocketFactory
+        get() {
+            customSslSocketFactory?.let { return it }
+            synchronized(this) {
+                customSslSocketFactory?.let { return it }
+                val factory = sslContext.socketFactory
+                customSslSocketFactory = factory
+                return factory
+            }
+        }
 
     val trustAllHostnameVerifier: HostnameVerifier = HostnameVerifier { _, _ -> true }
 
@@ -54,11 +80,23 @@ object SslHelper {
  * 与其声明一致，杜绝中间人。
  *
  * 采用归一化（去除冒号/空格并转小写）与引用计数管理，防止多请求或多文件传输时发生 unpin 竞态。
+ * 同时配置 LocalSend 自签名客户端证书（mTLS），使目标端在请求客户端证书（CertificateRequest）时能正常接收并完成握手。
  */
 object FingerprintTrust {
 
     private val pinCounts = ConcurrentHashMap<String, AtomicInteger>()
     private val trustedSet = ConcurrentHashMap.newKeySet<String>()
+
+    @Volatile
+    private var customPinnedSslContext: SSLContext? = null
+    @Volatile
+    private var customPinnedSslSocketFactory: SSLSocketFactory? = null
+
+    @Synchronized
+    fun resetSslContext() {
+        customPinnedSslContext = null
+        customPinnedSslSocketFactory = null
+    }
 
     fun normalize(fp: String): String =
         fp.replace(":", "").replace(" ", "").lowercase(Locale.ROOT).trim()
@@ -87,15 +125,30 @@ object FingerprintTrust {
         override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
     }
 
-    val pinnedSslContext: SSLContext by lazy {
-        SSLContext.getInstance("TLS").apply {
-            init(null, arrayOf<TrustManager>(trustManager), SecureRandom())
+    val pinnedSslContext: SSLContext
+        get() {
+            customPinnedSslContext?.let { return it }
+            synchronized(this) {
+                customPinnedSslContext?.let { return it }
+                val km = try { TlsStore.getKeyManagers() } catch (e: Exception) { null }
+                val sc = SSLContext.getInstance("TLS").apply {
+                    init(km, arrayOf<TrustManager>(trustManager), SecureRandom())
+                }
+                customPinnedSslContext = sc
+                return sc
+            }
         }
-    }
 
-    val pinnedSslSocketFactory: SSLSocketFactory by lazy {
-        pinnedSslContext.socketFactory
-    }
+    val pinnedSslSocketFactory: SSLSocketFactory
+        get() {
+            customPinnedSslSocketFactory?.let { return it }
+            synchronized(this) {
+                customPinnedSslSocketFactory?.let { return it }
+                val factory = pinnedSslContext.socketFactory
+                customPinnedSslSocketFactory = factory
+                return factory
+            }
+        }
 
     /** 登记对端证书指纹（引用计数 +1），使指向该服务的 TLS 连接通过校验。 */
     fun pin(fingerprint: String) {
