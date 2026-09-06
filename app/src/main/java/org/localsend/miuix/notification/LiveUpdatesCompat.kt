@@ -54,11 +54,21 @@ object LiveUpdatesCompat {
         val actionType = if (session.isIncoming) "正在接收" else "正在发送"
         val fileIndexInfo = if (session.files.size > 1) " (${session.currentFileIndex + 1}/${session.files.size})" else ""
 
-        // 胶囊收起态左侧：状态与进度（例如：正在发送 45%）
-        val capsuleLeftStatus = "$actionType ${session.progressPercent}%"
+        // 胶囊收起态左侧：状态与进度（例如：正在发送 45% 或 传输完成）
+        val capsuleLeftStatus = if (session.isTextMessage) {
+            actionType
+        } else if (session.status == org.localsend.miuix.model.TransferStatus.Completed) {
+            "传输完成"
+        } else {
+            "$actionType ${session.progressPercent}%"
+        }
 
         // 胶囊收起态右侧：实时速度与剩余时间（例如：28.5 MB/s · 剩余3秒）
-        val capsuleRightSpeedEta = if (compactEta.isNotEmpty() && compactEta != "即将完成") {
+        val capsuleRightSpeedEta = if (session.isTextMessage) {
+            "纯文本"
+        } else if (session.status == org.localsend.miuix.model.TransferStatus.Completed) {
+            "传输完毕"
+        } else if (compactEta.isNotEmpty() && compactEta != "即将完成") {
             "$speedText · $compactEta"
         } else if (compactEta == "即将完成") {
             "$speedText · 即将完成"
@@ -79,8 +89,10 @@ object LiveUpdatesCompat {
         // 状态栏胶囊与芯片文案（兼顾原生 Android 16 与 ColorOS）
         val chipText = "$capsuleLeftStatus · $capsuleRightSpeedEta"
 
+        val smallIconRes = if (session.isIncoming) R.drawable.ic_stat_receive else R.drawable.ic_stat_send
+
         val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_stat_receive)
+            .setSmallIcon(smallIconRes)
             .setContentTitle(expandedTitle)
             .setContentText(contentText)
             .setColor(0xFF00897B.toInt()) // LocalSend 经典 Teal 品牌主色
@@ -135,15 +147,71 @@ object LiveUpdatesCompat {
             putInt("android.progressMax", 100)
             putBoolean("android.progressIndeterminate", session.totalBytes <= 0)
 
-            // ColorOS 泛在服务 / 流体云胶囊核心参数
+            // ColorOS 泛在服务 / 流体云胶囊核心参数 (Pantanal / Aqua Dynamics)
             // 左边显示状态（例如：正在发送 45%），右边显示速度和剩余时间（例如：28.5 MB/s · 剩余3秒）
             putString("oplus.view.type", "capsule")
             putBoolean("oplus.capsule.enable", true)
+
+            // 1. ColorOS 胶囊左右两侧标准规范字段（leftText / rightText）
+            putString("oplus.capsule.leftText", capsuleLeftStatus)
+            putString("oplus.capsule.rightText", capsuleRightSpeedEta)
+            putString("oplus.capsule.left_text", capsuleLeftStatus)
+            putString("oplus.capsule.right_text", capsuleRightSpeedEta)
             putString("oplus.capsule.title", capsuleLeftStatus)
             putString("oplus.capsule.content", capsuleRightSpeedEta)
+            putString("oplus.capsule.status", if (session.progressPercent >= 100) "finished" else "running")
+            putString("oplus.capsule.legacyText", "$capsuleLeftStatus · $capsuleRightSpeedEta")
+            putString("oplus.capsule.legacy_text", "$capsuleLeftStatus · $capsuleRightSpeedEta")
+
+            // 抑制左侧强制默认图标，优先显示 leftText 状态文本
+            putString("oplus.capsule.leftImg", "")
+            putString("oplus.capsule.left_img", "")
+
+            // 展开态卡片内容
             putString("oplus.capsule.ext_title", expandedTitle)
             putString("oplus.capsule.ext_content", contentText)
-            putString("oplus.capsule.status", if (session.progressPercent >= 100) "finished" else "running")
+
+            // 2. 顶层扁平化兼容字段（部分 ColorOS / 系统框架直接在 extras 顶层索引）
+            putString("leftText", capsuleLeftStatus)
+            putString("rightText", capsuleRightSpeedEta)
+            putString("left_text", capsuleLeftStatus)
+            putString("right_text", capsuleRightSpeedEta)
+            putString("capsule_left_text", capsuleLeftStatus)
+            putString("capsule_right_text", capsuleRightSpeedEta)
+            putString("legacyText", "$capsuleLeftStatus · $capsuleRightSpeedEta")
+            putString("leftImg", "")
+            putString("left_img", "")
+
+            // 3. 嵌套子 Bundle 结构兼容（针对 getBundle("oplus.capsule") 或 getBundle("capsule")）
+            val capsuleSubBundle = Bundle().apply {
+                putString("leftText", capsuleLeftStatus)
+                putString("rightText", capsuleRightSpeedEta)
+                putString("left_text", capsuleLeftStatus)
+                putString("right_text", capsuleRightSpeedEta)
+                putString("title", capsuleLeftStatus)
+                putString("content", capsuleRightSpeedEta)
+                putString("ext_title", expandedTitle)
+                putString("ext_content", contentText)
+                putString("status", if (session.progressPercent >= 100) "finished" else "running")
+                putString("legacyText", "$capsuleLeftStatus · $capsuleRightSpeedEta")
+                putString("leftImg", "")
+                putString("left_img", "")
+            }
+            putBundle("oplus.capsule", capsuleSubBundle)
+            putBundle("capsule", capsuleSubBundle)
+
+            // 4. OPPO 泛在服务意图共享 JSON 数据结构（IntelligentIntent / androidOppoIntelligentIntent）
+            val intentJson = buildIntelligentIntentJson(
+                sessionId = session.sessionId,
+                leftText = capsuleLeftStatus,
+                rightText = capsuleRightSpeedEta,
+                title = expandedTitle,
+                content = contentText,
+                isFinished = session.progressPercent >= 100
+            )
+            putString("androidOppoIntelligentIntent", intentJson)
+            putString("intelligent_intent", intentJson)
+            putString("intelligentIntent", intentJson)
             putString("android.substName", "LocalSend")
             putString("intelligent_intent_type", "local_transfer")
         }
@@ -158,6 +226,49 @@ object LiveUpdatesCompat {
     }
 
     /**
+     * 构建 OPPO / ColorOS 泛在服务流体云 IntelligentIntent 意图共享 JSON。
+     */
+    private fun buildIntelligentIntentJson(
+        sessionId: String,
+        leftText: String,
+        rightText: String,
+        title: String,
+        content: String,
+        isFinished: Boolean
+    ): String {
+        val actionStatus = if (isFinished) 2 else 1
+        val safeLeftText = leftText.replace("\"", "\\\"")
+        val safeRightText = rightText.replace("\"", "\\\"")
+        val safeTitle = title.replace("\"", "\\\"")
+        val safeContent = content.replace("\"", "\\\"")
+        val combinedText = "$safeLeftText · $safeRightText"
+
+        return """
+            {
+                "intentName": "local_transfer",
+                "identifier": "$sessionId",
+                "actionStatus": $actionStatus,
+                "serviceId": {
+                    "fluidCloud": "transfer"
+                },
+                "intentEntity": {
+                    "entityName": "TRANSFER",
+                    "entityId": "$sessionId",
+                    "capsule": {
+                        "leftText": "$safeLeftText",
+                        "rightText": "$safeRightText"
+                    },
+                    "legacyText": "$combinedText",
+                    "primary": {
+                        "title": "$safeTitle",
+                        "content": "$safeContent"
+                    }
+                }
+            }
+        """.trimIndent()
+    }
+
+    /**
      * 计算紧凑且直观的剩余时间文本（针对胶囊态排版优化）。
      */
     private fun formatCompactEta(session: TransferSession): String {
@@ -167,8 +278,13 @@ object LiveUpdatesCompat {
         if (remainingBytes == 0L) return "即将完成"
         val seconds = remainingBytes / session.speed
         return when {
+            seconds <= 0L -> "即将完成"
             seconds < 60 -> "剩余${seconds}秒"
-            seconds < 3600 -> "剩余${seconds / 60}分${seconds % 60}秒"
+            seconds < 3600 -> {
+                val min = seconds / 60
+                val sec = seconds % 60
+                if (sec == 0L) "剩余${min}分钟" else "剩余${min}分${sec}秒"
+            }
             else -> "剩余${seconds / 3600}小时"
         }
     }

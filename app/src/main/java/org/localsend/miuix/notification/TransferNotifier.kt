@@ -275,10 +275,11 @@ object TransferNotifier {
             }
             else -> return
         }
+        val resultIcon = if (session.isIncoming) R.drawable.ic_stat_receive else R.drawable.ic_stat_send
         val builder = NotificationCompat.Builder(context, channel)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(R.drawable.ic_stat_receive)
+            .setSmallIcon(resultIcon)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(appPendingIntent(context))
             .setOngoing(false)

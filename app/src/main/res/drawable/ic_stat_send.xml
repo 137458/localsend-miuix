@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 向上箭头 + 底栏：发送文件语义，白色单色图标，用于状态栏通知 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,17a1,1 0,0 1,-1 -1V6.414l-3.293,3.293a1,1 0,0 1,-1.414 -1.414l5,-5a1,1 0,0 1,1.414 0l5,5a1,1 0,0 1,-1.414 1.414L13,6.414V16a1,1 0,0 1,-1 1zM5,20h14a1,1 0,0 1,0 2H5a1,1 0,0 1,0 -2z" />
+</vector>
