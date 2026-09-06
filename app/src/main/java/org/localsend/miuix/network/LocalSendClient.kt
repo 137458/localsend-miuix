@@ -14,6 +14,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.localsend.miuix.model.Device
@@ -129,11 +130,51 @@ class LocalSendClient(
         sessionId: String,
         fileItem: FileItem,
         token: String,
+        maxRetries: Int = 2,
         onProgress: (bytesWritten: Long, speed: Long) -> Unit
     ): Result<Unit> = withContext(Dispatchers.IO) {
+        var lastError: Throwable? = null
+        for (attempt in 0..maxRetries) {
+            val result = uploadFileOnce(
+                targetDevice = targetDevice,
+                sessionId = sessionId,
+                fileItem = fileItem,
+                token = token,
+                onProgress = onProgress
+            )
+            if (result.isSuccess) {
+                return@withContext result
+            }
+            lastError = result.exceptionOrNull()
+            val msg = lastError?.message?.lowercase() ?: ""
+            val isTransientConnectionError = lastError is java.io.IOException ||
+                msg.contains("closed") ||
+                msg.contains("reset") ||
+                msg.contains("abort") ||
+                msg.contains("eof") ||
+                msg.contains("broken pipe")
+
+            if (attempt < maxRetries && isTransientConnectionError) {
+                onProgress(0L, 0L)
+                delay(150L * (attempt + 1))
+                continue
+            }
+            break
+        }
+        Result.failure(lastError ?: Exception("上传失败"))
+    }
+
+    private fun uploadFileOnce(
+        targetDevice: Device,
+        sessionId: String,
+        fileItem: FileItem,
+        token: String,
+        onProgress: (bytesWritten: Long, speed: Long) -> Unit
+    ): Result<Unit> {
         var inputStream: InputStream? = null
         var connection: HttpURLConnection? = null
-        try {
+        var isSucceeded = false
+        return try {
             inputStream = openSourceStream(fileItem)?.buffered(128 * 1024)
                 ?: throw IllegalStateException("Cannot open input stream for ${fileItem.name}")
 
@@ -150,14 +191,18 @@ class LocalSendClient(
                 doOutput = true
                 useCaches = false
                 instanceFollowRedirects = false
-                setChunkedStreamingMode(128 * 1024)
+                if (fileItem.size >= 0) {
+                    setFixedLengthStreamingMode(fileItem.size)
+                } else {
+                    setChunkedStreamingMode(128 * 1024)
+                }
                 connectTimeout = 15000
                 readTimeout = 120000
                 setRequestProperty("Content-Type", "application/octet-stream")
+                setRequestProperty("Connection", "keep-alive")
+                setRequestProperty("Keep-Alive", "timeout=60")
             }
 
-            // 注意：openConnection() 是惰性的，真正的 TLS 握手发生在获取 outputStream/读取响应时，
-            // 因此 fingerprint 的 pin 必须保持到整个上传结束，直到 finally 才 unpin。
             val outputStream: OutputStream = connection.outputStream.buffered(128 * 1024)
             val buffer = ByteArray(128 * 1024)
             var bytesWritten = 0L
@@ -189,13 +234,24 @@ class LocalSendClient(
 
             val responseCode = connection.responseCode
             if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+                // 关键优化：完整排空响应输入流，防止 TCP 缓冲区残留数据导致连接关闭时向对端发送 TCP RST
+                try {
+                    connection.inputStream?.use { stream ->
+                        val drainBuf = ByteArray(8192)
+                        while (stream.read(drainBuf) != -1) {}
+                    }
+                } catch (ignored: Exception) {}
                 onProgress(bytesWritten, 0L)
+                isSucceeded = true
                 Result.success(Unit)
             } else {
+                val errorBody = try {
+                    connection.errorStream?.bufferedReader()?.use { it.readText() }
+                } catch (ignored: Exception) { null }
                 val message = when (responseCode) {
                     HttpURLConnection.HTTP_FORBIDDEN -> "上传被拒绝：令牌或来源地址无效（403）"
                     422 -> "文件校验失败：SHA-256 不匹配（422）"
-                    else -> "上传失败: HTTP $responseCode"
+                    else -> "上传失败: HTTP $responseCode ${errorBody?.take(100) ?: ""}".trim()
                 }
                 Result.failure(Exception(message))
             }
@@ -206,9 +262,13 @@ class LocalSendClient(
             try {
                 inputStream?.close()
             } catch (ignored: Exception) {}
-            try {
-                connection?.disconnect()
-            } catch (ignored: Exception) {}
+            // 关键优化：若传输成功且响应流已排空，保持底层 TCP/TLS 长连接供后续文件直接复用，
+            // 避免频繁四次挥手/拆建链与并发冲突；仅在异常或失败时 disconnect 踢出坏连接。
+            if (!isSucceeded) {
+                try {
+                    connection?.disconnect()
+                } catch (ignored: Exception) {}
+            }
         }
     }
 

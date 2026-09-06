@@ -402,63 +402,73 @@ class LocalSendManager(private val context: Context) {
         syncForegroundServiceState(_activeSessions.value.size)
 
         scope.launch(Dispatchers.IO) {
-            val prepResult = client.prepareUpload(targetDevice, filesToSend)
-            if (prepResult.isFailure) {
-                session.status = TransferStatus.Failed
-                session.errorMessage = prepResult.exceptionOrNull()?.message ?: "Handshake failed"
-                _sessionMessage.value = "对方拒绝接收：${session.errorMessage}"
-                updateSessionState(session)
-                return@launch
-            }
-
-            val handshake = prepResult.getOrNull()!!
-            val responseDto = handshake.response
-            val activeDevice = handshake.activeDevice
-            val remoteSessionId = responseDto.sessionId
-            val fileTokens = responseDto.files
-
-            if (activeDevice.ip != targetDevice.ip) {
-                upsertDevice(activeDevice)
-            }
-
-            for (fileItem in filesToSend) {
-                val token = fileTokens[fileItem.id] ?: fileItem.id
-                fileItem.status = TransferStatus.InProgress
-
-                val uploadResult = client.uploadFile(
-                    targetDevice = activeDevice,
-                    sessionId = remoteSessionId,
-                    fileItem = fileItem,
-                    token = token
-                ) { bytesWritten, speed ->
-                    fileItem.bytesTransferred = bytesWritten
-                    fileItem.speed = speed
-                    if (fileItem.size > 0) {
-                        fileItem.progress = (bytesWritten.toFloat() / fileItem.size).coerceIn(0f, 1f)
-                    }
-                    session.transferredBytes = filesToSend.sumOf { it.bytesTransferred }
-                    session.speed = speed
-                    updateSessionState(session)
-                }
-
-                if (uploadResult.isSuccess) {
-                    fileItem.status = TransferStatus.Completed
-                    fileItem.progress = 1f
-                    fileItem.bytesTransferred = fileItem.size
-                } else {
-                    fileItem.status = TransferStatus.Failed
-                    fileItem.error = uploadResult.exceptionOrNull()?.message
+            FingerprintTrust.pin(targetDevice.fingerprint)
+            try {
+                val prepResult = client.prepareUpload(targetDevice, filesToSend)
+                if (prepResult.isFailure) {
                     session.status = TransferStatus.Failed
-                    session.errorMessage = fileItem.error
+                    session.errorMessage = prepResult.exceptionOrNull()?.message ?: "Handshake failed"
+                    _sessionMessage.value = "对方拒绝接收：${session.errorMessage}"
                     updateSessionState(session)
                     return@launch
                 }
-                updateSessionState(session)
-            }
 
-            session.status = TransferStatus.Completed
-            session.endTime = System.currentTimeMillis()
-            updateSessionState(session)
+                val handshake = prepResult.getOrNull()!!
+                val responseDto = handshake.response
+                val activeDevice = handshake.activeDevice
+                val remoteSessionId = responseDto.sessionId
+                val fileTokens = responseDto.files
+
+                if (activeDevice.ip != targetDevice.ip) {
+                    upsertDevice(activeDevice)
+                }
+
+                for (fileItem in filesToSend) {
+                    val token = fileTokens[fileItem.id] ?: fileItem.id
+                    fileItem.status = TransferStatus.InProgress
+
+                    val uploadResult = client.uploadFile(
+                        targetDevice = activeDevice,
+                        sessionId = remoteSessionId,
+                        fileItem = fileItem,
+                        token = token
+                    ) { bytesWritten, speed ->
+                        fileItem.bytesTransferred = bytesWritten
+                        fileItem.speed = speed
+                        if (fileItem.size > 0) {
+                            fileItem.progress = (bytesWritten.toFloat() / fileItem.size).coerceIn(0f, 1f)
+                        }
+                        session.transferredBytes = filesToSend.sumOf { it.bytesTransferred }
+                        session.speed = speed
+                        updateSessionState(session)
+                    }
+
+                    if (uploadResult.isSuccess) {
+                        fileItem.status = TransferStatus.Completed
+                        fileItem.progress = 1f
+                        fileItem.bytesTransferred = fileItem.size
+                    } else {
+                        fileItem.status = TransferStatus.Failed
+                        fileItem.error = uploadResult.exceptionOrNull()?.message ?: "Upload failed"
+                    }
+                    updateSessionState(session)
+                }
+
+                val failedCount = filesToSend.count { it.status == TransferStatus.Failed }
+                if (failedCount == filesToSend.size) {
+                    session.status = TransferStatus.Failed
+                    session.errorMessage = filesToSend.firstNotNullOfOrNull { it.error } ?: "所有文件传输失败"
+                } else if (failedCount > 0) {
+                    session.status = TransferStatus.Completed
+                    session.errorMessage = "部分文件传输失败 ($failedCount/${filesToSend.size})"
+                } else {
+                    session.status = TransferStatus.Completed
+                }
+                session.endTime = System.currentTimeMillis()
+                updateSessionState(session)
+            } finally {
+                FingerprintTrust.unpin(targetDevice.fingerprint)
+            }
         }
     }
 

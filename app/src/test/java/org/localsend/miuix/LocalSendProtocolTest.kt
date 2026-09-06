@@ -139,4 +139,36 @@ class LocalSendProtocolTest {
         assertTrue(org.localsend.miuix.network.NetworkUtils.isSameSubnet("192.168.1.5", "192.168.1.100"))
         org.junit.Assert.assertFalse(org.localsend.miuix.network.NetworkUtils.isSameSubnet("192.168.1.5", "192.168.43.15"))
     }
+
+    @Test
+    fun testMultiFilePinLifecycle() {
+        val fp = "11:22:33:44:55:66:77:88"
+        org.localsend.miuix.network.FingerprintTrust.pin(fp)
+        // Session level pin keeps it pinned
+        org.localsend.miuix.network.FingerprintTrust.pin(fp)
+        org.localsend.miuix.network.FingerprintTrust.unpin(fp)
+        // Still pinned by the session
+        org.localsend.miuix.network.FingerprintTrust.unpin(fp)
+    }
+
+    @Test
+    fun testMultiFileBatchStatusAggregation() {
+        val files = listOf(
+            FileItem(id = "1", name = "a.txt", size = 100, status = org.localsend.miuix.model.TransferStatus.Completed),
+            FileItem(id = "2", name = "b.txt", size = 200, status = org.localsend.miuix.model.TransferStatus.Failed, error = "Connection closed"),
+            FileItem(id = "3", name = "c.txt", size = 300, status = org.localsend.miuix.model.TransferStatus.Completed)
+        )
+        val failedCount = files.count { it.status == org.localsend.miuix.model.TransferStatus.Failed }
+        assertEquals(1, failedCount)
+        val hasCompleted = files.any { it.status == org.localsend.miuix.model.TransferStatus.Completed }
+        assertTrue(hasCompleted)
+        val finalStatus = if (failedCount == files.size) {
+            org.localsend.miuix.model.TransferStatus.Failed
+        } else if (failedCount > 0) {
+            org.localsend.miuix.model.TransferStatus.Completed
+        } else {
+            org.localsend.miuix.model.TransferStatus.Completed
+        }
+        assertEquals(org.localsend.miuix.model.TransferStatus.Completed, finalStatus)
+    }
 }

@@ -93,7 +93,7 @@ class LocalSendServer(
             val isStale = (now - session.startTime > 120_000L && session.transferredBytes == 0L) ||
                 (session.endTime?.let { now - it > 5_000L } ?: false)
             val isSameSenderReconnecting = incomingIp != null && session.device.ip == incomingIp &&
-                (session.status == TransferStatus.WaitingApproval || session.status == TransferStatus.Failed || now - session.startTime > 10_000L)
+                (session.status == TransferStatus.WaitingApproval || session.status == TransferStatus.Failed || (session.status != TransferStatus.InProgress && now - session.startTime > 10_000L))
 
             if (isTerminal || isStale || isSameSenderReconnecting) {
                 iterator.remove()
@@ -160,6 +160,8 @@ class LocalSendServer(
         } catch (ignored: Exception) {}
     }
 
+    private val allocatedMediaNames = ConcurrentHashMap.newKeySet<String>()
+
     /** 基于 MediaStore 公共下载目录的子目录列表生成不重复的文件名。 */
     private fun uniqueMediaName(name: String): String {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return name
@@ -179,12 +181,17 @@ class LocalSendServer(
                     }
                 }
         } catch (ignored: Exception) {}
-        if (name !in existing) return name
-        val base = name.substringBeforeLast('.', "").ifEmpty { name }
-        val ext = if (name.contains('.')) ".${name.substringAfterLast('.')}" else ""
-        var counter = 1
-        while ("$base ($counter)$ext" in existing) counter++
-        return "$base ($counter)$ext"
+        existing.addAll(allocatedMediaNames)
+        var result = name
+        if (result in existing) {
+            val base = name.substringBeforeLast('.', "").ifEmpty { name }
+            val ext = if (name.contains('.')) ".${name.substringAfterLast('.')}" else ""
+            var counter = 1
+            while ("$base ($counter)$ext" in existing) counter++
+            result = "$base ($counter)$ext"
+        }
+        allocatedMediaNames.add(result)
+        return result
     }
 
     private fun uniqueTreeName(name: String, existing: Set<String>): String {
@@ -210,6 +217,22 @@ class LocalSendServer(
                 }
             }
         } catch (ignored: Exception) {}
+    }
+
+    /** 检查会话内所有文件是否均已到达终态（成功/失败/取消），全部终结时才结算会话状态并释放令牌。 */
+    private fun checkSessionFinished(session: TransferSession, sessionId: String) {
+        val allTerminal = session.files.all {
+            it.status == TransferStatus.Completed ||
+            it.status == TransferStatus.Failed ||
+            it.status == TransferStatus.Canceled
+        }
+        if (allTerminal) {
+            val hasCompleted = session.files.any { it.status == TransferStatus.Completed }
+            session.status = if (hasCompleted) TransferStatus.Completed else TransferStatus.Failed
+            session.endTime = System.currentTimeMillis()
+            activeSessions.remove(sessionId)
+            sessionTokens.remove(sessionId)
+        }
     }
 
     @Volatile
@@ -347,6 +370,7 @@ class LocalSendServer(
             activeSessions.clear()
             sessionTokens.clear()
             requestHits.clear()
+            allocatedMediaNames.clear()
         }
     }
 
@@ -1420,7 +1444,7 @@ class LocalSendServer(
                                 textBuffer?.write(buffer, 0, read)
                                 digest?.update(buffer, 0, read)
                                 fileItem.bytesTransferred += read
-                                session.transferredBytes += read
+                                session.transferredBytes = session.files.sumOf { it.bytesTransferred }
                                 bytesSinceLast += read
 
                                 val now = System.currentTimeMillis()
@@ -1461,10 +1485,8 @@ class LocalSendServer(
                         deleteSavedFile(fileItem, saveTarget)
                         fileItem.status = TransferStatus.Failed
                         fileItem.progress = 0f
-                        session.status = TransferStatus.Failed
-                        session.endTime = System.currentTimeMillis()
-                        activeSessions.remove(sessionId)
-                        sessionTokens.remove(sessionId)
+                        fileItem.error = "CHECKSUM_MISMATCH"
+                        checkSessionFinished(session, sessionId)
                         onSessionUpdated(session)
                         call.respond(HttpStatusCode.UnprocessableEntity, "CHECKSUM_MISMATCH")
                         return@post
@@ -1474,25 +1496,18 @@ class LocalSendServer(
                     fileItem.progress = 1f
                     fileItem.bytesTransferred = fileItem.size
 
-                    // Check if all files in session completed
-                    if (session.files.all { it.status == TransferStatus.Completed }) {
-                        session.status = TransferStatus.Completed
-                        session.endTime = System.currentTimeMillis()
-                        activeSessions.remove(sessionId)
-                        sessionTokens.remove(sessionId)
-                    }
+                    checkSessionFinished(session, sessionId)
                     onSessionUpdated(session)
 
+                    call.response.header(HttpHeaders.Connection, "keep-alive")
                     call.respond(HttpStatusCode.OK, mapOf("message" to "File uploaded successfully"))
                 } catch (e: Throwable) {
                     e.printStackTrace()
                     deleteSavedFile(fileItem, saveTarget)
                     fileItem.status = TransferStatus.Failed
                     fileItem.progress = 0f
-                    session.status = TransferStatus.Failed
-                    session.endTime = System.currentTimeMillis()
-                    activeSessions.remove(sessionId)
-                    sessionTokens.remove(sessionId)
+                    fileItem.error = e.message ?: "Upload failed"
+                    checkSessionFinished(session, sessionId)
                     onSessionUpdated(session)
                     call.respond(HttpStatusCode.InternalServerError, mapOf("message" to (e.message ?: "Upload failed")))
                 }
