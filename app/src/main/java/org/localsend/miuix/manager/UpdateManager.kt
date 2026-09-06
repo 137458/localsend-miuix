@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -13,7 +14,9 @@ import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -144,15 +147,19 @@ class UpdateManager(private val context: Context) {
         downloadUrl: String,
         onProgress: (progress: Float, downloadedBytes: Long, totalBytes: Long) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
+        var apkFile: File? = null
         try {
             val cacheDir = context.externalCacheDir ?: context.cacheDir
-            val apkFile = File(cacheDir, "localsend-update.apk")
-            if (apkFile.exists()) apkFile.delete()
+            val targetFile = File(cacheDir, "localsend-update.apk")
+            apkFile = targetFile
+            if (targetFile.exists()) targetFile.delete()
 
             val url = URL(downloadUrl)
             val connection = url.openConnection() as HttpURLConnection
             connection.setRequestProperty("User-Agent", "LocalSend-Miuix-App")
             connection.instanceFollowRedirects = true
+            connection.connectTimeout = 15000
+            connection.readTimeout = 30000
             connection.connect()
 
             val totalBytes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -163,10 +170,11 @@ class UpdateManager(private val context: Context) {
             var downloadedBytes = 0L
 
             connection.inputStream.use { input ->
-                FileOutputStream(apkFile).use { output ->
+                FileOutputStream(targetFile).use { output ->
                     val buffer = ByteArray(64 * 1024)
                     var read: Int
                     while (input.read(buffer).also { read = it } != -1) {
+                        ensureActive()
                         output.write(buffer, 0, read)
                         downloadedBytes += read
                         val progress = if (totalBytes > 0) (downloadedBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
@@ -176,14 +184,28 @@ class UpdateManager(private val context: Context) {
                 }
             }
 
-            Result.success(apkFile)
+            Result.success(targetFile)
+        } catch (e: CancellationException) {
+            apkFile?.delete()
+            throw e
         } catch (e: Exception) {
+            apkFile?.delete()
             Result.failure(e)
         }
     }
 
     fun installApk(context: Context, apkFile: File) {
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!context.packageManager.canRequestPackageInstalls()) {
+                    val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(settingsIntent)
+                    return
+                }
+            }
             val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
             } else {
