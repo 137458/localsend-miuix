@@ -20,7 +20,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -55,7 +56,6 @@ android {
     }
 
     packaging {
-        // Netty 多个模块 jar 内都含相同 META-INF/INDEX.LIST，打包时丢弃，避免 java resource 冲突
         resources {
             excludes += setOf(
                 "META-INF/INDEX.LIST",
@@ -63,8 +63,15 @@ android {
                 "META-INF/DEPENDENCIES",
                 "META-INF/LICENSE",
                 "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
                 "META-INF/NOTICE",
-                "META-INF/NOTICE.txt"
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/*.version",
+                "META-INF/native-image/**",
+                "META-INF/services/reactor.blockhound.integration.BlockHoundIntegration",
+                "org/fusesource/jansi/**",
+                "org/bouncycastle/pqc/**"
             )
         }
     }
