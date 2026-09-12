@@ -32,7 +32,8 @@ class LocalSendClient(
 
     data class HandshakeResult(
         val response: PrepareUploadResponseDto,
-        val activeDevice: Device
+        val activeDevice: Device,
+        val completedImmediately: Boolean = false
     )
 
     suspend fun prepareUpload(
@@ -101,7 +102,17 @@ class LocalSendClient(
                             val responseBody = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                             val responseDto = json.decodeFromString<PrepareUploadResponseDto>(responseBody)
                             Log.i(TAG, "prepareUpload: handshake successful with $host, sessionId=${responseDto.sessionId}, granted tokens count=${responseDto.files.size}/${files.size}")
-                            return@withContext Result.success(HandshakeResult(responseDto, candidateDevice))
+                            return@withContext Result.success(HandshakeResult(responseDto, candidateDevice, completedImmediately = false))
+                        } else if (responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+                            // 协议 §4.1 / RFC 7231：204 No Content 表示对端完全接受请求且无需传输文件体（如纯文本消息在 preview 中已被接收方直接复制或消费）
+                            Log.i(TAG, "prepareUpload: handshake completed immediately with $host (HTTP 204 No Content, no file upload needed)")
+                            return@withContext Result.success(
+                                HandshakeResult(
+                                    response = PrepareUploadResponseDto(sessionId = "", files = emptyMap()),
+                                    activeDevice = candidateDevice,
+                                    completedImmediately = true
+                                )
+                            )
                         } else {
                             val errorBody = try {
                                 connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }

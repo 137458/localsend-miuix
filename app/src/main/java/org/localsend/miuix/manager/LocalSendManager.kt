@@ -429,11 +429,43 @@ class LocalSendManager(private val context: Context) {
                     upsertDevice(activeDevice)
                 }
 
+                val isAllTextMessage = filesToSend.all { it.isTextMessage }
+                // 1. 协议 §4.1 / 原版应用纯文本传输特性：
+                // 当对端响应 HTTP 204 No Content（完成，无需传输文件），说明接收方已在握手弹窗中直接复制/消费纯文本，无需上传二进制实体；
+                // 或当发送纯文本消息时，对端返回 HTTP 200 但未分配任何上传令牌（fileTokens 为空），同样表示纯文本已被接收方消费且免后续上传
+                if (handshake.completedImmediately || (isAllTextMessage && fileTokens.isEmpty())) {
+                    Log.i(TAG, "Transfer completed immediately without upload (completedImmediately=${handshake.completedImmediately}, isAllTextMessage=$isAllTextMessage)")
+                    filesToSend.forEach { fileItem ->
+                        fileItem.status = TransferStatus.Completed
+                        fileItem.progress = 1f
+                        fileItem.bytesTransferred = fileItem.size
+                    }
+                    session.transferredBytes = session.totalBytes
+                    session.speed = 0L
+                    session.status = TransferStatus.Completed
+                    session.errorMessage = null
+                    session.endTime = System.currentTimeMillis()
+                    updateSessionState(session)
+                    return@launch
+                }
+
                 Log.i(TAG, "Starting transfer session $remoteSessionId to '${activeDevice.alias}' (${activeDevice.url}), ${filesToSend.size} files, ${fileTokens.size} tokens granted")
 
                 for ((index, fileItem) in filesToSend.withIndex()) {
                     val token = fileTokens[fileItem.id]
                     if (token == null) {
+                        // 若该项为纯文本消息且其内容已在 prepare-upload 握手阶段通过 preview 完整提供，
+                        // 且对端未授予 upload token，表明接收方已在对话框中复制/消费该文本且无需上传二进制流
+                        if (fileItem.isTextMessage && !fileItem.textContent.isNullOrEmpty() && fileItem.textContent!!.length <= 2000) {
+                            Log.i(TAG, "Text message '${fileItem.name}' (id=${fileItem.id}) accepted via preview without upload token.")
+                            fileItem.status = TransferStatus.Completed
+                            fileItem.progress = 1f
+                            fileItem.bytesTransferred = fileItem.size
+                            session.transferredBytes = filesToSend.sumOf { it.bytesTransferred }
+                            updateSessionState(session)
+                            continue
+                        }
+
                         Log.w(TAG, "File '${fileItem.name}' (id=${fileItem.id}) has no token from peer! Skipping upload.")
                         fileItem.status = TransferStatus.Failed
                         fileItem.error = "接收方未接受该文件（未授予上传令牌）"
@@ -487,6 +519,7 @@ class LocalSendManager(private val context: Context) {
                     session.errorMessage = "部分文件传输失败 ($failedCount/${filesToSend.size})"
                 } else {
                     session.status = TransferStatus.Completed
+                    session.errorMessage = null
                 }
                 session.endTime = System.currentTimeMillis()
                 updateSessionState(session)

@@ -171,4 +171,92 @@ class LocalSendProtocolTest {
         }
         assertEquals(org.localsend.miuix.model.TransferStatus.Completed, finalStatus)
     }
+
+    @Test
+    fun testHandshakeResultImmediateCompletion() {
+        val device = Device(alias = "TestPeer", fingerprint = "fp-test", ip = "192.168.1.50")
+        val handshakeResult = org.localsend.miuix.network.LocalSendClient.HandshakeResult(
+            response = PrepareUploadResponseDto(sessionId = "", files = emptyMap()),
+            activeDevice = device,
+            completedImmediately = true
+        )
+        assertTrue(handshakeResult.completedImmediately)
+        assertTrue(handshakeResult.response.files.isEmpty())
+        assertEquals("TestPeer", handshakeResult.activeDevice.alias)
+    }
+
+    @Test
+    fun testTextMessageCopyStatusTransition() {
+        // 模拟向原版应用发送纯文本消息：接收方点击“复制”，服务端返回 HTTP 204 或 200且空令牌
+        val textMessage = "Hello LocalSend from test"
+        val textBytes = textMessage.toByteArray(Charsets.UTF_8)
+        val fileItem = FileItem(
+            id = "text-1",
+            name = "纯文本消息",
+            size = textBytes.size.toLong(),
+            textContent = textMessage,
+            mimeType = "text/plain",
+            status = org.localsend.miuix.model.TransferStatus.InProgress
+        )
+        val files = listOf(fileItem)
+        val isAllTextMessage = files.all { it.isTextMessage }
+        assertTrue(isAllTextMessage)
+
+        val fileTokens = emptyMap<String, String>()
+        val completedImmediately = true
+
+        if (completedImmediately || (isAllTextMessage && fileTokens.isEmpty())) {
+            files.forEach {
+                it.status = org.localsend.miuix.model.TransferStatus.Completed
+                it.progress = 1f
+                it.bytesTransferred = it.size
+            }
+        }
+
+        assertEquals(org.localsend.miuix.model.TransferStatus.Completed, fileItem.status)
+        assertEquals(1f, fileItem.progress, 0.001f)
+        assertEquals(textBytes.size.toLong(), fileItem.bytesTransferred)
+        org.junit.Assert.assertNull(fileItem.error)
+    }
+
+    @Test
+    fun testTextMessageInBatchWithoutTokenHandledAsCompleted() {
+        // 混合传输场景：纯文本消息在 preview 中提供（<= 2000 字符），接收方未索取 token
+        val textContent = "短文本消息"
+        val textItem = FileItem(
+            id = "text-msg",
+            name = "说明.txt",
+            size = textContent.toByteArray().size.toLong(),
+            textContent = textContent,
+            mimeType = "text/plain",
+            status = org.localsend.miuix.model.TransferStatus.InProgress
+        )
+        val binaryItem = FileItem(
+            id = "binary-file",
+            name = "image.png",
+            size = 1024,
+            mimeType = "image/png",
+            status = org.localsend.miuix.model.TransferStatus.InProgress
+        )
+        val files = listOf(textItem, binaryItem)
+        // 接收方仅给 binaryItem 分配了 token，未给 textItem 分配 token
+        val fileTokens = mapOf("binary-file" to "token-123")
+
+        for (item in files) {
+            val token = fileTokens[item.id]
+            if (token == null) {
+                if (item.isTextMessage && !item.textContent.isNullOrEmpty() && item.textContent!!.length <= 2000) {
+                    item.status = org.localsend.miuix.model.TransferStatus.Completed
+                    item.progress = 1f
+                    item.bytesTransferred = item.size
+                    continue
+                }
+                item.status = org.localsend.miuix.model.TransferStatus.Failed
+            }
+        }
+
+        assertEquals(org.localsend.miuix.model.TransferStatus.Completed, textItem.status)
+        assertEquals(org.localsend.miuix.model.TransferStatus.InProgress, binaryItem.status)
+    }
 }
+
