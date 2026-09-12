@@ -11,6 +11,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigationevent.NavigationEventDispatcher
 import androidx.navigationevent.NavigationEventDispatcherOwner
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
+import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.notification.TransferNotifier
 
@@ -89,9 +90,9 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
             // 自动跳转至主界面的“发送”Tab（索引 1）
             manager.requestNavigateToTab(1)
             val msg = if (items.size == 1 && items[0].textContent != null) {
-                "已添加待发送文本"
+                getString(R.string.toast_external_text_added)
             } else {
-                "已添加 ${items.size} 个待发送文件"
+                getString(R.string.toast_external_files_added, items.size)
             }
             android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
         }

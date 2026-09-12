@@ -40,6 +40,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
 import org.localsend.miuix.model.DeviceType
@@ -472,7 +473,7 @@ class LocalSendServer(
 
         val fileListHtml = if (binaryFiles.isNotEmpty()) {
             val rows = binaryFiles.joinToString("") { file ->
-                val downloadUrl = "/api/localsend/v2/download?sessionId=${session?.sessionId}&fileId=${file.id}"
+                val downloadUrl = "${LocalSendRoutes.DOWNLOAD}?sessionId=${session?.sessionId}&fileId=${file.id}"
                 val iconSvg = getWebFileSvgIcon(file.mimeType, file.name)
                 """
                 <div class="file-item">
@@ -500,7 +501,7 @@ class LocalSendServer(
                         共享文件
                     </span>
                     <div style="display:inline-flex;align-items:center;gap:8px;">
-                        ${if (binaryFiles.size > 1 && session != null) """<a href="/api/localsend/v2/download-zip?sessionId=${session.sessionId}" class="btn-zip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> 打包下载全部 (.zip)</a>""" else ""}
+                        ${if (binaryFiles.size > 1 && session != null) """<a href="${LocalSendRoutes.DOWNLOAD_ZIP}?sessionId=${session.sessionId}" class="btn-zip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> 打包下载全部 (.zip)</a>""" else ""}
                         <span class="section-tag">${binaryFiles.size} 个</span>
                     </div>
                 </div>
@@ -1157,7 +1158,7 @@ class LocalSendServer(
             }
 
             // 协议 §5.2：接收方请求文件元数据（支持 ?sessionId= 避免刷新后丢失会话）
-            post("/api/localsend/v2/prepare-download") {
+            post(LocalSendRoutes.PREPARE_DOWNLOAD) {
                 if (!pinOk(call.request.queryParameters["pin"])) {
                     call.respond(HttpStatusCode.Unauthorized, "Request is unauthorized")
                     return@post
@@ -1190,7 +1191,7 @@ class LocalSendServer(
             }
 
             // 协议 §5.3：按 fileId 流式回传文件二进制
-            get("/api/localsend/v2/download") {
+            get(LocalSendRoutes.DOWNLOAD) {
                 val sessionId = call.request.queryParameters["sessionId"]
                 val fileId = call.request.queryParameters["fileId"]
                 if (sessionId == null || fileId == null) {
@@ -1230,7 +1231,7 @@ class LocalSendServer(
             }
 
             // Web Share 增强：多文件一键打包流式下载为 ZIP
-            get("/api/localsend/v2/download-zip") {
+            get(LocalSendRoutes.DOWNLOAD_ZIP) {
                 val sessionId = call.request.queryParameters["sessionId"]
                 val session = if (sessionId != null) {
                     getShares().firstOrNull { it.sessionId == sessionId }
@@ -1276,15 +1277,15 @@ class LocalSendServer(
                 }
             }
 
-            get("/api/localsend/v2/info") {
+            get(LocalSendRoutes.INFO_V2) {
                 call.respond(getLocalDevice().toDto())
             }
 
-            get("/api/localsend/v1/info") {
+            get(LocalSendRoutes.INFO_V1) {
                 call.respond(getLocalDevice().toDto())
             }
 
-            post("/api/localsend/v2/register") {
+            post(LocalSendRoutes.REGISTER_V2) {
                 val remoteDto = call.receive<DeviceDto>()
                 val remoteIp = call.request.origin.remoteHost
                 val remoteDevice = Device.fromDto(remoteDto, remoteIp)
@@ -1292,7 +1293,7 @@ class LocalSendServer(
                 call.respond(getLocalDevice().toDto())
             }
 
-            post("/api/localsend/v1/register") {
+            post(LocalSendRoutes.REGISTER_V1) {
                 val remoteDto = call.receive<DeviceDto>()
                 val remoteIp = call.request.origin.remoteHost
                 val remoteDevice = Device.fromDto(remoteDto, remoteIp)
@@ -1300,7 +1301,7 @@ class LocalSendServer(
                 call.respond(getLocalDevice().toDto())
             }
 
-            post("/api/localsend/v2/prepare-upload") {
+            post(LocalSendRoutes.PREPARE_UPLOAD) {
                 if (!pinOk(call.request.queryParameters["pin"])) {
                     call.respond(HttpStatusCode.Unauthorized, "Request is unauthorized")
                     return@post
@@ -1383,7 +1384,7 @@ class LocalSendServer(
                 }
             }
 
-            post("/api/localsend/v2/upload") {
+            post(LocalSendRoutes.UPLOAD) {
                 val sessionId = call.request.queryParameters["sessionId"]
                 val fileId = call.request.queryParameters["fileId"]
                 val token = call.request.queryParameters["token"]
@@ -1513,7 +1514,7 @@ class LocalSendServer(
                 }
             }
 
-            post("/api/localsend/v2/cancel") {
+            post(LocalSendRoutes.CANCEL) {
                 val sessionId = call.request.queryParameters["sessionId"]
                 if (sessionId != null) {
                     val session = activeSessions.remove(sessionId)

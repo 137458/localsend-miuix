@@ -46,10 +46,10 @@ object TransferNotifier {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val liveChannel = NotificationChannel(
             CHANNEL_LIVE,
-            "传输实时进度",
+            context.getString(R.string.notif_channel_live_name),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "显示流体云胶囊与实时传输进度"
+            description = context.getString(R.string.notif_channel_live_desc)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             setShowBadge(false)
             enableVibration(false)
@@ -57,28 +57,28 @@ object TransferNotifier {
         }
         val receiveChannel = NotificationChannel(
             CHANNEL_RECEIVE,
-            "接收通知",
+            context.getString(R.string.notif_channel_receive_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "接收文件与文本时的结果提示"
+            description = context.getString(R.string.notif_channel_receive_desc)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             setShowBadge(false)
         }
         val sendChannel = NotificationChannel(
             CHANNEL_SEND,
-            "发送通知",
+            context.getString(R.string.notif_channel_send_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "发送文件与文本时的结果提示"
+            description = context.getString(R.string.notif_channel_send_desc)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             setShowBadge(false)
         }
         val serviceChannel = NotificationChannel(
             CHANNEL_SERVICE,
-            "后台传输服务",
+            context.getString(R.string.notif_channel_service_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "保持后台传输连接与防杀保活"
+            description = context.getString(R.string.notif_channel_service_desc)
             setShowBadge(false)
         }
         nm.createNotificationChannel(liveChannel)
@@ -88,8 +88,12 @@ object TransferNotifier {
     }
 
     fun buildForegroundNotification(context: Context, sessionCount: Int = 1): android.app.Notification {
-        val title = "LocalSend 正在后台传输"
-        val text = if (sessionCount > 1) "正在进行 $sessionCount 个传输任务，保持局域网连接..." else "正在进行文件传输，保持局域网连接..."
+        val title = context.getString(R.string.notif_foreground_title)
+        val text = if (sessionCount > 1) {
+            context.getString(R.string.notif_foreground_multiple, sessionCount)
+        } else {
+            context.getString(R.string.notif_foreground_single)
+        }
         return NotificationCompat.Builder(context, CHANNEL_SERVICE)
             .setContentTitle(title)
             .setContentText(text)
@@ -192,16 +196,16 @@ object TransferNotifier {
         if (!isAllowed(context)) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val title = if (session.isTextMessage) {
-            "收到来自 ${session.device.alias} 的文本"
+            context.getString(R.string.notif_incoming_text_title, session.device.alias)
         } else {
-            "收到来自 ${session.device.alias} 的文件"
+            context.getString(R.string.notif_incoming_file_title, session.device.alias)
         }
         val text = if (session.isTextMessage) {
-            session.singleTextMessageContent?.take(80) ?: "纯文本消息"
+            session.singleTextMessageContent?.take(80) ?: context.getString(R.string.notif_plain_text_message)
         } else if (session.files.size == 1) {
             "${session.files.first().name} (${session.formattedTotalSize})"
         } else {
-            "共 ${session.files.size} 个文件 (${session.formattedTotalSize})"
+            context.getString(R.string.notif_files_count_and_size, session.files.size, session.formattedTotalSize)
         }
         val builder = NotificationCompat.Builder(context, CHANNEL_RECEIVE)
             .setContentTitle(title)
@@ -216,7 +220,11 @@ object TransferNotifier {
     fun updateProgress(context: Context, session: TransferSession) {
         if (!isAllowed(context)) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val actionText = if (session.isIncoming) "正在接收" else "正在发送"
+        val actionText = if (session.isIncoming) {
+            context.getString(R.string.live_receiving)
+        } else {
+            context.getString(R.string.live_sending)
+        }
 
         val notification = LiveUpdatesCompat.buildLiveNotification(
             context = context,
@@ -242,23 +250,23 @@ object TransferNotifier {
             TransferStatus.Completed -> {
                 if (session.isIncoming) {
                     if (session.isTextMessage) {
-                        "已收到来自 ${session.device.alias} 的文本" to (session.singleTextMessageContent?.take(100) ?: "纯文本消息")
+                        context.getString(R.string.notif_receive_completed_text, session.device.alias) to (session.singleTextMessageContent?.take(100) ?: context.getString(R.string.notif_plain_text_message))
                     } else {
-                        "文件接收完成" to "已成功接收来自 ${session.device.alias} 的 ${session.files.size} 个文件"
+                        context.getString(R.string.notif_receive_completed_files_title) to context.getString(R.string.notif_receive_completed_files_desc, session.device.alias, session.files.size)
                     }
                 } else {
                     if (session.isTextMessage) {
-                        "文本消息已送达" to "已发送给 ${session.device.alias}"
+                        context.getString(R.string.notif_send_completed_text_title) to context.getString(R.string.notif_send_completed_text_desc, session.device.alias)
                     } else {
-                        "文件发送完成" to "已成功发送 ${session.files.size} 个文件给 ${session.device.alias}"
+                        context.getString(R.string.notif_send_completed_files_title) to context.getString(R.string.notif_send_completed_files_desc, session.files.size, session.device.alias)
                     }
                 }
             }
             TransferStatus.Canceled -> {
-                (if (session.isIncoming) "接收已取消" else "发送已取消") to "对端：${session.device.alias}"
+                (if (session.isIncoming) context.getString(R.string.notif_canceled_receive) else context.getString(R.string.notif_canceled_send)) to context.getString(R.string.notif_canceled_peer_tag, session.device.alias)
             }
             TransferStatus.Failed -> {
-                (if (session.isIncoming) "接收失败" else "发送失败") to "${session.errorMessage ?: "传输异常"}"
+                (if (session.isIncoming) context.getString(R.string.notif_failed_receive) else context.getString(R.string.notif_failed_send)) to (session.errorMessage ?: context.getString(R.string.notif_failed_default_err))
             }
             else -> return
         }

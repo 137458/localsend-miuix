@@ -11,6 +11,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import org.localsend.miuix.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -111,11 +112,14 @@ fun App(manager: LocalSendManager) {
     }
 
     // 3. Navigation Items（接收在第 0 页，发送在第 1 页，设置在第 2 页）
-    val navigationItems = remember {
+    val tabReceive = context.getString(R.string.nav_tab_receive)
+    val tabSend = context.getString(R.string.nav_tab_send)
+    val tabSettings = context.getString(R.string.nav_tab_settings)
+    val navigationItems = remember(tabReceive, tabSend, tabSettings) {
         listOf(
-            NavigationItem("接收", AppIcons.Receive),
-            NavigationItem("发送", AppIcons.Send),
-            NavigationItem("设置", AppIcons.Settings)
+            NavigationItem(tabReceive, AppIcons.Receive),
+            NavigationItem(tabSend, AppIcons.Send),
+            NavigationItem(tabSettings, AppIcons.Settings)
         )
     }
 
@@ -180,7 +184,7 @@ fun App(manager: LocalSendManager) {
                 FileItem(name = name, size = size, uri = uri, mimeType = mime)
             }
             manager.addFiles(items)
-            Toast.makeText(context, "已添加 ${items.size} 个文件", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_files_added, items.size), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -221,7 +225,7 @@ fun App(manager: LocalSendManager) {
                 FileItem(name = name, size = size, uri = uri, mimeType = mime)
             }
             manager.addFiles(items)
-            Toast.makeText(context, "已添加 ${items.size} 个媒体文件", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_media_added, items.size), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -229,15 +233,16 @@ fun App(manager: LocalSendManager) {
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         if (uri != null) {
+            val defaultFolder = context.getString(R.string.settings_custom_folder)
             val display = try {
                 DocumentFile.fromTreeUri(context, uri)?.name
                     ?: uri.lastPathSegment
-                    ?: "自定义目录"
+                    ?: defaultFolder
             } catch (e: Exception) {
-                uri.lastPathSegment ?: "自定义目录"
+                uri.lastPathSegment ?: defaultFolder
             }
             manager.setDownloadTree(uri, display)
-            Toast.makeText(context, "保存目录已设置为: $display", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_save_path_updated, display), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -255,15 +260,15 @@ fun App(manager: LocalSendManager) {
                         mimeType = "text/plain"
                     )
                     manager.addFiles(listOf(item))
-                    Toast.makeText(context, "已提取剪贴板文本并添加", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_clipboard_extracted), Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "剪贴板为空", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_clipboard_empty), Toast.LENGTH_SHORT).show()
                 }
             } else {
-                Toast.makeText(context, "剪贴板中无内容", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_clipboard_no_content), Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(context, "无法访问剪贴板: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_clipboard_error, e.message ?: ""), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -419,7 +424,7 @@ fun App(manager: LocalSendManager) {
                     if (!text.isNullOrEmpty()) {
                         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                         clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", text))
-                        Toast.makeText(context, "已复制文本到剪贴板", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                     }
                     manager.acceptIncomingTransfer(session.sessionId)
                 }
@@ -435,7 +440,7 @@ fun App(manager: LocalSendManager) {
             onDismissRequest = { showRenameDialog = false },
             onConfirm = { newAlias ->
                 manager.updateSettings { it.copy(alias = newAlias) }
-                Toast.makeText(context, "设备名称已更新为: $newAlias", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_device_renamed, newAlias), Toast.LENGTH_SHORT).show()
             }
         )
 
@@ -445,7 +450,7 @@ fun App(manager: LocalSendManager) {
             onDismissRequest = { showPortDialog = false },
             onConfirm = { newPort ->
                 manager.applyPortChange(newPort)
-                Toast.makeText(context, "服务端口已更新为: $newPort", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_port_updated, newPort), Toast.LENGTH_SHORT).show()
             }
         )
 
@@ -461,7 +466,7 @@ fun App(manager: LocalSendManager) {
                     mimeType = "text/plain"
                 )
                 manager.addFiles(listOf(item))
-                Toast.makeText(context, "已添加纯文本内容", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_text_added), Toast.LENGTH_SHORT).show()
             }
         )
 
@@ -498,7 +503,7 @@ fun App(manager: LocalSendManager) {
             onDismissRequest = { showManualIpDialog = false },
             onSend = { ip, port ->
                 manager.sendToIp(ip, port)
-                Toast.makeText(context, "正在连接 $ip:$port 发送内容...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_connecting_ip, ip, port), Toast.LENGTH_SHORT).show()
             }
         )
 

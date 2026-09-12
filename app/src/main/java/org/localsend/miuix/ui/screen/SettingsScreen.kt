@@ -17,7 +17,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.ui.component.CertFingerprintDialog
@@ -55,20 +57,21 @@ fun SettingsScreen(
         onPauseOrDispose {}
     }
 
-    val themeOptions = remember {
-        listOf(
-            "跟随系统",
-            "浅色模式",
-            "深色模式",
-            "莫奈跟随系统",
-            "莫奈浅色",
-            "莫奈深色"
-        )
-    }
+    val themeOptions = listOf(
+        stringResource(R.string.theme_system),
+        stringResource(R.string.theme_light),
+        stringResource(R.string.theme_dark),
+        stringResource(R.string.theme_monet_system),
+        stringResource(R.string.theme_monet_light),
+        stringResource(R.string.theme_monet_dark)
+    )
 
-    val deviceTypeOptions = remember {
-        listOf("手机 (Mobile)", "平板 (Tablet)", "电脑 (Desktop)", "服务器 (Server)")
-    }
+    val deviceTypeOptions = listOf(
+        stringResource(R.string.device_type_mobile),
+        stringResource(R.string.device_type_tablet),
+        stringResource(R.string.device_type_desktop),
+        stringResource(R.string.device_type_server)
+    )
     val currentDeviceTypeIndex = remember(settings.deviceType) {
         when (settings.deviceType) {
             DeviceType.mobile -> 0
@@ -83,7 +86,7 @@ fun SettingsScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         TopAppBar(
-            title = "设置",
+            title = stringResource(R.string.settings_title),
             scrollBehavior = scrollBehavior
         )
 
@@ -101,15 +104,15 @@ fun SettingsScreen(
         ) {
             // Section 1: General Settings
             item {
-                SmallTitle(text = "通用设置")
+                SmallTitle(text = stringResource(R.string.settings_section_general))
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ArrowPreference(
-                        title = "设备别名",
+                        title = stringResource(R.string.settings_pref_alias_title),
                         summary = settings.alias,
                         onClick = onOpenRenameDialog
                     )
                     WindowDropdownPreference(
-                        title = "设备类型",
+                        title = stringResource(R.string.settings_pref_device_type_title),
                         items = deviceTypeOptions,
                         selectedIndex = currentDeviceTypeIndex,
                         onSelectedIndexChange = { index ->
@@ -124,7 +127,7 @@ fun SettingsScreen(
                         }
                     )
                     WindowDropdownPreference(
-                        title = "应用主题",
+                        title = stringResource(R.string.settings_pref_theme_title),
                         items = themeOptions,
                         selectedIndex = settings.themeModeIndex,
                         onSelectedIndexChange = { index ->
@@ -132,16 +135,16 @@ fun SettingsScreen(
                         }
                     )
                     SwitchPreference(
-                        title = "传输完成震动反馈",
-                        summary = "发送或接收完成时触发触感震动",
+                        title = stringResource(R.string.settings_pref_vibrate_title),
+                        summary = stringResource(R.string.settings_pref_vibrate_summary),
                         checked = settings.vibrateOnComplete,
                         onCheckedChange = { checked ->
                             manager.updateSettings { it.copy(vibrateOnComplete = checked) }
                         }
                     )
                     ArrowPreference(
-                        title = "系统通知与流体云权限",
-                        summary = if (isNotificationEnabled) "已开启 (传输进度与流体云胶囊提示正常)" else "未开启 (点击授权或前往系统设置开启通知)",
+                        title = stringResource(R.string.settings_pref_notif_perm_title),
+                        summary = if (isNotificationEnabled) stringResource(R.string.settings_pref_notif_perm_enabled) else stringResource(R.string.settings_pref_notif_perm_disabled),
                         onClick = {
                             val activity = context as? org.localsend.miuix.ui.MainActivity
                             if (activity != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
@@ -159,34 +162,34 @@ fun SettingsScreen(
             // Section 2: Receive Settings
             item {
                 Spacer(modifier = Modifier.height(4.dp))
-                SmallTitle(text = "接收设置")
+                SmallTitle(text = stringResource(R.string.settings_section_receive))
                 Card(modifier = Modifier.fillMaxWidth()) {
                     SwitchPreference(
-                        title = "快速保存",
-                        summary = "自动接收所有传入的发送请求",
+                        title = stringResource(R.string.receive_pref_quick_save_title),
+                        summary = stringResource(R.string.settings_pref_quick_save_desc),
                         checked = settings.quickSave,
                         onCheckedChange = { checked ->
                             manager.updateSettings { it.copy(quickSave = checked) }
                         }
                     )
                     SwitchPreference(
-                        title = "自动复制文本",
-                        summary = "收到纯文本消息时自动复制到剪贴板",
+                        title = stringResource(R.string.receive_pref_auto_copy_title),
+                        summary = stringResource(R.string.settings_pref_auto_copy_desc),
                         checked = settings.autoCopyText,
                         onCheckedChange = { checked ->
                             manager.updateSettings { it.copy(autoCopyText = checked) }
                         }
                     )
                     SwitchPreference(
-                        title = "保存传输历史",
-                        summary = "将完成和取消的传输记录存入历史页面",
+                        title = stringResource(R.string.settings_pref_save_history_title),
+                        summary = stringResource(R.string.settings_pref_save_history_desc),
                         checked = settings.saveToHistory,
                         onCheckedChange = { checked ->
                             manager.updateSettings { it.copy(saveToHistory = checked) }
                         }
                     )
                     ArrowPreference(
-                        title = "文件保存目录",
+                        title = stringResource(R.string.settings_pref_download_path_title),
                         summary = settings.downloadDisplay ?: settings.downloadPath,
                         onClick = onPickDirectory
                     )
@@ -196,29 +199,29 @@ fun SettingsScreen(
             // Section 3: Network & Security Settings
             item {
                 Spacer(modifier = Modifier.height(4.dp))
-                SmallTitle(text = "网络与安全")
+                SmallTitle(text = stringResource(R.string.settings_section_network_security))
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ArrowPreference(
-                        title = "服务端口",
+                        title = stringResource(R.string.settings_pref_port_title),
                         summary = settings.port.toString(),
                         onClick = onOpenPortDialog
                     )
                     SwitchPreference(
-                        title = "启用 HTTPS (TLS 加密)",
-                        summary = "使用端到端自签名证书加密局域网通信",
+                        title = stringResource(R.string.settings_pref_https_title),
+                        summary = stringResource(R.string.settings_pref_https_summary),
                         checked = settings.useHttps,
                         onCheckedChange = { checked ->
                             manager.applyUseHttpsChange(checked)
                         }
                     )
                     ArrowPreference(
-                        title = "传输 PIN 码保护",
-                        summary = if (settings.pin.isNullOrEmpty()) "未启用 (点击设置)" else "已设置: ••••",
+                        title = stringResource(R.string.settings_pref_pin_title),
+                        summary = if (settings.pin.isNullOrEmpty()) stringResource(R.string.settings_pref_pin_disabled) else stringResource(R.string.settings_pref_pin_enabled),
                         onClick = { showPinDialog = true }
                     )
                     ArrowPreference(
-                        title = "TLS 证书指纹",
-                        summary = if (settings.useHttps) "查看与重新生成 SHA-256 指纹" else "HTTPS 开启后可用",
+                        title = stringResource(R.string.settings_pref_cert_fp_title),
+                        summary = if (settings.useHttps) stringResource(R.string.settings_pref_cert_fp_enabled) else stringResource(R.string.settings_pref_cert_fp_disabled),
                         onClick = { showCertDialog = true }
                     )
                 }
@@ -227,15 +230,15 @@ fun SettingsScreen(
             // Section 4: About
             item {
                 Spacer(modifier = Modifier.height(4.dp))
-                SmallTitle(text = "关于")
+                SmallTitle(text = stringResource(R.string.settings_section_about))
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ArrowPreference(
-                        title = "检查更新",
-                        summary = "当前版本 v${org.localsend.miuix.BuildConfig.VERSION_NAME} (点击检查新版本)",
+                        title = stringResource(R.string.settings_pref_check_update_title),
+                        summary = stringResource(R.string.settings_pref_check_update_summary, org.localsend.miuix.BuildConfig.VERSION_NAME),
                         onClick = onNavigateToUpdate
                     )
                     ArrowPreference(
-                        title = "GitHub 开源主页",
+                        title = stringResource(R.string.settings_pref_github_title),
                         summary = "https://github.com/137458/localsend-miuix",
                         onClick = {
                             try {
@@ -250,8 +253,8 @@ fun SettingsScreen(
                         }
                     )
                     ArrowPreference(
-                        title = "开源协议与标准",
-                        summary = "LocalSend Protocol v2.1 • Apache 2.0 License",
+                        title = stringResource(R.string.settings_pref_license_title),
+                        summary = stringResource(R.string.settings_pref_license_summary),
                         onClick = {}
                     )
                 }

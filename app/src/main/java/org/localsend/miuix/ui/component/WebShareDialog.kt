@@ -23,10 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.network.NetworkUtils
 import top.yukonga.miuix.kmp.basic.Button
@@ -57,7 +59,7 @@ fun WebShareDialog(
     WindowBottomSheet(
         show = show,
         onDismissRequest = onDismissRequest,
-        title = "通过浏览器链接分享 (Web Share)"
+        title = stringResource(R.string.webshare_dialog_title)
     ) {
         Column(
             modifier = Modifier
@@ -66,7 +68,7 @@ fun WebShareDialog(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "同局域网设备扫描二维码或在浏览器访问下方地址即可互传",
+                text = stringResource(R.string.webshare_dialog_hint),
                 style = MiuixTheme.textStyles.body2,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 textAlign = TextAlign.Center,
@@ -104,7 +106,7 @@ fun WebShareDialog(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "网页访问地址",
+                            text = stringResource(R.string.webshare_url_label),
                             style = MiuixTheme.textStyles.footnote1,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
@@ -125,7 +127,7 @@ fun WebShareDialog(
                         },
                         colors = ButtonDefaults.buttonColorsPrimary()
                     ) {
-                        Text("复制")
+                        Text(stringResource(R.string.btn_copy))
                     }
                 }
             }
@@ -143,7 +145,7 @@ fun WebShareDialog(
                             .padding(horizontal = 14.dp, vertical = 12.dp)
                     ) {
                         Text(
-                            text = "当前共享内容 (${currentShare.files.size} 项)",
+                            text = stringResource(R.string.webshare_current_shared_count, currentShare.files.size),
                             style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -162,7 +164,7 @@ fun WebShareDialog(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = if (file.isTextMessage) (file.textContent?.take(40) ?: "纯文本") else "${file.name} (${file.formattedSize})",
+                                    text = if (file.isTextMessage) (file.textContent?.take(40) ?: stringResource(R.string.send_quick_action_text)) else "${file.name} (${file.formattedSize})",
                                     style = MiuixTheme.textStyles.footnote1,
                                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                     maxLines = 1,
@@ -173,7 +175,7 @@ fun WebShareDialog(
                         }
                         if (currentShare.files.size > 5) {
                             Text(
-                                text = "... 等共 ${currentShare.files.size} 项",
+                                text = stringResource(R.string.webshare_more_items, currentShare.files.size),
                                 style = MiuixTheme.textStyles.footnote1,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 modifier = Modifier.padding(top = 4.dp, start = 24.dp)
@@ -191,15 +193,15 @@ fun WebShareDialog(
                             .padding(horizontal = 14.dp, vertical = 12.dp)
                     ) {
                         Text(
-                            text = "双向网页快传已就绪",
+                            text = stringResource(R.string.webshare_ready_title),
                             style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (selectedFiles.isNotEmpty()) {
-                                "当前已选择 ${selectedFiles.size} 项文件，可随时加入共享供对方下载；电脑/浏览器端也可以直接向手机回传文件。"
+                                stringResource(R.string.webshare_ready_desc_with_files, selectedFiles.size)
                             } else {
-                                "对方在浏览器打开此链接可直接拖拽或选择文件回传到手机。如需共享文件给对方，请先在发送页添加内容。"
+                                stringResource(R.string.webshare_ready_desc_empty)
                             },
                             style = MiuixTheme.textStyles.footnote1,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
@@ -219,7 +221,7 @@ fun WebShareDialog(
                     colors = ButtonDefaults.buttonColors(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("关闭")
+                    Text(stringResource(R.string.btn_close))
                 }
 
                 if (isSharing) {
@@ -233,7 +235,7 @@ fun WebShareDialog(
                         ),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("停止共享")
+                        Text(stringResource(R.string.webshare_btn_stop_share))
                     }
                 } else if (selectedFiles.isNotEmpty()) {
                     Button(
@@ -243,7 +245,7 @@ fun WebShareDialog(
                         colors = ButtonDefaults.buttonColorsPrimary(),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("共享已选 ${selectedFiles.size} 项")
+                        Text(stringResource(R.string.webshare_btn_share_selected, selectedFiles.size))
                     }
                 }
             }

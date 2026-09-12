@@ -1,3 +1,383 @@
-﻿<resources>
+<resources>
     <string name="app_name">LocalSend Miuix</string>
+
+    <!-- 通用操作与按钮 -->
+    <string name="btn_cancel">取消</string>
+    <string name="btn_confirm">确定</string>
+    <string name="btn_save">保存</string>
+    <string name="btn_close">关闭</string>
+    <string name="btn_copy">复制</string>
+    <string name="btn_delete">删除</string>
+    <string name="btn_clear">清空</string>
+    <string name="btn_preview">预览</string>
+    <string name="btn_add">添加</string>
+    <string name="btn_refresh">刷新</string>
+    <string name="btn_retry">重试</string>
+    <string name="btn_ignore">忽略</string>
+    <string name="btn_later">稍后</string>
+    <string name="btn_open">打开</string>
+    <string name="btn_open_link">打开链接</string>
+    <string name="btn_decline">拒绝</string>
+    <string name="btn_accept">接收</string>
+    <string name="action_back">返回</string>
+    <string name="action_history">传输历史</string>
+    <string name="action_input_ip">输入IP</string>
+    <string name="action_refresh">刷新</string>
+    <string name="action_cancel_transfer">取消传输</string>
+    <string name="action_expand">展开</string>
+    <string name="action_collapse">收起</string>
+
+    <!-- 底部导航栏 -->
+    <string name="nav_tab_receive">接收</string>
+    <string name="nav_tab_send">发送</string>
+    <string name="nav_tab_settings">设置</string>
+
+    <!-- 通用 Toast 与反馈 -->
+    <string name="toast_transfer_declined">对方拒绝接收</string>
+    <string name="toast_files_added">已添加 %1$d 个文件</string>
+    <string name="toast_media_added">已添加 %1$d 个媒体文件</string>
+    <string name="toast_text_added">已添加纯文本内容</string>
+    <string name="toast_external_text_added">已添加待发送文本</string>
+    <string name="toast_external_files_added">已添加 %1$d 个待发送文件</string>
+    <string name="toast_save_path_updated">保存目录已设置为: %1$s</string>
+    <string name="toast_clipboard_extracted">已提取剪贴板文本并添加</string>
+    <string name="toast_clipboard_empty">剪贴板为空</string>
+    <string name="toast_clipboard_no_content">剪贴板中无内容</string>
+    <string name="toast_clipboard_error">无法访问剪贴板: %1$s</string>
+    <string name="toast_copied_to_clipboard">已复制文本到剪贴板</string>
+    <string name="toast_device_renamed">设备名称已更新为: %1$s</string>
+    <string name="toast_port_updated">服务端口已更新为: %1$d</string>
+    <string name="toast_connecting_ip">正在连接 %1$s:%2$d 发送内容...</string>
+    <string name="toast_multicast_sent">已发送局域网发现广播</string>
+    <string name="toast_empty_selection_warn">请先添加要发送的文件或内容</string>
+    <string name="toast_initiating_transfer">正在向 %1$s 发起传输...</string>
+    <string name="toast_cannot_open_link">无法打开链接</string>
+    <string name="toast_cannot_open_file">无法打开此文件</string>
+    <string name="toast_history_item_deleted">已删除该条记录</string>
+    <string name="toast_latest_version">已是最新版本 (v%1$s)</string>
+    <string name="toast_check_update_failed">检查更新失败: %1$s</string>
+    <string name="toast_download_apk_failed">下载失败: %1$s</string>
+
+    <!-- 接收主页面 -->
+    <string name="receive_title">接收</string>
+    <string name="receive_section_local_device">本机设备</string>
+    <string name="receive_pref_alias_summary">设备别名 (点击修改)</string>
+    <string name="receive_pref_all_ips_summary">所有网卡 IP: %1$s</string>
+    <string name="receive_pref_ip_port_summary">局域网 IPv4 地址与服务端口</string>
+    <string name="receive_section_options">接收选项</string>
+    <string name="receive_pref_quick_save_title">快速保存</string>
+    <string name="receive_pref_quick_save_summary">自动接受同局域网所有设备的传输请求，无需每次手动确认</string>
+    <string name="receive_pref_auto_copy_title">自动复制文本</string>
+    <string name="receive_pref_auto_copy_summary">收到纯文本消息时自动写入系统剪贴板</string>
+    <string name="receive_section_incoming_count">正在接收 (%1$d)</string>
+    <string name="receive_waiting_idle">等待接收中...</string>
+    <string name="receive_waiting_hint">确保发送端连接在同一 Wi-Fi 或局域网</string>
+
+    <!-- 发送主页面 -->
+    <string name="send_title">发送</string>
+    <string name="send_cat_images_count">%1$d 张图片</string>
+    <string name="send_cat_videos_count">%1$d 个视频</string>
+    <string name="send_cat_audios_count">%1$d 首音频</string>
+    <string name="send_cat_texts_count">%1$d 条文本</string>
+    <string name="send_cat_apks_count">%1$d 个应用</string>
+    <string name="send_cat_others_count">%1$d 个文件</string>
+    <string name="send_pull_refresh_pull">下拉刷新</string>
+    <string name="send_pull_refresh_release">释放立即刷新</string>
+    <string name="send_pull_refresh_refreshing">正在刷新...</string>
+    <string name="send_pull_refresh_complete">刷新完成</string>
+    <string name="send_section_quick_pick">快速选择内容</string>
+    <string name="send_quick_action_files">文件</string>
+    <string name="send_quick_action_folder">文件夹</string>
+    <string name="send_quick_action_media">媒体</string>
+    <string name="send_quick_action_apps">应用</string>
+    <string name="send_quick_action_text">纯文本</string>
+    <string name="send_quick_action_clipboard">剪贴板</string>
+    <string name="send_web_share_running_title">Web 共享正在运行中</string>
+    <string name="send_web_share_idle_title">通过浏览器链接分享 (Web Share)</string>
+    <string name="send_web_share_running_summary">已有 %1$d 项正在局域网共享，点击查看链接与二维码</string>
+    <string name="send_web_share_idle_summary">无需客户端，任何浏览器扫描二维码或访问链接即可接收</string>
+    <string name="send_section_selected_files">待发送内容 (%1$d)</string>
+    <string name="send_selected_summary_header">共 %1$d 项 (%2$s)</string>
+    <string name="send_type_text_message">纯文本消息</string>
+    <string name="send_expand_files">展开其余 %1$d 项文件</string>
+    <string name="send_collapse_files">收起待发送列表</string>
+    <string name="send_section_nearby_devices">附近设备 (%1$d)</string>
+    <string name="send_scanning_subnet_hint">正在全网段并发探测设备中...</string>
+    <string name="send_searching_devices_title">正在搜索同一局域网下的 LocalSend 设备...</string>
+    <string name="send_searching_devices_hint">下拉即可刷新或点击右上角广播</string>
+    <string name="send_device_multi_subnet_tag">" (+%1$d个网段)"</string>
+
+    <!-- 设置主页面 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_section_general">通用设置</string>
+    <string name="settings_pref_alias_title">设备别名</string>
+    <string name="settings_pref_device_type_title">设备类型</string>
+    <string name="settings_pref_theme_title">应用主题</string>
+    <string name="settings_pref_vibrate_title">传输完成震动反馈</string>
+    <string name="settings_pref_vibrate_summary">发送或接收完成时触发触感震动</string>
+    <string name="settings_pref_notif_perm_title">系统通知与流体云权限</string>
+    <string name="settings_pref_notif_perm_enabled">已开启 (传输进度与流体云胶囊提示正常)</string>
+    <string name="settings_pref_notif_perm_disabled">未开启 (点击授权或前往系统设置开启通知)</string>
+    <string name="settings_section_receive">接收设置</string>
+    <string name="settings_pref_quick_save_desc">自动接收所有传入的发送请求</string>
+    <string name="settings_pref_auto_copy_desc">收到纯文本消息时自动复制到剪贴板</string>
+    <string name="settings_pref_save_history_title">保存传输历史</string>
+    <string name="settings_pref_save_history_desc">将完成和取消的传输记录存入历史页面</string>
+    <string name="settings_pref_download_path_title">文件保存目录</string>
+    <string name="settings_custom_folder">自定义目录</string>
+    <string name="settings_section_network_security">网络与安全</string>
+    <string name="settings_pref_port_title">服务端口</string>
+    <string name="settings_pref_https_title">启用 HTTPS (TLS 加密)</string>
+    <string name="settings_pref_https_summary">使用端到端自签名证书加密局域网通信</string>
+    <string name="settings_pref_pin_title">传输 PIN 码保护</string>
+    <string name="settings_pref_pin_disabled">未启用 (点击设置)</string>
+    <string name="settings_pref_pin_enabled">已设置: ••••</string>
+    <string name="settings_pref_cert_fp_title">TLS 证书指纹</string>
+    <string name="settings_pref_cert_fp_enabled">查看与重新生成 SHA-256 指纹</string>
+    <string name="settings_pref_cert_fp_disabled">HTTPS 开启后可用</string>
+    <string name="settings_section_about">关于</string>
+    <string name="settings_pref_check_update_title">检查更新</string>
+    <string name="settings_pref_check_update_summary">当前版本 v%1$s (点击检查新版本)</string>
+    <string name="settings_pref_github_title">GitHub 开源主页</string>
+    <string name="settings_pref_license_title">开源协议与标准</string>
+    <string name="settings_pref_license_summary">LocalSend Protocol v2.1 • Apache 2.0 License</string>
+
+    <string name="theme_system">跟随系统</string>
+    <string name="theme_light">浅色模式</string>
+    <string name="theme_dark">深色模式</string>
+    <string name="theme_monet_system">莫奈跟随系统</string>
+    <string name="theme_monet_light">莫奈浅色</string>
+    <string name="theme_monet_dark">莫奈深色</string>
+
+    <string name="device_type_mobile">手机 (Mobile)</string>
+    <string name="device_type_tablet">平板 (Tablet)</string>
+    <string name="device_type_desktop">电脑 (Desktop)</string>
+    <string name="device_type_server">服务器 (Server)</string>
+
+    <!-- 传输历史页面 -->
+    <string name="history_title">传输历史</string>
+    <string name="history_empty_title">暂无传输记录</string>
+    <string name="history_empty_summary">完成、失败或取消的传输会显示在这里</string>
+    <string name="history_dialog_clear_title">清空传输历史</string>
+    <string name="history_dialog_clear_msg">确定要清空全部 %1$d 条传输历史记录吗？此操作无法撤销。</string>
+    <string name="history_item_from">接收自 %1$s</string>
+    <string name="history_item_to">发送给 %1$s</string>
+    <string name="history_files_count">%1$d 个文件</string>
+
+    <!-- 软件更新页面 -->
+    <string name="update_screen_title">软件更新</string>
+    <string name="update_checking_hint">正在检查更新...</string>
+    <string name="update_found_header">发现新版本 %1$s (当前 v%2$s)</string>
+    <string name="update_latest_header">已是最新版本 (v%1$s)</string>
+    <string name="update_changelog_title_new">新版本更新日志 (%1$s)</string>
+    <string name="update_changelog_title_current">当前版本说明 (v%1$s)</string>
+    <string name="update_release_default_title">版本特性说明</string>
+    <string name="update_downloading_hint">正在下载更新...</string>
+    <string name="update_btn_install_now">立即安装更新</string>
+    <string name="update_btn_download_now">立即下载更新</string>
+    <string name="update_section_settings">更新设置</string>
+    <string name="update_pref_auto_check_title">自动检查更新</string>
+    <string name="update_pref_auto_check_summary">每次启动应用时自动检查最新版本</string>
+    <string name="update_pref_ignore_title">忽略此版本</string>
+    <string name="update_pref_ignore_checking">正在检查...</string>
+    <string name="update_pref_ignore_already_latest">当前已是最新版本</string>
+    <string name="update_pref_ignore_ignored">已忽略版本 %1$s</string>
+    <string name="update_pref_ignore_desc">忽略新版本 %1$s 的更新提示</string>
+    <string name="update_section_channel">版本通道与操作</string>
+    <string name="update_pref_manual_check_title">手动检查更新</string>
+    <string name="update_pref_manual_check_busy">正在检索远程版本信息...</string>
+    <string name="update_pref_manual_check_idle">点击从 GitHub Releases 检索最新版本</string>
+    <string name="update_pref_github_releases_summary">前往项目官方发布页面查看历史版本</string>
+    <string name="update_pref_os3_title">HyperOS 3 流光特效</string>
+    <string name="update_pref_os3_enabled">已开启 HyperOS 3 增强流光着色器</string>
+    <string name="update_pref_os3_disabled">当前使用 HyperOS 2 经典流光着色器</string>
+
+    <!-- 弹窗组件 -->
+    <string name="dialog_rename_title">修改设备名称</string>
+    <string name="dialog_rename_label">设备别名</string>
+
+    <string name="dialog_port_title">修改服务端口</string>
+    <string name="dialog_port_label">端口号 (1 - 65535)</string>
+
+    <string name="dialog_manual_ip_title">手动输入 IP 发送</string>
+    <string name="dialog_manual_ip_address_label">目标 IP 地址 (例如 192.168.1.100)</string>
+    <string name="dialog_manual_ip_recent_history">近期连接历史</string>
+    <string name="dialog_manual_ip_port_label">端口 (默认 53317)</string>
+    <string name="dialog_manual_ip_btn_send">连接并发送</string>
+
+    <string name="dialog_send_text_title">发送纯文本</string>
+    <string name="dialog_send_text_label">输入或粘贴要发送的文本内容</string>
+    <string name="dialog_send_text_btn_send">发送文本</string>
+
+    <string name="dialog_pin_title">设置传输 PIN 码</string>
+    <string name="dialog_pin_desc">设置 PIN 码后，其它设备向您发送内容时必须输入相同的 PIN 码才能完成握手。留空则表示不启用 PIN 保护。</string>
+    <string name="dialog_pin_label">PIN 码（留空关闭）</string>
+
+    <string name="dialog_cert_title">TLS 安全证书指纹</string>
+    <string name="dialog_cert_desc">LocalSend 在 HTTPS 模式下使用本设备生成的自签名 X.509 证书进行端到端加密。对方设备可通过比对此 SHA-256 指纹确认未遭受中间人攻击。</string>
+    <string name="dialog_cert_label">SHA-256 指纹</string>
+    <string name="dialog_cert_empty">未生成或 HTTPS 未启用</string>
+    <string name="dialog_cert_btn_copy">复制指纹</string>
+    <string name="dialog_cert_btn_regenerate">重新生成</string>
+
+    <string name="dialog_incoming_text_title">收到纯文本消息</string>
+    <string name="dialog_incoming_files_title">收到传输请求</string>
+    <string name="dialog_incoming_from_device">来自设备: %1$s (%2$s)</string>
+    <string name="dialog_incoming_text_length">文本内容 (%1$d 字符)</string>
+    <string name="dialog_incoming_files_summary">共 %1$d 个文件，大小 %2$s</string>
+
+    <string name="sheet_add_content_title">添加发送内容</string>
+    <string name="sheet_add_file_title">选择文件</string>
+    <string name="sheet_add_file_summary">从设备存储选择任意文件</string>
+    <string name="sheet_add_folder_title">选择文件夹</string>
+    <string name="sheet_add_folder_summary">递归添加整个文件夹内的所有文件</string>
+    <string name="sheet_add_media_title">选择媒体</string>
+    <string name="sheet_add_media_summary">从相册选择照片与视频</string>
+    <string name="sheet_add_apps_title">选择应用 (APK)</string>
+    <string name="sheet_add_apps_summary">提取本机已安装应用的 APK 文件</string>
+    <string name="sheet_add_text_title">输入纯文本</string>
+    <string name="sheet_add_text_summary">输入需要发送的文字或链接</string>
+    <string name="sheet_add_clipboard_title">从剪贴板粘贴</string>
+    <string name="sheet_add_clipboard_summary">快速提取当前剪贴板文本或链接</string>
+
+    <string name="app_picker_title">选择应用 (APK)</string>
+    <string name="app_picker_search_label">搜索应用名称或包名...</string>
+    <string name="app_picker_show_system_apps">显示系统应用</string>
+    <string name="app_picker_selected_count">已选 %1$d 项 / 共 %2$d 个</string>
+    <string name="app_picker_refreshing">刷新中...</string>
+    <string name="app_picker_deselect_all">取消全选</string>
+    <string name="app_picker_select_all">全选当前</string>
+    <string name="app_picker_empty">没有找到符合条件的应用</string>
+    <string name="app_picker_system_tag">系统</string>
+    <string name="app_picker_btn_add_selected">添加所选 (%1$d)</string>
+
+    <string name="history_detail_text_title">文本消息详情</string>
+    <string name="history_detail_file_title">传输记录详情</string>
+    <string name="history_detail_sender">发送方: %1$s</string>
+    <string name="history_detail_receiver">接收方: %1$s</string>
+    <string name="history_detail_device_ip">设备 IP</string>
+    <string name="history_detail_time">时间</string>
+    <string name="history_detail_total">总计</string>
+    <string name="history_detail_total_summary">%1$d 项 · %2$s</string>
+    <string name="history_detail_text_content">文本内容</string>
+    <string name="history_detail_btn_copy_text">复制完整文本</string>
+    <string name="history_detail_included_files">包含文件 (%1$d)</string>
+    <string name="history_detail_btn_delete_record">删除此记录</string>
+
+    <string name="preview_video_tag">视频</string>
+    <string name="preview_text_title">文本内容预览</string>
+    <string name="preview_action_prev">上一个</string>
+    <string name="preview_action_next">下一个</string>
+    <string name="preview_empty_text">(无文本内容)</string>
+    <string name="preview_text_stats">长度: %1$d 字符 • 大小: %2$s</string>
+    <string name="preview_video_content_desc">视频预览</string>
+    <string name="preview_file_stats">文件大小: %1$s • 类型: %2$s</string>
+    <string name="preview_mime_type">MIME 类型: %1$s</string>
+    <string name="preview_path">路径: %1$s</string>
+    <string name="preview_btn_copy_content">复制内容</string>
+    <string name="preview_btn_remove_item">移除此项</string>
+
+    <string name="session_waiting_peer">等待对方同意接收...</string>
+    <string name="session_waiting_peer_confirm">等待对方确认接收...</string>
+    <string name="session_waiting_self">等待您确认接收...</string>
+    <string name="session_syncing_text">正在同步文本...</string>
+    <string name="session_text_delivered">文本已送达</string>
+    <string name="session_text_completed">文本传输完成</string>
+    <string name="session_send_failed">发送失败: %1$s</string>
+    <string name="session_received_text_from">收到来自 %1$s 的文本</string>
+    <string name="session_send_to_alias">发送至: %1$s</string>
+    <string name="session_from_alias">来自: %1$s</string>
+    <string name="session_btn_copy_text">复制文本</string>
+    <string name="session_transfer_failed">传输失败: %1$s</string>
+    <string name="session_canceled">传输已取消</string>
+    <string name="session_peer_declined">对方拒绝</string>
+    <string name="session_unknown_error">未知错误</string>
+    <string name="session_files_in_progress">共 %1$d 个文件 • %2$s</string>
+    <string name="session_files_completed">传输完成 • 共 %1$d 个文件 (%2$s)</string>
+    <string name="session_transferring_indexed">正在传输 (%1$d/%2$d): %3$s</string>
+    <string name="session_transferring_single">正在传输: %1$s</string>
+    <string name="session_preparing_transfer">正在准备传输...</string>
+    <string name="session_transfer_complete_check">✓ 传输完成 (共 %1$d 个文件，%2$s)</string>
+    <string name="session_file_list_title">文件清单 (%1$d/%2$d)</string>
+
+    <string name="webshare_dialog_title">通过浏览器链接分享 (Web Share)</string>
+    <string name="webshare_dialog_hint">同局域网设备扫描二维码或在浏览器访问下方地址即可互传</string>
+    <string name="webshare_url_label">网页访问地址</string>
+    <string name="webshare_current_shared_count">当前共享内容 (%1$d 项)</string>
+    <string name="webshare_more_items">... 等共 %1$d 项</string>
+    <string name="webshare_ready_title">双向网页快传已就绪</string>
+    <string name="webshare_ready_desc_with_files">当前已选择 %1$d 项文件，可随时加入共享供对方下载；电脑/浏览器端也可以直接向手机回传文件。</string>
+    <string name="webshare_ready_desc_empty">对方在浏览器打开此链接可直接拖拽或选择文件回传到手机。如需共享文件给对方，请先在发送页添加内容。</string>
+    <string name="webshare_btn_stop_share">停止共享</string>
+    <string name="webshare_btn_share_selected">共享已选 %1$d 项</string>
+
+    <string name="update_dialog_title">发现新版本</string>
+    <string name="update_dialog_no_changelog">暂无详细更新日志</string>
+    <string name="update_dialog_downloading">正在下载更新%1$s</string>
+    <string name="update_dialog_ready_install">安装包已下载完成，点击下方按钮立即安装</string>
+    <string name="update_dialog_download_failed">下载失败: %1$s</string>
+    <string name="update_dialog_network_hint">如网络连接不稳定，可点击下方\"浏览器下载\"通过网页获取安装包</string>
+    <string name="update_dialog_btn_cancel_download">取消下载</string>
+    <string name="update_dialog_btn_background_download">后台下载</string>
+    <string name="update_dialog_btn_redownload">重新下载</string>
+    <string name="update_dialog_btn_install">立即安装</string>
+    <string name="update_dialog_btn_browser">浏览器下载</string>
+    <string name="update_dialog_btn_update_now">立即更新</string>
+    <string name="update_dialog_github_release_note">前往 GitHub 查看详细发布说明 ↗</string>
+
+    <!-- 系统通知与流体云胶囊 -->
+    <string name="notif_channel_live_name">传输实时进度</string>
+    <string name="notif_channel_live_desc">显示流体云胶囊与实时传输进度</string>
+    <string name="notif_channel_receive_name">接收通知</string>
+    <string name="notif_channel_receive_desc">接收文件与文本时的结果提示</string>
+    <string name="notif_channel_send_name">发送通知</string>
+    <string name="notif_channel_send_desc">发送文件与文本时的结果提示</string>
+    <string name="notif_channel_service_name">后台传输服务</string>
+    <string name="notif_channel_service_desc">保持后台传输连接与防杀保活</string>
+
+    <string name="notif_foreground_title">LocalSend 正在后台传输</string>
+    <string name="notif_foreground_multiple">正在进行 %1$d 个传输任务，保持局域网连接...</string>
+    <string name="notif_foreground_single">正在进行文件传输，保持局域网连接...</string>
+    <string name="notif_incoming_text_title">收到来自 %1$s 的文本</string>
+    <string name="notif_incoming_file_title">收到来自 %1$s 的文件</string>
+    <string name="notif_receive_completed_text">已收到来自 %1$s 的文本</string>
+    <string name="notif_receive_completed_files_title">文件接收完成</string>
+    <string name="notif_receive_completed_files_desc">已成功接收来自 %1$s 的 %2$d 个文件</string>
+    <string name="notif_send_completed_text_title">文本消息已送达</string>
+    <string name="notif_send_completed_text_desc">已发送给 %1$s</string>
+    <string name="notif_send_completed_files_title">文件发送完成</string>
+    <string name="notif_send_completed_files_desc">已成功发送 %1$d 个文件给 %2$s</string>
+    <string name="notif_canceled_receive">接收已取消</string>
+    <string name="notif_canceled_send">发送已取消</string>
+    <string name="notif_canceled_peer_tag">对端：%1$s</string>
+    <string name="notif_failed_receive">接收失败</string>
+    <string name="notif_failed_send">发送失败</string>
+    <string name="notif_failed_default_err">传输异常</string>
+    <string name="notif_plain_text_message">纯文本消息</string>
+    <string name="notif_files_count_and_size">共 %1$d 个文件 (%2$s)</string>
+
+    <string name="live_preparing">准备中</string>
+    <string name="live_receiving">接收中</string>
+    <string name="live_sending">发送中</string>
+    <string name="live_from_prefix">接收自</string>
+    <string name="live_to_prefix">发送至</string>
+    <string name="live_file_transfer">文件传输</string>
+    <string name="live_files_count">共 %1$d 个文件</string>
+    <string name="live_almost_done">即将完成</string>
+    <string name="live_remaining_seconds">剩余 %1$d 秒</string>
+    <string name="live_remaining_minutes">剩余 %1$d 分钟</string>
+    <string name="live_remaining_min_sec">剩余 %1$d 分 %2$d 秒</string>
+    <string name="live_remaining_hours">剩余 %1$d 小时</string>
+    <string name="chip_text">文本</string>
+    <string name="chip_completed">已完成</string>
+    <string name="chip_waiting_approval">待确认</string>
+    <string name="chip_incoming_prefix">"收 "</string>
+    <string name="chip_outgoing_prefix">"发 "</string>
+
+    <!-- 状态标签 -->
+    <string name="status_completed">已完成</string>
+    <string name="status_failed">失败</string>
+    <string name="status_canceled">已取消</string>
+    <string name="status_processing">处理中</string>
+    <string name="status_waiting">等待中</string>
 </resources>

@@ -43,8 +43,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.localsend.miuix.R
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
@@ -94,7 +96,7 @@ private fun TextMessageCardContent(
     onCancel: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: "纯文本消息"
+    val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: stringResource(R.string.notif_plain_text_message)
 
     // 1. 顶部状态栏（文本图标 + 对端别名 + 状态文本 + 取消按钮）
     Row(
@@ -123,7 +125,7 @@ private fun TextMessageCardContent(
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (session.isIncoming) "收到来自 ${session.device.alias} 的文本" else "发送至: ${session.device.alias}",
+                    text = if (session.isIncoming) stringResource(R.string.session_received_text_from, session.device.alias) else stringResource(R.string.session_send_to_alias, session.device.alias),
                     style = MiuixTheme.textStyles.headline1,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -131,11 +133,11 @@ private fun TextMessageCardContent(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = when (session.status) {
-                        TransferStatus.WaitingApproval -> if (session.isIncoming) "等待您确认接收..." else "等待对方确认接收..."
-                        TransferStatus.InProgress -> "正在同步文本..."
-                        TransferStatus.Completed -> "文本传输完成"
-                        TransferStatus.Failed -> "发送失败: ${session.errorMessage ?: "对方拒绝"}"
-                        TransferStatus.Canceled -> "传输已取消"
+                        TransferStatus.WaitingApproval -> if (session.isIncoming) stringResource(R.string.session_waiting_self) else stringResource(R.string.session_waiting_peer_confirm)
+                        TransferStatus.InProgress -> stringResource(R.string.session_syncing_text)
+                        TransferStatus.Completed -> stringResource(R.string.session_text_completed)
+                        TransferStatus.Failed -> stringResource(R.string.session_send_failed, session.errorMessage ?: stringResource(R.string.session_peer_declined))
+                        TransferStatus.Canceled -> stringResource(R.string.session_canceled)
                     },
                     style = MiuixTheme.textStyles.footnote1,
                     color = when (session.status) {
@@ -153,7 +155,7 @@ private fun TextMessageCardContent(
             IconButton(onClick = onCancel) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "取消传输",
+                    contentDescription = stringResource(R.string.action_cancel_transfer),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
@@ -224,7 +226,7 @@ private fun TextMessageCardContent(
                 onClick = {
                     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                     clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", previewText))
-                    android.widget.Toast.makeText(context, "已复制文本到剪贴板", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), android.widget.Toast.LENGTH_SHORT).show()
                 },
                 colors = if (detectedUrl != null) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary()
             ) {
@@ -234,7 +236,7 @@ private fun TextMessageCardContent(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("复制文本")
+                Text(stringResource(R.string.session_btn_copy_text))
             }
 
             if (detectedUrl != null) {
@@ -246,12 +248,12 @@ private fun TextMessageCardContent(
                             }
                             context.startActivity(intent)
                         } catch (e: Exception) {
-                            android.widget.Toast.makeText(context, "无法打开链接", android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(context, context.getString(R.string.toast_cannot_open_link), android.widget.Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColorsPrimary()
                 ) {
-                    Text("打开链接")
+                    Text(stringResource(R.string.btn_open_link))
                 }
             }
         }
@@ -294,7 +296,11 @@ private fun FileTransferCardContent(
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (session.isIncoming) "来自: ${session.device.alias}" else "发送至: ${session.device.alias}",
+                    text = if (session.isIncoming) {
+                        stringResource(R.string.session_from_alias, session.device.alias)
+                    } else {
+                        stringResource(R.string.session_send_to_alias, session.device.alias)
+                    },
                     style = MiuixTheme.textStyles.headline1,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -302,11 +308,11 @@ private fun FileTransferCardContent(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = when (session.status) {
-                        TransferStatus.WaitingApproval -> "等待对方同意接收..."
-                        TransferStatus.InProgress -> "共 ${session.files.size} 个文件 • ${session.formattedTotalSize}"
-                        TransferStatus.Completed -> "传输完成 • 共 ${session.files.size} 个文件 (${session.formattedTotalSize})"
-                        TransferStatus.Failed -> "传输失败: ${session.errorMessage ?: "未知错误"}"
-                        TransferStatus.Canceled -> "传输已取消"
+                        TransferStatus.WaitingApproval -> stringResource(R.string.session_waiting_peer)
+                        TransferStatus.InProgress -> stringResource(R.string.session_files_in_progress, session.files.size, session.formattedTotalSize)
+                        TransferStatus.Completed -> stringResource(R.string.session_files_completed, session.files.size, session.formattedTotalSize)
+                        TransferStatus.Failed -> stringResource(R.string.session_transfer_failed, session.errorMessage ?: stringResource(R.string.session_unknown_error))
+                        TransferStatus.Canceled -> stringResource(R.string.session_canceled)
                     },
                     style = MiuixTheme.textStyles.footnote1,
                     color = when (session.status) {
@@ -324,7 +330,7 @@ private fun FileTransferCardContent(
             IconButton(onClick = onCancel) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "取消传输",
+                    contentDescription = stringResource(R.string.action_cancel_transfer),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
@@ -352,9 +358,9 @@ private fun FileTransferCardContent(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (session.files.size > 1) {
-                        "正在传输 (${session.currentFileIndex + 1}/${session.files.size}): ${current.name}"
+                        stringResource(R.string.session_transferring_indexed, session.currentFileIndex + 1, session.files.size, current.name)
                     } else {
-                        "正在传输: ${current.name}"
+                        stringResource(R.string.session_transferring_single, current.name)
                     },
                     style = MiuixTheme.textStyles.footnote1,
                     maxLines = 1,
@@ -439,13 +445,13 @@ private fun FileTransferCardContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "文件清单 (${session.files.count { it.status == TransferStatus.Completed }}/${session.files.size})",
+                text = stringResource(R.string.session_file_list_title, session.files.count { it.status == TransferStatus.Completed }, session.files.size),
                 style = MiuixTheme.textStyles.footnote1,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
             Icon(
                 imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = if (isExpanded) "收起" else "展开",
+                contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                 tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.size(18.dp)
             )
@@ -504,7 +510,7 @@ private fun FileDetailItem(
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = if (file.isTextMessage) "纯文本消息" else file.name,
+                text = if (file.isTextMessage) stringResource(R.string.send_type_text_message) else file.name,
                 style = MiuixTheme.textStyles.body2,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -546,7 +552,7 @@ private fun FileDetailItem(
         when (file.status) {
             TransferStatus.Completed -> Icon(
                 imageVector = Icons.Default.CheckCircle,
-                contentDescription = "已完成",
+                contentDescription = stringResource(R.string.status_completed),
                 tint = Color(0xFF4CAF50),
                 modifier = Modifier.size(18.dp)
             )
@@ -557,13 +563,13 @@ private fun FileDetailItem(
             )
             TransferStatus.Failed -> Icon(
                 imageVector = Icons.Default.Error,
-                contentDescription = "失败",
+                contentDescription = stringResource(R.string.status_failed),
                 tint = MiuixTheme.colorScheme.error,
                 modifier = Modifier.size(18.dp)
             )
             TransferStatus.WaitingApproval, TransferStatus.Canceled -> Icon(
                 imageVector = Icons.Default.HourglassEmpty,
-                contentDescription = "等待中",
+                contentDescription = stringResource(R.string.status_waiting),
                 tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.size(16.dp)
             )
@@ -614,7 +620,7 @@ private fun InlineTextMessageProgress(
     session: TransferSession,
     onCancel: () -> Unit
 ) {
-    val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: "纯文本消息"
+    val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: stringResource(R.string.send_type_text_message)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -634,11 +640,11 @@ private fun InlineTextMessageProgress(
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = when (session.status) {
-                    TransferStatus.WaitingApproval -> "等待对方确认接收..."
-                    TransferStatus.InProgress -> "正在同步文本..."
-                    TransferStatus.Completed -> "文本已送达"
-                    TransferStatus.Failed -> "发送失败: ${session.errorMessage ?: "对方拒绝"}"
-                    TransferStatus.Canceled -> "传输已取消"
+                    TransferStatus.WaitingApproval -> stringResource(R.string.session_waiting_peer_confirm)
+                    TransferStatus.InProgress -> stringResource(R.string.session_syncing_text)
+                    TransferStatus.Completed -> stringResource(R.string.session_text_delivered)
+                    TransferStatus.Failed -> stringResource(R.string.session_send_failed, session.errorMessage ?: stringResource(R.string.session_peer_declined))
+                    TransferStatus.Canceled -> stringResource(R.string.session_canceled)
                 },
                 style = MiuixTheme.textStyles.footnote1,
                 color = when (session.status) {
@@ -656,7 +662,7 @@ private fun InlineTextMessageProgress(
             IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "取消传输",
+                    contentDescription = stringResource(R.string.action_cancel_transfer),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.size(16.dp)
                 )
@@ -747,20 +753,20 @@ private fun InlineFileTransferProgress(
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = when (session.status) {
-                    TransferStatus.WaitingApproval -> "等待对方同意接收..."
+                    TransferStatus.WaitingApproval -> stringResource(R.string.session_waiting_peer)
                     TransferStatus.InProgress -> {
                         val current = session.currentFile
                         if (current != null && session.files.size > 1) {
-                            "(${session.currentFileIndex + 1}/${session.files.size}) 正在传输: ${current.name}"
+                            stringResource(R.string.session_transferring_indexed, session.currentFileIndex + 1, session.files.size, current.name)
                         } else if (current != null) {
-                            "正在传输: ${current.name}"
+                            stringResource(R.string.session_transferring_single, current.name)
                         } else {
-                            "正在准备传输..."
+                            stringResource(R.string.session_preparing_transfer)
                         }
                     }
-                    TransferStatus.Completed -> "✓ 传输完成 (共 ${session.files.size} 个文件，${session.formattedTotalSize})"
-                    TransferStatus.Failed -> "传输失败: ${session.errorMessage ?: "未知错误"}"
-                    TransferStatus.Canceled -> "传输已取消"
+                    TransferStatus.Completed -> stringResource(R.string.session_transfer_complete_check, session.files.size, session.formattedTotalSize)
+                    TransferStatus.Failed -> stringResource(R.string.session_transfer_failed, session.errorMessage ?: stringResource(R.string.session_unknown_error))
+                    TransferStatus.Canceled -> stringResource(R.string.session_canceled)
                 },
                 style = MiuixTheme.textStyles.footnote1,
                 color = when (session.status) {
@@ -779,7 +785,7 @@ private fun InlineFileTransferProgress(
             IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "取消传输",
+                    contentDescription = stringResource(R.string.action_cancel_transfer),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.size(16.dp)
                 )
@@ -855,13 +861,13 @@ private fun InlineFileTransferProgress(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "文件清单 (${session.files.count { it.status == TransferStatus.Completed }}/${session.files.size})",
+                text = stringResource(R.string.session_file_list_title, session.files.count { it.status == TransferStatus.Completed }, session.files.size),
                 style = MiuixTheme.textStyles.footnote1,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
             Icon(
                 imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = if (isExpanded) "收起" else "展开",
+                contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                 tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.size(16.dp)
             )

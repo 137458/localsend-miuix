@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import org.localsend.miuix.R
 import org.localsend.miuix.manager.UpdateCheckResult
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.FileItem
@@ -128,7 +130,7 @@ fun UpdateDialog(
                 }
                 .onFailure { error ->
                     if (error !is CancellationException) {
-                        downloadError = error.localizedMessage ?: "下载失败，请检查网络连接"
+                        downloadError = error.localizedMessage ?: context.getString(R.string.toast_download_apk_failed, "")
                     }
                 }
         }
@@ -136,7 +138,7 @@ fun UpdateDialog(
 
     WindowDialog(
         show = show,
-        title = "发现新版本",
+        title = stringResource(R.string.update_dialog_title),
         summary = "${releaseInfo.currentVersion} ➔ ${releaseInfo.latestVersion}",
         onDismissRequest = {
             if (!isDownloading) {
@@ -209,7 +211,7 @@ fun UpdateDialog(
                     )
                 } else {
                     Text(
-                        text = "暂无详细更新日志",
+                        text = stringResource(R.string.update_dialog_no_changelog),
                         style = MiuixTheme.textStyles.body2.copy(fontSize = 13.sp, lineHeight = 18.sp),
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
@@ -233,7 +235,7 @@ fun UpdateDialog(
                     ) {
                         val speedText = if (downloadSpeed > 0L) " · ${FileItem.formatFileSize(downloadSpeed)}/s" else ""
                         Text(
-                            text = "正在下载更新$speedText",
+                            text = stringResource(R.string.update_dialog_downloading, speedText),
                             style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
                             color = MiuixTheme.colorScheme.primary,
                         )
@@ -266,7 +268,7 @@ fun UpdateDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "安装包已下载完成，点击下方按钮立即安装",
+                        text = stringResource(R.string.update_dialog_ready_install),
                         style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
                         color = MiuixTheme.colorScheme.primary,
                     )
@@ -281,13 +283,13 @@ fun UpdateDialog(
                         .padding(12.dp)
                 ) {
                     Text(
-                        text = "下载失败: $downloadError",
+                        text = stringResource(R.string.update_dialog_download_failed, downloadError ?: ""),
                         style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
                         color = MiuixTheme.colorScheme.error,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "如网络连接不稳定，可点击下方\"浏览器下载\"通过网页获取安装包",
+                        text = stringResource(R.string.update_dialog_network_hint),
                         style = MiuixTheme.textStyles.body2.copy(fontSize = 11.sp),
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
@@ -308,14 +310,14 @@ fun UpdateDialog(
                             colors = ButtonDefaults.buttonColors(),
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text("取消下载")
+                            Text(stringResource(R.string.update_dialog_btn_cancel_download))
                         }
                         Button(
                             onClick = onDismiss,
                             colors = ButtonDefaults.buttonColorsPrimary(),
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text("后台下载")
+                            Text(stringResource(R.string.update_dialog_btn_background_download))
                         }
                     }
                     downloadedFile != null -> {
@@ -324,7 +326,7 @@ fun UpdateDialog(
                             colors = ButtonDefaults.buttonColors(),
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text("重新下载")
+                            Text(stringResource(R.string.update_dialog_btn_redownload))
                         }
                         Button(
                             onClick = {
@@ -333,7 +335,7 @@ fun UpdateDialog(
                             colors = ButtonDefaults.buttonColorsPrimary(),
                             modifier = Modifier.weight(1.3f),
                         ) {
-                            Text("立即安装")
+                            Text(stringResource(R.string.update_dialog_btn_install))
                         }
                     }
                     downloadError != null -> {
@@ -345,14 +347,14 @@ fun UpdateDialog(
                             colors = ButtonDefaults.buttonColors(),
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text("浏览器下载")
+                            Text(stringResource(R.string.update_dialog_btn_browser))
                         }
                         Button(
                             onClick = { startDownload() },
                             colors = ButtonDefaults.buttonColorsPrimary(),
                             modifier = Modifier.weight(1.2f),
                         ) {
-                            Text("重试")
+                            Text(stringResource(R.string.btn_retry))
                         }
                     }
                     else -> {
@@ -362,7 +364,7 @@ fun UpdateDialog(
                                 colors = ButtonDefaults.buttonColors(),
                                 modifier = Modifier.weight(1f),
                             ) {
-                                Text("忽略")
+                                Text(stringResource(R.string.btn_ignore))
                             }
                         }
                         Button(
@@ -370,14 +372,14 @@ fun UpdateDialog(
                             colors = ButtonDefaults.buttonColors(),
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text(if (onIgnore != null) "取消" else "稍后")
+                            Text(if (onIgnore != null) stringResource(R.string.btn_cancel) else stringResource(R.string.btn_later))
                         }
                         Button(
                             onClick = { startDownload() },
                             colors = ButtonDefaults.buttonColorsPrimary(),
                             modifier = Modifier.weight(1.3f),
                         ) {
-                            Text("立即更新")
+                            Text(stringResource(R.string.update_dialog_btn_update_now))
                         }
                     }
                 }
@@ -387,7 +389,7 @@ fun UpdateDialog(
 
             // 网页端说明链接
             Text(
-                text = "前往 GitHub 查看详细发布说明 ↗",
+                text = stringResource(R.string.update_dialog_github_release_note),
                 style = MiuixTheme.textStyles.body2.copy(fontSize = 11.sp),
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 textAlign = TextAlign.Center,

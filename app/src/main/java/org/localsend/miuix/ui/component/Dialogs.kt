@@ -30,8 +30,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import org.localsend.miuix.R
 import org.localsend.miuix.model.TransferSession
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -55,7 +57,7 @@ fun RenameDeviceDialog(
 
     WindowDialog(
         show = show,
-        title = "修改设备名称",
+        title = stringResource(R.string.dialog_rename_title),
         onDismissRequest = onDismissRequest
     ) {
         Column(
@@ -66,7 +68,7 @@ fun RenameDeviceDialog(
             TextField(
                 value = name,
                 onValueChange = { name = it },
-                label = "设备别名",
+                label = stringResource(R.string.dialog_rename_label),
                 useLabelAsPlaceholder = true,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -83,7 +85,7 @@ fun RenameDeviceDialog(
                     colors = ButtonDefaults.buttonColors(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("取消")
+                    Text(stringResource(R.string.btn_cancel))
                 }
                 Button(
                     onClick = {
@@ -96,7 +98,7 @@ fun RenameDeviceDialog(
                     colors = ButtonDefaults.buttonColorsPrimary(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("确定")
+                    Text(stringResource(R.string.btn_confirm))
                 }
             }
         }
@@ -114,7 +116,7 @@ fun PortDialog(
 
     WindowDialog(
         show = show,
-        title = "修改服务端口",
+        title = stringResource(R.string.dialog_port_title),
         onDismissRequest = onDismissRequest
     ) {
         Column(
@@ -125,7 +127,7 @@ fun PortDialog(
             TextField(
                 value = port,
                 onValueChange = { newValue -> if (newValue.length <= 5) port = newValue },
-                label = "端口号 (1 - 65535)",
+                label = stringResource(R.string.dialog_port_label),
                 useLabelAsPlaceholder = true,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -143,7 +145,7 @@ fun PortDialog(
                     colors = ButtonDefaults.buttonColors(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("取消")
+                    Text(stringResource(R.string.btn_cancel))
                 }
                 Button(
                     onClick = {
@@ -156,7 +158,7 @@ fun PortDialog(
                     colors = ButtonDefaults.buttonColorsPrimary(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("确定")
+                    Text(stringResource(R.string.btn_confirm))
                 }
             }
         }
@@ -175,7 +177,7 @@ fun ManualIpDialog(
 
     WindowDialog(
         show = show,
-        title = "手动输入 IP 发送",
+        title = stringResource(R.string.dialog_manual_ip_title),
         onDismissRequest = onDismissRequest
     ) {
         Column(
@@ -186,7 +188,7 @@ fun ManualIpDialog(
             TextField(
                 value = ip,
                 onValueChange = { ip = it },
-                label = "目标 IP 地址 (例如 192.168.1.100)",
+                label = stringResource(R.string.dialog_manual_ip_address_label),
                 useLabelAsPlaceholder = true,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -196,7 +198,7 @@ fun ManualIpDialog(
             if (recentIps.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "近期连接历史",
+                    text = stringResource(R.string.dialog_manual_ip_recent_history),
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
@@ -232,7 +234,7 @@ fun ManualIpDialog(
             TextField(
                 value = port,
                 onValueChange = { port = it },
-                label = "端口 (默认 53317)",
+                label = stringResource(R.string.dialog_manual_ip_port_label),
                 useLabelAsPlaceholder = true,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -250,7 +252,7 @@ fun ManualIpDialog(
                     colors = ButtonDefaults.buttonColors(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("取消")
+                    Text(stringResource(R.string.btn_cancel))
                 }
                 Button(
                     onClick = {
@@ -264,7 +266,7 @@ fun ManualIpDialog(
                     colors = ButtonDefaults.buttonColorsPrimary(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("连接并发送")
+                    Text(stringResource(R.string.dialog_manual_ip_btn_send))
                 }
             }
         }
@@ -281,7 +283,7 @@ fun SendTextDialog(
 
     WindowDialog(
         show = show,
-        title = "发送纯文本",
+        title = stringResource(R.string.dialog_send_text_title),
         onDismissRequest = onDismissRequest
     ) {
         Column(
@@ -292,7 +294,7 @@ fun SendTextDialog(
             TextField(
                 value = text,
                 onValueChange = { text = it },
-                label = "输入或粘贴要发送的文本内容",
+                label = stringResource(R.string.dialog_send_text_label),
                 useLabelAsPlaceholder = true,
                 minLines = 3,
                 maxLines = 6,
@@ -310,7 +312,7 @@ fun SendTextDialog(
                     colors = ButtonDefaults.buttonColors(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("取消")
+                    Text(stringResource(R.string.btn_cancel))
                 }
                 Button(
                     onClick = {
@@ -323,7 +325,7 @@ fun SendTextDialog(
                     colors = ButtonDefaults.buttonColorsPrimary(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("发送文本")
+                    Text(stringResource(R.string.dialog_send_text_btn_send))
                 }
             }
         }
@@ -341,7 +343,7 @@ fun PinDialog(
 
     WindowDialog(
         show = show,
-        title = "设置传输 PIN 码",
+        title = stringResource(R.string.dialog_pin_title),
         onDismissRequest = onDismissRequest
     ) {
         Column(
@@ -350,7 +352,7 @@ fun PinDialog(
                 .padding(top = 8.dp)
         ) {
             Text(
-                text = "设置 PIN 码后，其它设备向您发送内容时必须输入相同的 PIN 码才能完成握手。留空则表示不启用 PIN 保护。",
+                text = stringResource(R.string.dialog_pin_desc),
                 style = MiuixTheme.textStyles.body2,
                 color = MiuixTheme.colorScheme.onSurfaceSecondary
             )
@@ -360,7 +362,7 @@ fun PinDialog(
             TextField(
                 value = pin,
                 onValueChange = { pin = it },
-                label = "PIN 码（留空关闭）",
+                label = stringResource(R.string.dialog_pin_label),
                 useLabelAsPlaceholder = true,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -378,7 +380,7 @@ fun PinDialog(
                     colors = ButtonDefaults.buttonColors(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("取消")
+                    Text(stringResource(R.string.btn_cancel))
                 }
                 Button(
                     onClick = {
@@ -389,7 +391,7 @@ fun PinDialog(
                     colors = ButtonDefaults.buttonColorsPrimary(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("保存")
+                    Text(stringResource(R.string.btn_save))
                 }
             }
         }
@@ -407,7 +409,7 @@ fun CertFingerprintDialog(
 
     WindowDialog(
         show = show,
-        title = "TLS 安全证书指纹",
+        title = stringResource(R.string.dialog_cert_title),
         onDismissRequest = onDismissRequest
     ) {
         Column(
@@ -416,7 +418,7 @@ fun CertFingerprintDialog(
                 .padding(top = 8.dp)
         ) {
             Text(
-                text = "LocalSend 在 HTTPS 模式下使用本设备生成的自签名 X.509 证书进行端到端加密。对方设备可通过比对此 SHA-256 指纹确认未遭受中间人攻击。",
+                text = stringResource(R.string.dialog_cert_desc),
                 style = MiuixTheme.textStyles.body2,
                 color = MiuixTheme.colorScheme.onSurfaceSecondary
             )
@@ -426,13 +428,13 @@ fun CertFingerprintDialog(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        text = "SHA-256 指纹",
+                        text = stringResource(R.string.dialog_cert_label),
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = fingerprint.ifEmpty { "未生成或 HTTPS 未启用" },
+                        text = fingerprint.ifEmpty { stringResource(R.string.dialog_cert_empty) },
                         style = MiuixTheme.textStyles.body2.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
                         color = MiuixTheme.colorScheme.primary
                     )
@@ -452,7 +454,7 @@ fun CertFingerprintDialog(
                     },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("复制指纹")
+                    Text(stringResource(R.string.dialog_cert_btn_copy))
                 }
 
                 Button(
@@ -463,7 +465,7 @@ fun CertFingerprintDialog(
                     colors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.error, contentColor = androidx.compose.ui.graphics.Color.White),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("重新生成")
+                    Text(stringResource(R.string.dialog_cert_btn_regenerate))
                 }
             }
 
@@ -474,7 +476,7 @@ fun CertFingerprintDialog(
                 colors = ButtonDefaults.buttonColors(),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("关闭")
+                Text(stringResource(R.string.btn_close))
             }
         }
     }
@@ -491,7 +493,7 @@ fun IncomingTransferDialog(
 
     WindowDialog(
         show = session != null,
-        title = if (session?.isTextMessage == true) "收到纯文本消息" else "收到传输请求",
+        title = if (session?.isTextMessage == true) stringResource(R.string.dialog_incoming_text_title) else stringResource(R.string.dialog_incoming_files_title),
         onDismissRequest = onDecline
     ) {
         if (session != null) {
@@ -501,12 +503,13 @@ fun IncomingTransferDialog(
                     .padding(top = 8.dp)
             ) {
                 Text(
-                    text = "来自设备: ${session.device.alias} (${session.device.ip})",
+                    text = stringResource(R.string.dialog_incoming_from_device, session.device.alias, session.device.ip),
                     style = MiuixTheme.textStyles.body1
                 )
 
                 if (session.isTextMessage) {
-                    val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: "纯文本消息"
+                    val defaultTextMsg = stringResource(R.string.notif_plain_text_message)
+                    val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: defaultTextMsg
                     val detectedUrl = remember(previewText) {
                         val trimmed = previewText.trim()
                         if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
@@ -532,7 +535,7 @@ fun IncomingTransferDialog(
                     }
 
                     Text(
-                        text = "文本内容 (${previewText.length} 字符)",
+                        text = stringResource(R.string.dialog_incoming_text_length, previewText.length),
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
@@ -560,7 +563,7 @@ fun IncomingTransferDialog(
                             colors = ButtonDefaults.buttonColors(),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("拒绝")
+                            Text(stringResource(R.string.btn_decline))
                         }
 
                         Button(
@@ -568,7 +571,7 @@ fun IncomingTransferDialog(
                             colors = if (detectedUrl != null) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary(),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("复制")
+                            Text(stringResource(R.string.btn_copy))
                         }
 
                         if (detectedUrl != null) {
@@ -580,20 +583,20 @@ fun IncomingTransferDialog(
                                         }
                                         context.startActivity(intent)
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.toast_cannot_open_link), Toast.LENGTH_SHORT).show()
                                     }
                                     onAccept()
                                 },
                                 colors = ButtonDefaults.buttonColorsPrimary(),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("打开")
+                                Text(stringResource(R.string.btn_open))
                             }
                         }
                     }
                 } else {
                     Text(
-                        text = "共 ${session.files.size} 个文件，大小 ${session.formattedTotalSize}",
+                        text = stringResource(R.string.dialog_incoming_files_summary, session.files.size, session.formattedTotalSize),
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
@@ -647,14 +650,14 @@ fun IncomingTransferDialog(
                             colors = ButtonDefaults.buttonColors(),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("拒绝")
+                            Text(stringResource(R.string.btn_decline))
                         }
                         Button(
                             onClick = onAccept,
                             colors = ButtonDefaults.buttonColorsPrimary(),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("接收")
+                            Text(stringResource(R.string.btn_accept))
                         }
                     }
                 }
@@ -676,7 +679,7 @@ fun AddContentBottomSheet(
 ) {
     top.yukonga.miuix.kmp.window.WindowBottomSheet(
         show = show,
-        title = "添加发送内容",
+        title = stringResource(R.string.sheet_add_content_title),
         onDismissRequest = onDismissRequest
     ) {
         Column(
@@ -686,48 +689,48 @@ fun AddContentBottomSheet(
         ) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 ArrowPreference(
-                    title = "选择文件",
-                    summary = "从设备存储选择任意文件",
+                    title = stringResource(R.string.sheet_add_file_title),
+                    summary = stringResource(R.string.sheet_add_file_summary),
                     onClick = {
                         onDismissRequest()
                         onPickFiles()
                     }
                 )
                 ArrowPreference(
-                    title = "选择文件夹",
-                    summary = "递归添加整个文件夹内的所有文件",
+                    title = stringResource(R.string.sheet_add_folder_title),
+                    summary = stringResource(R.string.sheet_add_folder_summary),
                     onClick = {
                         onDismissRequest()
                         onPickFolder()
                     }
                 )
                 ArrowPreference(
-                    title = "选择媒体",
-                    summary = "从相册选择照片与视频",
+                    title = stringResource(R.string.sheet_add_media_title),
+                    summary = stringResource(R.string.sheet_add_media_summary),
                     onClick = {
                         onDismissRequest()
                         onPickMedia()
                     }
                 )
                 ArrowPreference(
-                    title = "选择应用 (APK)",
-                    summary = "提取本机已安装应用的 APK 文件",
+                    title = stringResource(R.string.sheet_add_apps_title),
+                    summary = stringResource(R.string.sheet_add_apps_summary),
                     onClick = {
                         onDismissRequest()
                         onPickApps()
                     }
                 )
                 ArrowPreference(
-                    title = "输入纯文本",
-                    summary = "输入需要发送的文字或链接",
+                    title = stringResource(R.string.sheet_add_text_title),
+                    summary = stringResource(R.string.sheet_add_text_summary),
                     onClick = {
                         onDismissRequest()
                         onSendText()
                     }
                 )
                 ArrowPreference(
-                    title = "从剪贴板粘贴",
-                    summary = "快速提取当前剪贴板文本或链接",
+                    title = stringResource(R.string.sheet_add_clipboard_title),
+                    summary = stringResource(R.string.sheet_add_clipboard_summary),
                     onClick = {
                         onDismissRequest()
                         onPasteClipboard()

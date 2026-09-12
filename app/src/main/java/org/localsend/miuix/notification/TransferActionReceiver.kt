@@ -22,7 +22,7 @@ class TransferActionReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val ACTION_CANCEL_TRANSFER = "org.localsend.miuix.action.CANCEL_TRANSFER"
-        const val EXTRA_SESSION_ID = "extra_session_id"
+        const val ACTION_CANCEL_TRANSFER = org.localsend.miuix.core.AppActions.ACTION_CANCEL_TRANSFER
+        const val EXTRA_SESSION_ID = org.localsend.miuix.core.AppActions.EXTRA_SESSION_ID
     }
 }

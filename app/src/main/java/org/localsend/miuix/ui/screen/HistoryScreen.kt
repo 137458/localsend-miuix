@@ -35,9 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferStatus
@@ -72,11 +74,11 @@ fun HistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = "传输历史",
+                title = stringResource(R.string.history_title),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 actions = {
@@ -84,7 +86,7 @@ fun HistoryScreen(
                         IconButton(onClick = { showClearConfirmDialog = true }) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
-                                contentDescription = "清空历史",
+                                contentDescription = stringResource(R.string.history_dialog_clear_title),
                                 tint = MiuixTheme.colorScheme.error
                             )
                         }
@@ -107,7 +109,7 @@ fun HistoryScreen(
         ) {
             if (history.isEmpty()) {
                 item {
-                    SmallTitle(text = "暂无传输记录")
+                    SmallTitle(text = stringResource(R.string.history_empty_title))
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier
@@ -123,7 +125,7 @@ fun HistoryScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "完成、失败或取消的传输会显示在这里",
+                                text = stringResource(R.string.history_empty_summary),
                                 style = MiuixTheme.textStyles.body2,
                                 color = MiuixTheme.colorScheme.onSurfaceSecondary
                             )
@@ -154,7 +156,7 @@ fun HistoryScreen(
     if (showClearConfirmDialog) {
         top.yukonga.miuix.kmp.window.WindowDialog(
             show = true,
-            title = "清空传输历史",
+            title = stringResource(R.string.history_dialog_clear_title),
             onDismissRequest = { showClearConfirmDialog = false }
         ) {
             Column(
@@ -163,7 +165,7 @@ fun HistoryScreen(
                     .padding(top = 8.dp)
             ) {
                 Text(
-                    text = "确定要清空全部 ${history.size} 条传输历史记录吗？此操作无法撤销。",
+                    text = stringResource(R.string.history_dialog_clear_msg, history.size),
                     style = MiuixTheme.textStyles.body1,
                     color = MiuixTheme.colorScheme.onSurface
                 )
@@ -177,7 +179,7 @@ fun HistoryScreen(
                         colors = ButtonDefaults.buttonColors(),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("取消")
+                        Text(stringResource(R.string.btn_cancel))
                     }
                     Button(
                         onClick = {
@@ -190,7 +192,7 @@ fun HistoryScreen(
                         ),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("清空")
+                        Text(stringResource(R.string.btn_clear))
                     }
                 }
             }
@@ -206,8 +208,8 @@ private fun HistoryItemCard(
 ) {
     val context = LocalContext.current
     val primary = MiuixTheme.colorScheme.primary
-    val statusInfo = remember(primary, item.status) {
-        statusInfo(status = item.status, primaryColor = primary)
+    val statusInfo = remember(primary, item.status, context) {
+        statusInfo(context = context, status = item.status, primaryColor = primary)
     }
 
     Card(
@@ -233,7 +235,7 @@ private fun HistoryItemCard(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (item.isIncoming) "接收自 ${item.deviceAlias}" else "发送给 ${item.deviceAlias}",
+                        text = if (item.isIncoming) stringResource(R.string.history_item_from, item.deviceAlias) else stringResource(R.string.history_item_to, item.deviceAlias),
                         style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.SemiBold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -258,7 +260,7 @@ private fun HistoryItemCard(
                     )
                 } else {
                     Text(
-                        text = if (item.fileNames.isNotEmpty()) item.fileNames.joinToString("、") else "${item.fileCount} 个文件",
+                        text = if (item.fileNames.isNotEmpty()) item.fileNames.joinToString("、") else stringResource(R.string.history_files_count, item.fileCount),
                         style = MiuixTheme.textStyles.body2,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -283,11 +285,11 @@ private fun HistoryItemCard(
                 Button(
                     onClick = {
                         onCopyText(item.textContent)
-                        Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColorsPrimary()
                 ) {
-                    Text("复制")
+                    Text(stringResource(R.string.btn_copy))
                 }
             }
         }
@@ -296,9 +298,9 @@ private fun HistoryItemCard(
 
 private data class StatusInfo(val label: String, val color: Color)
 
-private fun statusInfo(status: TransferStatus, primaryColor: Color): StatusInfo = when (status) {
-    TransferStatus.Completed -> StatusInfo("已完成", Color(0xFF16A34A))
-    TransferStatus.Failed -> StatusInfo("失败", Color(0xFFDC2626))
-    TransferStatus.Canceled -> StatusInfo("已取消", Color(0xFFF59E0B))
-    else -> StatusInfo("处理中", primaryColor)
+private fun statusInfo(context: Context, status: TransferStatus, primaryColor: Color): StatusInfo = when (status) {
+    TransferStatus.Completed -> StatusInfo(context.getString(R.string.status_completed), Color(0xFF16A34A))
+    TransferStatus.Failed -> StatusInfo(context.getString(R.string.status_failed), Color(0xFFDC2626))
+    TransferStatus.Canceled -> StatusInfo(context.getString(R.string.status_canceled), Color(0xFFF59E0B))
+    else -> StatusInfo(context.getString(R.string.status_processing), primaryColor)
 }

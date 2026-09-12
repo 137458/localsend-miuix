@@ -37,12 +37,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import org.localsend.miuix.BuildConfig
+import org.localsend.miuix.R
 import org.localsend.miuix.manager.UpdateCheckResult
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.FileItem
@@ -108,12 +110,12 @@ fun UpdateScreen(
                 if (info.hasUpdate) {
                     showDialog = true
                 } else if (userInitiated) {
-                    Toast.makeText(context, "已是最新版本 (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_latest_version, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
                 }
             }.onFailure { error ->
-                val message = error.localizedMessage ?: "检查更新失败"
+                val message = error.localizedMessage ?: ""
                 if (userInitiated) {
-                    Toast.makeText(context, "检查更新失败: $message", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_check_update_failed, message), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -149,7 +151,7 @@ fun UpdateScreen(
                 alpha = ((scrollProgress - 0.35f) / 0.65f).coerceIn(0f, 1f),
             )
             SmallTopAppBar(
-                title = "软件更新",
+                title = stringResource(R.string.update_screen_title),
                 scrollBehavior = topAppBarScrollBehavior,
                 color = barColor,
                 titleColor = titleColor,
@@ -157,7 +159,7 @@ fun UpdateScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.action_back),
                         )
                     }
                 },
@@ -221,7 +223,7 @@ fun UpdateScreen(
 
                 if (isChecking) {
                     Text(
-                        text = "正在检查更新...",
+                        text = stringResource(R.string.update_checking_hint),
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center,
@@ -234,7 +236,7 @@ fun UpdateScreen(
                     )
                 } else if (hasNew) {
                     Text(
-                        text = "发现新版本 ${releaseInfo?.latestVersion} (当前 v${BuildConfig.VERSION_NAME})",
+                        text = stringResource(R.string.update_found_header, releaseInfo?.latestVersion ?: "", BuildConfig.VERSION_NAME),
                         color = MiuixTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp,
@@ -248,7 +250,7 @@ fun UpdateScreen(
                     )
                 } else {
                     Text(
-                        text = "已是最新版本 (v${BuildConfig.VERSION_NAME})",
+                        text = stringResource(R.string.update_latest_header, BuildConfig.VERSION_NAME),
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center,
@@ -283,10 +285,11 @@ fun UpdateScreen(
                 if (releaseInfo != null) {
                     item(key = "changelog") {
                         val changelogTitle = if (hasNew) {
-                            "新版本更新日志 (${releaseInfo?.latestVersion})"
+                            stringResource(R.string.update_changelog_title_new, releaseInfo?.latestVersion ?: "")
                         } else {
-                            "当前版本说明 (v${BuildConfig.VERSION_NAME})"
+                            stringResource(R.string.update_changelog_title_current, BuildConfig.VERSION_NAME)
                         }
+                        val defaultReleaseTitle = stringResource(R.string.update_release_default_title)
                         SmallTitle(text = changelogTitle)
                         Card(
                             modifier = Modifier
@@ -295,7 +298,7 @@ fun UpdateScreen(
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = releaseInfo?.releaseTitle?.ifBlank { "版本特性说明" } ?: "版本特性说明",
+                                    text = releaseInfo?.releaseTitle?.ifBlank { defaultReleaseTitle } ?: defaultReleaseTitle,
                                     style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold),
                                     color = MiuixTheme.colorScheme.onSurface,
                                 )
@@ -313,7 +316,7 @@ fun UpdateScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                     ) {
                                         Text(
-                                            text = "正在下载更新...",
+                                            text = stringResource(R.string.update_downloading_hint),
                                             style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
                                             color = MiuixTheme.colorScheme.primary,
                                         )
@@ -340,7 +343,7 @@ fun UpdateScreen(
 
                                 if (downloadedFile != null) {
                                     TextButton(
-                                        text = "立即安装更新",
+                                        text = stringResource(R.string.update_btn_install_now),
                                         onClick = {
                                             updateManager.installApk(context, downloadedFile!!)
                                         },
@@ -349,7 +352,7 @@ fun UpdateScreen(
                                     )
                                 } else if (hasNew && !isDownloading) {
                                     TextButton(
-                                        text = "立即下载更新",
+                                        text = stringResource(R.string.update_btn_download_now),
                                         onClick = {
                                             val url = releaseInfo?.downloadUrl ?: releaseInfo?.releaseUrl
                                             if (url != null) {
@@ -369,7 +372,7 @@ fun UpdateScreen(
                                                         downloadedFile = file
                                                         updateManager.installApk(context, file)
                                                     }.onFailure { error ->
-                                                        Toast.makeText(context, "下载失败: ${error.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.toast_download_apk_failed, error.localizedMessage ?: ""), Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             } else {
@@ -388,15 +391,15 @@ fun UpdateScreen(
 
                 // ── 更新设置 ──
                 item(key = "settings") {
-                    SmallTitle(text = "更新设置")
+                    SmallTitle(text = stringResource(R.string.update_section_settings))
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp),
                     ) {
                         BasicComponent(
-                            title = "自动检查更新",
-                            summary = "每次启动应用时自动检查最新版本",
+                            title = stringResource(R.string.update_pref_auto_check_title),
+                            summary = stringResource(R.string.update_pref_auto_check_summary),
                             endActions = {
                                 Switch(
                                     checked = autoCheckUpdate,
@@ -408,12 +411,12 @@ fun UpdateScreen(
                         )
 
                         BasicComponent(
-                            title = "忽略此版本",
+                            title = stringResource(R.string.update_pref_ignore_title),
                             summary = when {
-                                isChecking -> "正在检查..."
-                                !hasNew -> "当前已是最新版本"
-                                ignoredVersion == releaseInfo?.latestVersion -> "已忽略版本 ${releaseInfo?.latestVersion}"
-                                else -> "忽略新版本 ${releaseInfo?.latestVersion} 的更新提示"
+                                isChecking -> stringResource(R.string.update_pref_ignore_checking)
+                                !hasNew -> stringResource(R.string.update_pref_ignore_already_latest)
+                                ignoredVersion == releaseInfo?.latestVersion -> stringResource(R.string.update_pref_ignore_ignored, releaseInfo?.latestVersion ?: "")
+                                else -> stringResource(R.string.update_pref_ignore_desc, releaseInfo?.latestVersion ?: "")
                             },
                             endActions = {
                                 Switch(
@@ -430,15 +433,15 @@ fun UpdateScreen(
 
                 // ── 版本通道与操作 ──
                 item(key = "channel") {
-                    SmallTitle(text = "版本通道与操作")
+                    SmallTitle(text = stringResource(R.string.update_section_channel))
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp),
                     ) {
                         BasicComponent(
-                            title = "手动检查更新",
-                            summary = if (isChecking) "正在检索远程版本信息..." else "点击从 GitHub Releases 检索最新版本",
+                            title = stringResource(R.string.update_pref_manual_check_title),
+                            summary = if (isChecking) stringResource(R.string.update_pref_manual_check_busy) else stringResource(R.string.update_pref_manual_check_idle),
                             onClick = {
                                 doCheck(userInitiated = true)
                             },
@@ -453,15 +456,15 @@ fun UpdateScreen(
 
                         BasicComponent(
                             title = "GitHub Releases",
-                            summary = "前往项目官方发布页面查看历史版本",
+                            summary = stringResource(R.string.update_pref_github_releases_summary),
                             onClick = {
                                 updateManager.openInBrowser(context, "https://github.com/137458/localsend-miuix/releases")
                             },
                         )
 
                         BasicComponent(
-                            title = "HyperOS 3 流光特效",
-                            summary = if (isOs3Effect) "已开启 HyperOS 3 增强流光着色器" else "当前使用 HyperOS 2 经典流光着色器",
+                            title = stringResource(R.string.update_pref_os3_title),
+                            summary = if (isOs3Effect) stringResource(R.string.update_pref_os3_enabled) else stringResource(R.string.update_pref_os3_disabled),
                             endActions = {
                                 Switch(
                                     checked = isOs3Effect,

@@ -30,7 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferStatus
@@ -75,11 +77,11 @@ fun ReceiveScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         TopAppBar(
-            title = "接收",
+            title = stringResource(R.string.receive_title),
             scrollBehavior = scrollBehavior,
             actions = {
                 IconButton(onClick = onOpenHistory) {
-                    Icon(imageVector = AppIcons.History, contentDescription = "传输历史")
+                    Icon(imageVector = AppIcons.History, contentDescription = stringResource(R.string.action_history))
                 }
             }
         )
@@ -98,11 +100,11 @@ fun ReceiveScreen(
         ) {
             // Section 1: Device Info Card
             item {
-                SmallTitle(text = "本机设备")
+                SmallTitle(text = stringResource(R.string.receive_section_local_device))
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ArrowPreference(
                         title = settings.alias,
-                        summary = "设备别名 (点击修改)",
+                        summary = stringResource(R.string.receive_pref_alias_summary),
                         startAction = {
                             Icon(
                                 imageVector = AppIcons.getDeviceIcon(settings.deviceType),
@@ -115,7 +117,7 @@ fun ReceiveScreen(
                     )
                     ArrowPreference(
                         title = "$primaryIp:${settings.port}",
-                        summary = if (localIps.size > 1) "所有网卡 IP: ${localIps.joinToString(", ")}" else "局域网 IPv4 地址与服务端口",
+                        summary = if (localIps.size > 1) stringResource(R.string.receive_pref_all_ips_summary, localIps.joinToString(", ")) else stringResource(R.string.receive_pref_ip_port_summary),
                         onClick = {}
                     )
                 }
@@ -124,19 +126,19 @@ fun ReceiveScreen(
             // Section 2: Quick Receive Preferences
             item {
                 Spacer(modifier = Modifier.height(4.dp))
-                SmallTitle(text = "接收选项")
+                SmallTitle(text = stringResource(R.string.receive_section_options))
                 Card(modifier = Modifier.fillMaxWidth()) {
                     SwitchPreference(
-                        title = "快速保存",
-                        summary = "自动接受同局域网所有设备的传输请求，无需每次手动确认",
+                        title = stringResource(R.string.receive_pref_quick_save_title),
+                        summary = stringResource(R.string.receive_pref_quick_save_summary),
                         checked = settings.quickSave,
                         onCheckedChange = { checked ->
                             manager.updateSettings { it.copy(quickSave = checked) }
                         }
                     )
                     SwitchPreference(
-                        title = "自动复制文本",
-                        summary = "收到纯文本消息时自动写入系统剪贴板",
+                        title = stringResource(R.string.receive_pref_auto_copy_title),
+                        summary = stringResource(R.string.receive_pref_auto_copy_summary),
                         checked = settings.autoCopyText,
                         onCheckedChange = { checked ->
                             manager.updateSettings { it.copy(autoCopyText = checked) }
@@ -149,7 +151,7 @@ fun ReceiveScreen(
             if (incomingSessions.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = "正在接收 (${incomingSessions.count { it.status == TransferStatus.InProgress }})")
+                    SmallTitle(text = stringResource(R.string.receive_section_incoming_count, incomingSessions.count { it.status == TransferStatus.InProgress }))
                 }
                 items(incomingSessions, key = { it.sessionId }) { session ->
                     TransferSessionCard(
@@ -175,13 +177,13 @@ fun ReceiveScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "等待接收中...",
+                                text = stringResource(R.string.receive_waiting_idle),
                                 style = MiuixTheme.textStyles.body2,
                                 color = MiuixTheme.colorScheme.onSurfaceSecondary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "确保发送端连接在同一 Wi-Fi 或局域网",
+                                text = stringResource(R.string.receive_waiting_hint),
                                 style = MiuixTheme.textStyles.footnote1,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )

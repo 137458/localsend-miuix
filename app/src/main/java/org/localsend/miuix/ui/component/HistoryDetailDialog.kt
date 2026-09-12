@@ -38,12 +38,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.localsend.miuix.R
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.HistoryFileEntry
 import org.localsend.miuix.model.TransferHistoryItem
@@ -76,7 +78,7 @@ fun HistoryDetailDialog(
     WindowBottomSheet(
         show = show,
         onDismissRequest = onDismissRequest,
-        title = if (item.isTextMessage) "文本消息详情" else "传输记录详情"
+        title = if (item.isTextMessage) stringResource(R.string.history_detail_text_title) else stringResource(R.string.history_detail_file_title)
     ) {
         Column(
             modifier = Modifier
@@ -97,15 +99,19 @@ fun HistoryDetailDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (item.isIncoming) "发送方: ${item.deviceAlias}" else "接收方: ${item.deviceAlias}",
+                            text = if (item.isIncoming) {
+                                stringResource(R.string.history_detail_sender, item.deviceAlias)
+                            } else {
+                                stringResource(R.string.history_detail_receiver, item.deviceAlias)
+                            },
                             style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.SemiBold)
                         )
                         Text(
                             text = when (item.status) {
-                                TransferStatus.Completed -> "已完成"
-                                TransferStatus.Failed -> "失败"
-                                TransferStatus.Canceled -> "已取消"
-                                else -> "处理中"
+                                TransferStatus.Completed -> stringResource(R.string.status_completed)
+                                TransferStatus.Failed -> stringResource(R.string.status_failed)
+                                TransferStatus.Canceled -> stringResource(R.string.status_canceled)
+                                else -> stringResource(R.string.status_processing)
                             },
                             style = MiuixTheme.textStyles.footnote1,
                             color = when (item.status) {
@@ -121,7 +127,7 @@ fun HistoryDetailDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "设备 IP",
+                            text = stringResource(R.string.history_detail_device_ip),
                             style = MiuixTheme.textStyles.footnote1,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
@@ -136,7 +142,7 @@ fun HistoryDetailDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "时间",
+                            text = stringResource(R.string.history_detail_time),
                             style = MiuixTheme.textStyles.footnote1,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
@@ -151,12 +157,12 @@ fun HistoryDetailDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "总计",
+                            text = stringResource(R.string.history_detail_total),
                             style = MiuixTheme.textStyles.footnote1,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
                         Text(
-                            text = "${item.fileCount} 项 · ${item.formattedSize}",
+                            text = stringResource(R.string.history_detail_total_summary, item.fileCount, item.formattedSize),
                             style = MiuixTheme.textStyles.footnote1
                         )
                     }
@@ -168,7 +174,7 @@ fun HistoryDetailDialog(
             // Section 2: Text Content or File List
             if (item.isTextMessage && !item.textContent.isNullOrEmpty()) {
                 Text(
-                    text = "文本内容",
+                    text = stringResource(R.string.history_detail_text_content),
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
@@ -220,11 +226,11 @@ fun HistoryDetailDialog(
                                 onClick = {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                     clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Text", item.textContent))
-                                    Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                                 },
                                 colors = if (detectedUrl != null) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary()
                             ) {
-                                Text("复制完整文本")
+                                Text(stringResource(R.string.history_detail_btn_copy_text))
                             }
 
                             if (detectedUrl != null) {
@@ -236,12 +242,12 @@ fun HistoryDetailDialog(
                                             }
                                             context.startActivity(intent)
                                         } catch (e: Exception) {
-                                            Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, context.getString(R.string.toast_cannot_open_link), Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColorsPrimary()
                                 ) {
-                                    Text("打开链接")
+                                    Text(stringResource(R.string.btn_open_link))
                                 }
                             }
                         }
@@ -249,7 +255,7 @@ fun HistoryDetailDialog(
                 }
             } else if (item.fileEntries.isNotEmpty()) {
                 Text(
-                    text = "包含文件 (${item.fileEntries.size})",
+                    text = stringResource(R.string.history_detail_included_files, item.fileEntries.size),
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
@@ -274,7 +280,7 @@ fun HistoryDetailDialog(
                                             }
                                             context.startActivity(intent)
                                         } catch (e: Exception) {
-                                            Toast.makeText(context, "无法打开此文件", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, context.getString(R.string.toast_cannot_open_file), Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
@@ -320,7 +326,7 @@ fun HistoryDetailDialog(
                     onClick = {
                         onDelete(item.id)
                         onDismissRequest()
-                        Toast.makeText(context, "已删除该条记录", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_history_item_deleted), Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(
                         color = MiuixTheme.colorScheme.error,
@@ -328,7 +334,7 @@ fun HistoryDetailDialog(
                     ),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("删除此记录")
+                    Text(stringResource(R.string.history_detail_btn_delete_record))
                 }
 
                 Button(
@@ -336,7 +342,7 @@ fun HistoryDetailDialog(
                     colors = ButtonDefaults.buttonColors(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("关闭")
+                    Text(stringResource(R.string.btn_close))
                 }
             }
         }

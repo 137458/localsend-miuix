@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,6 +42,7 @@ import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.localsend.miuix.R
 import org.localsend.miuix.manager.AppInfoItem
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.FileItem
@@ -154,7 +156,7 @@ fun AppPickerBottomSheet(
     WindowBottomSheet(
         show = show,
         onDismissRequest = onDismissRequest,
-        title = "选择应用 (APK)"
+        title = stringResource(R.string.app_picker_title)
     ) {
         Column(
             modifier = Modifier
@@ -164,7 +166,7 @@ fun AppPickerBottomSheet(
             TextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                label = "搜索应用名称或包名...",
+                label = stringResource(R.string.app_picker_search_label),
                 useLabelAsPlaceholder = true,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -187,7 +189,7 @@ fun AppPickerBottomSheet(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "显示系统应用",
+                        text = stringResource(R.string.app_picker_show_system_apps),
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
@@ -195,13 +197,13 @@ fun AppPickerBottomSheet(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "已选 ${selectedPackages.size} 项 / 共 ${filteredApps.size} 个",
+                        text = stringResource(R.string.app_picker_selected_count, selectedPackages.size, filteredApps.size),
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isRefreshing) "刷新中..." else "刷新",
+                        text = if (isRefreshing) stringResource(R.string.app_picker_refreshing) else stringResource(R.string.btn_refresh),
                         style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
                         color = if (isRefreshing) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.primary,
                         modifier = Modifier
@@ -224,7 +226,7 @@ fun AppPickerBottomSheet(
                     horizontalArrangement = Arrangement.End
                 ) {
                     Text(
-                        text = if (isAllFilteredSelected) "取消全选" else "全选当前",
+                        text = if (isAllFilteredSelected) stringResource(R.string.app_picker_deselect_all) else stringResource(R.string.app_picker_select_all),
                         style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
                         color = MiuixTheme.colorScheme.primary,
                         modifier = Modifier
@@ -259,7 +261,7 @@ fun AppPickerBottomSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "没有找到符合条件的应用",
+                        text = stringResource(R.string.app_picker_empty),
                         style = MiuixTheme.textStyles.body2,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
@@ -326,7 +328,7 @@ fun AppPickerBottomSheet(
                                         if (app.isSystemApp) {
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = "系统",
+                                                text = stringResource(R.string.app_picker_system_tag),
                                                 style = MiuixTheme.textStyles.footnote1,
                                                 color = MiuixTheme.colorScheme.primary
                                             )
@@ -357,7 +359,7 @@ fun AppPickerBottomSheet(
                     onClick = onDismissRequest,
                     colors = ButtonDefaults.buttonColors()
                 ) {
-                    Text("取消")
+                    Text(stringResource(R.string.btn_cancel))
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -371,7 +373,7 @@ fun AppPickerBottomSheet(
                     enabled = selectedPackages.isNotEmpty(),
                     colors = ButtonDefaults.buttonColorsPrimary()
                 ) {
-                    Text("添加所选 (${selectedPackages.size})")
+                    Text(stringResource(R.string.app_picker_btn_add_selected, selectedPackages.size))
                 }
             }
         }

@@ -44,8 +44,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferStatus
@@ -106,12 +108,12 @@ fun SendScreen(
         val apks = selectedFiles.count { ThumbnailHelper.isApk(it) }
         val others = selectedFiles.size - (images + videos + audios + texts + apks)
         buildList {
-            if (images > 0) add("$images 张图片")
-            if (videos > 0) add("$videos 个视频")
-            if (audios > 0) add("$audios 首音频")
-            if (texts > 0) add("$texts 条文本")
-            if (apks > 0) add("$apks 个应用")
-            if (others > 0) add("$others 个文件")
+            if (images > 0) add(context.getString(R.string.send_cat_images_count, images))
+            if (videos > 0) add(context.getString(R.string.send_cat_videos_count, videos))
+            if (audios > 0) add(context.getString(R.string.send_cat_audios_count, audios))
+            if (texts > 0) add(context.getString(R.string.send_cat_texts_count, texts))
+            if (apks > 0) add(context.getString(R.string.send_cat_apks_count, apks))
+            if (others > 0) add(context.getString(R.string.send_cat_others_count, others))
         }
     }
 
@@ -121,23 +123,28 @@ fun SendScreen(
     val pullToRefreshState = rememberPullToRefreshState()
     val scrollBehavior = MiuixScrollBehavior()
 
+    val refreshPull = stringResource(R.string.send_pull_refresh_pull)
+    val refreshRelease = stringResource(R.string.send_pull_refresh_release)
+    val refreshRefreshing = stringResource(R.string.send_pull_refresh_refreshing)
+    val refreshComplete = stringResource(R.string.send_pull_refresh_complete)
+
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
         TopAppBar(
-            title = "发送",
+            title = stringResource(R.string.send_title),
             scrollBehavior = scrollBehavior,
             actions = {
                 IconButton(onClick = onManualIp) {
-                    Icon(imageVector = AppIcons.Send, contentDescription = "输入IP")
+                    Icon(imageVector = AppIcons.Send, contentDescription = stringResource(R.string.action_input_ip))
                 }
                 IconButton(
                     onClick = {
                         manager.refreshDevices()
-                        Toast.makeText(context, "已发送局域网发现广播", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_multicast_sent), Toast.LENGTH_SHORT).show()
                     }
                 ) {
-                    Icon(imageVector = AppIcons.Refresh, contentDescription = "刷新")
+                    Icon(imageVector = AppIcons.Refresh, contentDescription = stringResource(R.string.action_refresh))
                 }
             }
         )
@@ -151,7 +158,7 @@ fun SendScreen(
                 isRefreshing = false
             },
             pullToRefreshState = pullToRefreshState,
-            refreshTexts = listOf("下拉刷新", "释放立即刷新", "正在刷新...", "刷新完成"),
+            refreshTexts = listOf(refreshPull, refreshRelease, refreshRefreshing, refreshComplete),
             modifier = Modifier
                 .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
@@ -168,26 +175,26 @@ fun SendScreen(
             ) {
                 // Section 1: Quick Action Grid (6 types)
                 item {
-                    SmallTitle(text = "快速选择内容")
+                    SmallTitle(text = stringResource(R.string.send_section_quick_pick))
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                QuickActionItem(title = "文件", icon = Icons.Default.Folder, onClick = onPickFiles)
-                                QuickActionItem(title = "文件夹", icon = Icons.Default.FolderOpen, onClick = onPickFolder)
-                                QuickActionItem(title = "媒体", icon = Icons.Default.Image, onClick = onPickMedia)
+                                QuickActionItem(title = stringResource(R.string.send_quick_action_files), icon = Icons.Default.Folder, onClick = onPickFiles)
+                                QuickActionItem(title = stringResource(R.string.send_quick_action_folder), icon = Icons.Default.FolderOpen, onClick = onPickFolder)
+                                QuickActionItem(title = stringResource(R.string.send_quick_action_media), icon = Icons.Default.Image, onClick = onPickMedia)
                             }
                             Spacer(modifier = Modifier.height(10.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                QuickActionItem(title = "应用", icon = Icons.Default.Android, onClick = onPickApps)
-                                QuickActionItem(title = "纯文本", icon = Icons.Default.TextFields, onClick = onSendText)
+                                QuickActionItem(title = stringResource(R.string.send_quick_action_apps), icon = Icons.Default.Android, onClick = onPickApps)
+                                QuickActionItem(title = stringResource(R.string.send_quick_action_text), icon = Icons.Default.TextFields, onClick = onSendText)
                                 QuickActionItem(
-                                    title = "剪贴板",
+                                    title = stringResource(R.string.send_quick_action_clipboard),
                                     icon = Icons.AutoMirrored.Filled.Assignment,
                                     onClick = onPasteClipboard
                                 )
@@ -200,8 +207,8 @@ fun SendScreen(
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         ArrowPreference(
-                            title = if (shares.isNotEmpty()) "Web 共享正在运行中" else "通过浏览器链接分享 (Web Share)",
-                            summary = if (shares.isNotEmpty()) "已有 ${shares.first().files.size} 项正在局域网共享，点击查看链接与二维码" else "无需客户端，任何浏览器扫描二维码或访问链接即可接收",
+                            title = if (shares.isNotEmpty()) stringResource(R.string.send_web_share_running_title) else stringResource(R.string.send_web_share_idle_title),
+                            summary = if (shares.isNotEmpty()) stringResource(R.string.send_web_share_running_summary, shares.first().files.size) else stringResource(R.string.send_web_share_idle_summary),
                             startAction = {
                                 Icon(
                                     imageVector = Icons.Default.Language,
@@ -219,7 +226,7 @@ fun SendScreen(
                 if (selectedFiles.isNotEmpty()) {
                     item {
                         Spacer(modifier = Modifier.height(4.dp))
-                        SmallTitle(text = "待发送内容 (${selectedFiles.size})")
+                        SmallTitle(text = stringResource(R.string.send_section_selected_files, selectedFiles.size))
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(
                                 modifier = Modifier
@@ -233,7 +240,7 @@ fun SendScreen(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "共 ${selectedFiles.size} 项 (${FileItem.formatFileSize(totalSelectedSize)})",
+                                            text = stringResource(R.string.send_selected_summary_header, selectedFiles.size, FileItem.formatFileSize(totalSelectedSize)),
                                             style = MiuixTheme.textStyles.headline1
                                         )
                                         if (categoryBreakdown.isNotEmpty()) {
@@ -254,21 +261,21 @@ fun SendScreen(
                                             colors = ButtonDefaults.buttonColors(),
                                             modifier = Modifier.defaultMinSize(minWidth = 56.dp)
                                         ) {
-                                            Text("预览")
+                                            Text(stringResource(R.string.btn_preview))
                                         }
                                         Button(
                                             onClick = onOpenAddSheet,
                                             colors = ButtonDefaults.buttonColors(),
                                             modifier = Modifier.defaultMinSize(minWidth = 56.dp)
                                         ) {
-                                            Text("添加")
+                                            Text(stringResource(R.string.btn_add))
                                         }
                                         Button(
                                             onClick = { manager.clearFiles() },
                                             colors = ButtonDefaults.buttonColors(),
                                             modifier = Modifier.defaultMinSize(minWidth = 56.dp)
                                         ) {
-                                            Text("清空")
+                                            Text(stringResource(R.string.btn_clear))
                                         }
                                     }
                                 }
@@ -299,7 +306,7 @@ fun SendScreen(
                                             Spacer(modifier = Modifier.width(12.dp))
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = if (file.isTextMessage) "纯文本消息" else file.name,
+                                                    text = if (file.isTextMessage) stringResource(R.string.send_type_text_message) else file.name,
                                                     style = MiuixTheme.textStyles.body1,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
@@ -322,7 +329,7 @@ fun SendScreen(
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Delete,
-                                                    contentDescription = "删除",
+                                                    contentDescription = stringResource(R.string.btn_delete),
                                                     tint = MiuixTheme.colorScheme.error
                                                 )
                                             }
@@ -342,14 +349,14 @@ fun SendScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = if (isFileListExpanded) "收起待发送列表" else "展开其余 ${selectedFiles.size - 3} 项文件",
+                                            text = if (isFileListExpanded) stringResource(R.string.send_collapse_files) else stringResource(R.string.send_expand_files, selectedFiles.size - 3),
                                             style = MiuixTheme.textStyles.footnote1,
                                             color = if (isFileListExpanded) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.primary
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Icon(
                                             imageVector = if (isFileListExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                            contentDescription = if (isFileListExpanded) "收起" else "展开",
+                                            contentDescription = if (isFileListExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                                             tint = if (isFileListExpanded) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.primary,
                                             modifier = Modifier.size(16.dp)
                                         )
@@ -364,7 +371,7 @@ fun SendScreen(
                 val totalDeviceCount = nearbyDevices.size + nonNearbySessions.size
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = "附近设备 ($totalDeviceCount)")
+                    SmallTitle(text = stringResource(R.string.send_section_nearby_devices, totalDeviceCount))
                 }
 
                 if (isScanning) {
@@ -376,7 +383,7 @@ fun SendScreen(
                                     .padding(horizontal = 16.dp, vertical = 12.dp)
                             ) {
                                 Text(
-                                    text = "正在全网段并发探测设备中...",
+                                    text = stringResource(R.string.send_scanning_subnet_hint),
                                     style = MiuixTheme.textStyles.footnote1,
                                     color = MiuixTheme.colorScheme.primary
                                 )
@@ -409,13 +416,13 @@ fun SendScreen(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "正在搜索同一局域网下的 LocalSend 设备...",
+                                    text = stringResource(R.string.send_searching_devices_title),
                                     style = MiuixTheme.textStyles.body2,
                                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "下拉即可刷新或点击右上角广播",
+                                    text = stringResource(R.string.send_searching_devices_hint),
                                     style = MiuixTheme.textStyles.footnote1,
                                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                 )
@@ -428,7 +435,7 @@ fun SendScreen(
                             (it.device.fingerprint.isNotEmpty() && it.device.fingerprint == device.fingerprint) || it.device.ip == device.ip
                         }
                         val networkLabel = if (device.alternateIps.isNotEmpty()) {
-                            " (+${device.alternateIps.size}个网段)"
+                            stringResource(R.string.send_device_multi_subnet_tag, device.alternateIps.size)
                         } else {
                             ""
                         }
@@ -447,10 +454,10 @@ fun SendScreen(
                                     },
                                     onClick = {
                                         if (selectedFiles.isEmpty()) {
-                                            Toast.makeText(context, "请先添加要发送的文件或内容", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, context.getString(R.string.toast_empty_selection_warn), Toast.LENGTH_SHORT).show()
                                         } else {
                                             manager.sendFilesTo(device)
-                                            Toast.makeText(context, "正在向 ${device.alias} 发起传输...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, context.getString(R.string.toast_initiating_transfer, device.alias), Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 )

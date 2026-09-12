@@ -47,22 +47,22 @@ object LiveUpdatesCompat {
         contentIntent: PendingIntent,
         cancelIntent: PendingIntent
     ): Notification {
-        val speedText = if (session.speed > 0) session.formattedSpeed else "准备中"
-        val compactEta = formatCompactEta(session)
+        val speedText = if (session.speed > 0) session.formattedSpeed else context.getString(R.string.live_preparing)
+        val compactEta = formatCompactEta(session, context)
         val etaPart = if (compactEta.isNotEmpty()) " · $compactEta" else ""
 
-        val actionType = if (session.isIncoming) "接收中" else "发送中"
+        val actionType = if (session.isIncoming) context.getString(R.string.live_receiving) else context.getString(R.string.live_sending)
         val fileIndexInfo = if (session.files.size > 1) " (${session.currentFileIndex + 1}/${session.files.size})" else ""
 
         // 展开态大标题：发送至 / 接收自 目标设备（简练纯粹，不折行）
-        val direction = if (session.isIncoming) "接收自" else "发送至"
+        val direction = if (session.isIncoming) context.getString(R.string.live_from_prefix) else context.getString(R.string.live_to_prefix)
         val expandedTitle = "$direction ${session.device.alias}"
 
         // 展开态核心内容：当前文件名 + 文件序号序号一体化（例如：presentation_demo.mp4 (2/3)）
         val currentFileName = session.currentFile?.name
-            ?: if (session.isTextMessage) (session.singleTextMessageContent?.take(40) ?: "纯文本消息")
-            else if (session.files.size > 1) "共 ${session.files.size} 个文件"
-            else "文件传输"
+            ?: if (session.isTextMessage) (session.singleTextMessageContent?.take(40) ?: context.getString(R.string.notif_plain_text_message))
+            else if (session.files.size > 1) context.getString(R.string.live_files_count, session.files.size)
+            else context.getString(R.string.live_file_transfer)
         val fileIndexStr = if (session.files.size > 1) " (${session.currentFileIndex + 1}/${session.files.size})" else ""
         val contentText = "$currentFileName$fileIndexStr"
 
@@ -75,7 +75,7 @@ object LiveUpdatesCompat {
         }
 
         // 胶囊收起态右侧：状态简字 + 实时速度与剩余时间（例如：发 28M/s 3s）
-        val chipSpeedEta = formatChipSpeedEta(session)
+        val chipSpeedEta = formatChipSpeedEta(session, context)
 
         val smallIconRes = if (session.isIncoming) R.drawable.ic_stat_receive else R.drawable.ic_stat_send
 
@@ -99,7 +99,7 @@ object LiveUpdatesCompat {
                 .addAction(
                     Notification.Action.Builder(
                         android.graphics.drawable.Icon.createWithResource(context, android.R.drawable.ic_menu_close_clear_cancel),
-                        "取消传输",
+                        context.getString(R.string.action_cancel_transfer),
                         cancelIntent
                     ).build()
                 )
@@ -148,7 +148,7 @@ object LiveUpdatesCompat {
             .setProgress(100, session.progressPercent, session.totalBytes <= 0)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
-                "取消传输",
+                context.getString(R.string.action_cancel_transfer),
                 cancelIntent
             )
 
@@ -162,11 +162,11 @@ object LiveUpdatesCompat {
     /**
      * 格式化胶囊芯片短文本：状态简字 + 速度和剩余时间（控制在 8~10 字符内，适配状态栏芯片排版）。
      */
-    fun formatChipSpeedEta(session: TransferSession): String {
-        if (session.isTextMessage) return "文本"
-        if (session.status == org.localsend.miuix.model.TransferStatus.Completed) return "已完成"
-        if (session.status == org.localsend.miuix.model.TransferStatus.WaitingApproval) return "待确认"
-        if (session.speed <= 0) return "准备中"
+    fun formatChipSpeedEta(session: TransferSession, context: Context? = null): String {
+        if (session.isTextMessage) return context?.getString(R.string.chip_text) ?: "文本"
+        if (session.status == org.localsend.miuix.model.TransferStatus.Completed) return context?.getString(R.string.chip_completed) ?: "已完成"
+        if (session.status == org.localsend.miuix.model.TransferStatus.WaitingApproval) return context?.getString(R.string.chip_waiting_approval) ?: "待确认"
+        if (session.speed <= 0) return context?.getString(R.string.live_preparing) ?: "准备中"
 
         val speedMb = session.speed.toDouble() / (1024.0 * 1024.0)
         val speedStr = if (speedMb >= 1.0) {
@@ -186,7 +186,7 @@ object LiveUpdatesCompat {
             else -> "${etaSec / 3600L}h"
         }
 
-        val prefix = if (session.isIncoming) "收 " else "发 "
+        val prefix = if (session.isIncoming) (context?.getString(R.string.chip_incoming_prefix) ?: "收 ") else (context?.getString(R.string.chip_outgoing_prefix) ?: "发 ")
         val speedEta = if (etaStr.isNotEmpty()) "$speedStr $etaStr" else speedStr
         return "$prefix$speedEta"
     }
@@ -194,21 +194,21 @@ object LiveUpdatesCompat {
     /**
      * 计算紧凑且直观的剩余时间文本（针对胶囊态排版优化）。
      */
-    private fun formatCompactEta(session: TransferSession): String {
+    private fun formatCompactEta(session: TransferSession, context: Context): String {
         if (session.status != org.localsend.miuix.model.TransferStatus.InProgress) return ""
         if (session.speed <= 0 || session.totalBytes <= 0) return ""
         val remainingBytes = (session.totalBytes - session.transferredBytes).coerceAtLeast(0L)
-        if (remainingBytes == 0L) return "即将完成"
+        if (remainingBytes == 0L) return context.getString(R.string.live_almost_done)
         val seconds = remainingBytes / session.speed
         return when {
-            seconds <= 0L -> "即将完成"
-            seconds < 60 -> "剩余 ${seconds} 秒"
+            seconds <= 0L -> context.getString(R.string.live_almost_done)
+            seconds < 60 -> context.getString(R.string.live_remaining_seconds, seconds)
             seconds < 3600 -> {
                 val min = seconds / 60
                 val sec = seconds % 60
-                if (sec == 0L) "剩余 ${min} 分钟" else "剩余 ${min} 分 ${sec} 秒"
+                if (sec == 0L) context.getString(R.string.live_remaining_minutes, min) else context.getString(R.string.live_remaining_min_sec, min, sec)
             }
-            else -> "剩余 ${seconds / 3600} 小时"
+            else -> context.getString(R.string.live_remaining_hours, seconds / 3600)
         }
     }
 

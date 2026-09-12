@@ -39,6 +39,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.model.AppSettings
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
@@ -91,7 +92,7 @@ class LocalSendManager(private val context: Context) {
         Environment.DIRECTORY_DOWNLOADS + "/LocalSend"
     }
 
-    private val prefs = context.getSharedPreferences("localsend_settings", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(org.localsend.miuix.core.PreferenceKeys.PREF_NAME, Context.MODE_PRIVATE)
 
     // 从持久化恢复设置；别名首次生成后即固化，避免冷启动每次都随机更换。
     private val initialAlias = prefs.getString(KEY_ALIAS, null) ?: run {
@@ -537,7 +538,7 @@ class LocalSendManager(private val context: Context) {
             for (proto in listOf("https", "http")) {
                 var conn: HttpURLConnection? = null
                 try {
-                    val url = "$proto://$ip:$port/api/localsend/v2/info"
+                    val url = "$proto://$ip:$port${LocalSendRoutes.INFO_V2}"
                     conn = (URL(url).openConnection() as HttpURLConnection).apply {
                         if (this is HttpsURLConnection) {
                             sslSocketFactory = SslHelper.sslSocketFactory
@@ -975,20 +976,20 @@ class LocalSendManager(private val context: Context) {
         fun getInstance(): LocalSendManager? = instance
 
         private const val DEVICE_TTL_MS = 90_000L
-        private const val KEY_ALIAS = "alias"
-        private const val KEY_PORT = "port"
-        private const val KEY_QUICK_SAVE = "quick_save"
-        private const val KEY_AUTO_COPY_TEXT = "auto_copy_text"
-        private const val KEY_SAVE_TO_HISTORY = "save_to_history"
-        private const val KEY_USE_HTTPS = "use_https"
-        private const val KEY_DEVICE_TYPE = "device_type"
-        private const val KEY_DOWNLOAD = "download"
-        private const val KEY_PIN = "pin"
-        private const val KEY_THEME = "theme_mode_index"
-        private const val KEY_TREE_URI = "download_tree_uri"
-        private const val KEY_DOWNLOAD_DISPLAY = "download_display"
-        private const val KEY_VIBRATE = "vibrate_on_complete"
-        private const val KEY_LAST_TAB = "last_selected_tab"
-        private const val KEY_RECENT_MANUAL_IPS = "recent_manual_ips"
+        private const val KEY_ALIAS = org.localsend.miuix.core.PreferenceKeys.KEY_ALIAS
+        private const val KEY_PORT = org.localsend.miuix.core.PreferenceKeys.KEY_PORT
+        private const val KEY_QUICK_SAVE = org.localsend.miuix.core.PreferenceKeys.KEY_QUICK_SAVE
+        private const val KEY_AUTO_COPY_TEXT = org.localsend.miuix.core.PreferenceKeys.KEY_AUTO_COPY_TEXT
+        private const val KEY_SAVE_TO_HISTORY = org.localsend.miuix.core.PreferenceKeys.KEY_SAVE_TO_HISTORY
+        private const val KEY_USE_HTTPS = org.localsend.miuix.core.PreferenceKeys.KEY_USE_HTTPS
+        private const val KEY_DEVICE_TYPE = org.localsend.miuix.core.PreferenceKeys.KEY_DEVICE_TYPE
+        private const val KEY_DOWNLOAD = org.localsend.miuix.core.PreferenceKeys.KEY_DOWNLOAD
+        private const val KEY_PIN = org.localsend.miuix.core.PreferenceKeys.KEY_PIN
+        private const val KEY_THEME = org.localsend.miuix.core.PreferenceKeys.KEY_THEME
+        private const val KEY_TREE_URI = org.localsend.miuix.core.PreferenceKeys.KEY_TREE_URI
+        private const val KEY_DOWNLOAD_DISPLAY = org.localsend.miuix.core.PreferenceKeys.KEY_DOWNLOAD_DISPLAY
+        private const val KEY_VIBRATE = org.localsend.miuix.core.PreferenceKeys.KEY_VIBRATE
+        private const val KEY_LAST_TAB = org.localsend.miuix.core.PreferenceKeys.KEY_LAST_TAB
+        private const val KEY_RECENT_MANUAL_IPS = org.localsend.miuix.core.PreferenceKeys.KEY_RECENT_MANUAL_IPS
     }
 }

@@ -57,14 +57,14 @@ class TransferService : Service() {
         try {
             if (wakeLock == null) {
                 val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-                wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "LocalSend:TransferWakeLock")?.apply {
+                wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, org.localsend.miuix.core.NetworkConstants.WAKE_LOCK_TAG)?.apply {
                     setReferenceCounted(false)
                     acquire(60 * 60 * 1000L) // 最大持有 60 分钟保护
                 }
             }
             if (wifiLock == null) {
                 val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-                wifiLock = wifiManager?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "LocalSend:TransferWifiLock")?.apply {
+                wifiLock = wifiManager?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, org.localsend.miuix.core.NetworkConstants.WIFI_LOCK_TAG)?.apply {
                     setReferenceCounted(false)
                     acquire()
                 }
@@ -108,9 +108,9 @@ class TransferService : Service() {
     }
 
     companion object {
-        private const val ACTION_START = "org.localsend.miuix.service.ACTION_START"
-        private const val ACTION_STOP = "org.localsend.miuix.service.ACTION_STOP"
-        private const val EXTRA_SESSION_COUNT = "extra_session_count"
+        private const val ACTION_START = org.localsend.miuix.core.AppActions.ACTION_START_SERVICE
+        private const val ACTION_STOP = org.localsend.miuix.core.AppActions.ACTION_STOP_SERVICE
+        private const val EXTRA_SESSION_COUNT = org.localsend.miuix.core.AppActions.EXTRA_SESSION_COUNT
 
         fun start(context: Context, sessionCount: Int = 1) {
             try {

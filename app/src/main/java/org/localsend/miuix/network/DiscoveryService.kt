@@ -22,6 +22,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
 import java.net.DatagramPacket
@@ -228,7 +229,7 @@ class DiscoveryService(
     private fun sendDirectResponse(targetDevice: Device) {
         scope.launch(Dispatchers.IO) {
             val localDevice = getLocalDevice()
-            for (route in listOf("/api/localsend/v2/register", "/api/localsend/v1/register")) {
+            for (route in listOf(LocalSendRoutes.REGISTER_V2, LocalSendRoutes.REGISTER_V1)) {
                 try {
                     val url = "${targetDevice.url}$route"
                     val response = httpClient.post(url) {
@@ -262,7 +263,7 @@ class DiscoveryService(
                             var found = false
                             for (proto in listOf("https", "http")) {
                                 if (found) break
-                                for (route in listOf("/api/localsend/v2/info", "/api/localsend/v1/info")) {
+                                for (route in listOf(LocalSendRoutes.INFO_V2, LocalSendRoutes.INFO_V1)) {
                                     if (found) break
                                     try {
                                         val url = "$proto://$targetIp:53317$route"

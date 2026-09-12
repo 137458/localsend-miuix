@@ -37,11 +37,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.localsend.miuix.R
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.util.ThumbnailHelper
 import androidx.compose.foundation.border
@@ -108,7 +110,7 @@ fun FileThumbnail(
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "视频",
+                        contentDescription = stringResource(R.string.preview_video_tag),
                         tint = Color.White,
                         modifier = Modifier.size(14.dp)
                     )
@@ -143,7 +145,7 @@ fun FilePreviewDialog(
 
     WindowDialog(
         show = true,
-        title = if (file.isTextMessage) "文本内容预览" else file.name,
+        title = if (file.isTextMessage) stringResource(R.string.preview_text_title) else file.name,
         onDismissRequest = onDismissRequest
     ) {
         Column(
@@ -170,7 +172,7 @@ fun FilePreviewDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "上一个",
+                                contentDescription = stringResource(R.string.preview_action_prev),
                                 tint = if (safeIndex > 0) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.35f)
                             )
                         }
@@ -185,7 +187,7 @@ fun FilePreviewDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "下一个",
+                                contentDescription = stringResource(R.string.preview_action_next),
                                 tint = if (safeIndex < files.size - 1) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.35f)
                             )
                         }
@@ -216,7 +218,7 @@ fun FilePreviewDialog(
                 ) {
                     SelectionContainer {
                         Text(
-                            text = text.ifEmpty { "(无文本内容)" },
+                            text = text.ifEmpty { stringResource(R.string.preview_empty_text) },
                             style = MiuixTheme.textStyles.body2,
                             color = MiuixTheme.colorScheme.onSurface
                         )
@@ -224,7 +226,7 @@ fun FilePreviewDialog(
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "长度: ${text.length} 字符 • 大小: ${file.formattedSize}",
+                    text = stringResource(R.string.preview_text_stats, text.length, file.formattedSize),
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
@@ -267,7 +269,7 @@ fun FilePreviewDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "视频预览",
+                                contentDescription = stringResource(R.string.preview_video_content_desc),
                                 tint = Color.White,
                                 modifier = Modifier.size(28.dp)
                             )
@@ -280,7 +282,7 @@ fun FilePreviewDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "文件大小: ${file.formattedSize} • 类型: ${file.mimeType}",
+                        text = stringResource(R.string.preview_file_stats, file.formattedSize, file.mimeType),
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         maxLines = 1,
@@ -316,14 +318,14 @@ fun FilePreviewDialog(
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "MIME 类型: ${file.mimeType}",
+                        text = stringResource(R.string.preview_mime_type, file.mimeType),
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                     if (file.path != null) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "路径: ${file.path}",
+                            text = stringResource(R.string.preview_path, file.path),
                             style = MiuixTheme.textStyles.footnote1,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             maxLines = 2,
@@ -380,11 +382,11 @@ fun FilePreviewDialog(
             ) {
                 if (file.isTextMessage && !file.textContent.isNullOrEmpty()) {
                     TextButton(
-                        text = "复制内容",
+                        text = stringResource(R.string.preview_btn_copy_content),
                         onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend", file.textContent))
-                            Toast.makeText(context, "已复制文本到剪贴板", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                         },
                         colors = ButtonDefaults.textButtonColorsPrimary(),
                         modifier = Modifier.weight(1f)
@@ -392,7 +394,7 @@ fun FilePreviewDialog(
                 }
                 if (onRemoveFile != null) {
                     TextButton(
-                        text = "移除此项",
+                        text = stringResource(R.string.preview_btn_remove_item),
                         onClick = {
                             val fileToRemove = file
                             if (files.size <= 1) {
@@ -409,7 +411,7 @@ fun FilePreviewDialog(
                     )
                 }
                 TextButton(
-                    text = "关闭",
+                    text = stringResource(R.string.btn_close),
                     onClick = onDismissRequest,
                     colors = if (file.isTextMessage && !file.textContent.isNullOrEmpty() && onRemoveFile == null) {
                         ButtonDefaults.textButtonColors()

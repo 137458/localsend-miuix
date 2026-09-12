@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.PrepareUploadRequestDto
@@ -65,7 +66,7 @@ class LocalSendClient(
                 var connection: HttpURLConnection? = null
                 try {
                     val candidateDevice = if (host == targetDevice.ip) targetDevice else targetDevice.copy(ip = host)
-                    val urlBuilder = StringBuilder("${candidateDevice.url}/api/localsend/v2/prepare-upload")
+                    val urlBuilder = StringBuilder("${candidateDevice.url}${LocalSendRoutes.PREPARE_UPLOAD}")
                     getPin()?.takeIf { it.isNotEmpty() }?.let { 
                         urlBuilder.append("?pin=").append(URLEncoder.encode(it, "UTF-8")) 
                     }
@@ -212,10 +213,10 @@ class LocalSendClient(
             val encodedSessionId = URLEncoder.encode(sessionId, "UTF-8")
             val encodedFileId = URLEncoder.encode(fileItem.id, "UTF-8")
             val encodedToken = URLEncoder.encode(token, "UTF-8")
-            val uploadUrlStr = "${targetDevice.url}/api/localsend/v2/upload?sessionId=$encodedSessionId&fileId=$encodedFileId&token=$encodedToken"
+            val uploadUrlStr = "${targetDevice.url}${LocalSendRoutes.UPLOAD}?sessionId=$encodedSessionId&fileId=$encodedFileId&token=$encodedToken"
             val uploadUrl = URL(uploadUrlStr)
 
-            Log.d(TAG, "uploadFileOnce: connecting to ${targetDevice.url}/api/localsend/v2/upload for '${fileItem.name}' (id=${fileItem.id}, size=${fileItem.size})")
+            Log.d(TAG, "uploadFileOnce: connecting to ${targetDevice.url}${LocalSendRoutes.UPLOAD} for '${fileItem.name}' (id=${fileItem.id}, size=${fileItem.size})")
 
             FingerprintTrust.pin(targetDevice.fingerprint)
             connection = (uploadUrl.openConnection() as HttpURLConnection).apply {
@@ -336,7 +337,7 @@ class LocalSendClient(
         var connection: HttpURLConnection? = null
         try {
             val encodedSessionId = URLEncoder.encode(sessionId, "UTF-8")
-            val url = "${targetDevice.url}/api/localsend/v2/cancel?sessionId=$encodedSessionId"
+            val url = "${targetDevice.url}${LocalSendRoutes.CANCEL}?sessionId=$encodedSessionId"
             Log.i(TAG, "cancelUpload: sending cancel for session $sessionId to $url")
             FingerprintTrust.pin(targetDevice.fingerprint)
             try {

@@ -1,0 +1,383 @@
+<resources>
+    <string name="app_name">LocalSend Miuix</string>
+
+    <!-- General actions and buttons -->
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_confirm">OK</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_close">Close</string>
+    <string name="btn_copy">Copy</string>
+    <string name="btn_delete">Delete</string>
+    <string name="btn_clear">Clear</string>
+    <string name="btn_preview">Preview</string>
+    <string name="btn_add">Add</string>
+    <string name="btn_refresh">Refresh</string>
+    <string name="btn_retry">Retry</string>
+    <string name="btn_ignore">Ignore</string>
+    <string name="btn_later">Later</string>
+    <string name="btn_open">Open</string>
+    <string name="btn_open_link">Open Link</string>
+    <string name="btn_decline">Decline</string>
+    <string name="btn_accept">Accept</string>
+    <string name="action_back">Back</string>
+    <string name="action_history">History</string>
+    <string name="action_input_ip">Input IP</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_cancel_transfer">Cancel Transfer</string>
+    <string name="action_expand">Expand</string>
+    <string name="action_collapse">Collapse</string>
+
+    <!-- Navigation Tabs -->
+    <string name="nav_tab_receive">Receive</string>
+    <string name="nav_tab_send">Send</string>
+    <string name="nav_tab_settings">Settings</string>
+
+    <!-- Common Toasts and Feedback -->
+    <string name="toast_transfer_declined">Transfer declined by peer</string>
+    <string name="toast_files_added">Added %1$d files</string>
+    <string name="toast_media_added">Added %1$d media files</string>
+    <string name="toast_text_added">Text message added</string>
+    <string name="toast_external_text_added">Text added from share</string>
+    <string name="toast_external_files_added">Added %1$d shared files</string>
+    <string name="toast_save_path_updated">Download directory set to: %1$s</string>
+    <string name="toast_clipboard_extracted">Extracted and added clipboard text</string>
+    <string name="toast_clipboard_empty">Clipboard is empty</string>
+    <string name="toast_clipboard_no_content">No content in clipboard</string>
+    <string name="toast_clipboard_error">Cannot access clipboard: %1$s</string>
+    <string name="toast_copied_to_clipboard">Copied text to clipboard</string>
+    <string name="toast_device_renamed">Device name updated to: %1$s</string>
+    <string name="toast_port_updated">Server port updated to: %1$d</string>
+    <string name="toast_connecting_ip">Connecting to %1$s:%2$d to send content...</string>
+    <string name="toast_multicast_sent">Discovery multicast broadcast sent</string>
+    <string name="toast_empty_selection_warn">Please add files or content to send first</string>
+    <string name="toast_initiating_transfer">Initiating transfer to %1$s...</string>
+    <string name="toast_cannot_open_link">Cannot open link</string>
+    <string name="toast_cannot_open_file">Cannot open file</string>
+    <string name="toast_history_item_deleted">Record deleted</string>
+    <string name="toast_latest_version">Already the latest version (v%1$s)</string>
+    <string name="toast_check_update_failed">Failed to check for updates: %1$s</string>
+    <string name="toast_download_apk_failed">Download failed: %1$s</string>
+
+    <!-- Receive Screen -->
+    <string name="receive_title">Receive</string>
+    <string name="receive_section_local_device">This Device</string>
+    <string name="receive_pref_alias_summary">Device alias (tap to edit)</string>
+    <string name="receive_pref_all_ips_summary">All IP addresses: %1$s</string>
+    <string name="receive_pref_ip_port_summary">Local IPv4 address and server port</string>
+    <string name="receive_section_options">Receive Options</string>
+    <string name="receive_pref_quick_save_title">Quick Save</string>
+    <string name="receive_pref_quick_save_summary">Automatically accept transfer requests from local network without prompt</string>
+    <string name="receive_pref_auto_copy_title">Auto Copy Text</string>
+    <string name="receive_pref_auto_copy_summary">Automatically copy received text messages to system clipboard</string>
+    <string name="receive_section_incoming_count">Receiving (%1$d)</string>
+    <string name="receive_waiting_idle">Waiting to receive...</string>
+    <string name="receive_waiting_hint">Make sure the sender is connected to the same Wi-Fi or LAN</string>
+
+    <!-- Send Screen -->
+    <string name="send_title">Send</string>
+    <string name="send_cat_images_count">%1$d images</string>
+    <string name="send_cat_videos_count">%1$d videos</string>
+    <string name="send_cat_audios_count">%1$d audios</string>
+    <string name="send_cat_texts_count">%1$d texts</string>
+    <string name="send_cat_apks_count">%1$d apps</string>
+    <string name="send_cat_others_count">%1$d files</string>
+    <string name="send_pull_refresh_pull">Pull to refresh</string>
+    <string name="send_pull_refresh_release">Release to refresh</string>
+    <string name="send_pull_refresh_refreshing">Refreshing...</string>
+    <string name="send_pull_refresh_complete">Refresh complete</string>
+    <string name="send_section_quick_pick">Selection Shortcuts</string>
+    <string name="send_quick_action_files">Files</string>
+    <string name="send_quick_action_folder">Folder</string>
+    <string name="send_quick_action_media">Media</string>
+    <string name="send_quick_action_apps">Apps</string>
+    <string name="send_quick_action_text">Text</string>
+    <string name="send_quick_action_clipboard">Clipboard</string>
+    <string name="send_web_share_running_title">Web Share Active</string>
+    <string name="send_web_share_idle_title">Share via browser link (Web Share)</string>
+    <string name="send_web_share_running_summary">%1$d item(s) shared in LAN. Tap to view link &amp; QR code</string>
+    <string name="send_web_share_idle_summary">No app needed. Any browser can scan QR code or visit link to download</string>
+    <string name="send_section_selected_files">Selected Content (%1$d)</string>
+    <string name="send_selected_summary_header">%1$d items (%2$s)</string>
+    <string name="send_type_text_message">Text Message</string>
+    <string name="send_expand_files">Expand remaining %1$d files</string>
+    <string name="send_collapse_files">Collapse file list</string>
+    <string name="send_section_nearby_devices">Nearby Devices (%1$d)</string>
+    <string name="send_scanning_subnet_hint">Scanning subnet concurrently for devices...</string>
+    <string name="send_searching_devices_title">Searching for LocalSend devices in LAN...</string>
+    <string name="send_searching_devices_hint">Pull down to refresh or tap top-right broadcast button</string>
+    <string name="send_device_multi_subnet_tag">" (+%1$d subnets)"</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_general">General</string>
+    <string name="settings_pref_alias_title">Device Alias</string>
+    <string name="settings_pref_device_type_title">Device Type</string>
+    <string name="settings_pref_theme_title">App Theme</string>
+    <string name="settings_pref_vibrate_title">Vibration on Finish</string>
+    <string name="settings_pref_vibrate_summary">Vibrate when a file transfer finishes</string>
+    <string name="settings_pref_notif_perm_title">Notifications &amp; Live Updates</string>
+    <string name="settings_pref_notif_perm_enabled">Enabled (Transfer progress &amp; capsule notifications active)</string>
+    <string name="settings_pref_notif_perm_disabled">Disabled (Tap to grant or open system settings)</string>
+    <string name="settings_section_receive">Receive Settings</string>
+    <string name="settings_pref_quick_save_desc">Automatically accept all incoming transfer requests</string>
+    <string name="settings_pref_auto_copy_desc">Automatically copy received text messages to clipboard</string>
+    <string name="settings_pref_save_history_title">Save Transfer History</string>
+    <string name="settings_pref_save_history_desc">Keep logs of completed and cancelled transfers</string>
+    <string name="settings_pref_download_path_title">Download Directory</string>
+    <string name="settings_custom_folder">Custom folder</string>
+    <string name="settings_section_network_security">Network &amp; Security</string>
+    <string name="settings_pref_port_title">Server Port</string>
+    <string name="settings_pref_https_title">Enable HTTPS (TLS Encryption)</string>
+    <string name="settings_pref_https_summary">Encrypt local network transfers with self-signed certificate</string>
+    <string name="settings_pref_pin_title">Transfer PIN Protection</string>
+    <string name="settings_pref_pin_disabled">Disabled (Tap to set)</string>
+    <string name="settings_pref_pin_enabled">Configured: ••••</string>
+    <string name="settings_pref_cert_fp_title">TLS Certificate Fingerprint</string>
+    <string name="settings_pref_cert_fp_enabled">View and regenerate SHA-256 fingerprint</string>
+    <string name="settings_pref_cert_fp_disabled">Available when HTTPS is enabled</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_pref_check_update_title">Check for Updates</string>
+    <string name="settings_pref_check_update_summary">Current version v%1$s (Tap to check)</string>
+    <string name="settings_pref_github_title">GitHub Repository</string>
+    <string name="settings_pref_license_title">Open Source &amp; Standards</string>
+    <string name="settings_pref_license_summary">LocalSend Protocol v2.1 • Apache 2.0 License</string>
+
+    <string name="theme_system">System Default</string>
+    <string name="theme_light">Light Mode</string>
+    <string name="theme_dark">Dark Mode</string>
+    <string name="theme_monet_system">Monet System</string>
+    <string name="theme_monet_light">Monet Light</string>
+    <string name="theme_monet_dark">Monet Dark</string>
+
+    <string name="device_type_mobile">Mobile</string>
+    <string name="device_type_tablet">Tablet</string>
+    <string name="device_type_desktop">Desktop</string>
+    <string name="device_type_server">Server</string>
+
+    <!-- History Screen -->
+    <string name="history_title">Transfer History</string>
+    <string name="history_empty_title">No Transfer History</string>
+    <string name="history_empty_summary">Completed, failed, or cancelled transfers will appear here</string>
+    <string name="history_dialog_clear_title">Clear Transfer History</string>
+    <string name="history_dialog_clear_msg">Are you sure you want to clear all %1$d transfer history records? This cannot be undone.</string>
+    <string name="history_item_from">Received from %1$s</string>
+    <string name="history_item_to">Sent to %1$s</string>
+    <string name="history_files_count">%1$d files</string>
+
+    <!-- Update Screen -->
+    <string name="update_screen_title">Software Update</string>
+    <string name="update_checking_hint">Checking for updates...</string>
+    <string name="update_found_header">New version %1$s found (Current v%2$s)</string>
+    <string name="update_latest_header">Already up to date (v%1$s)</string>
+    <string name="update_changelog_title_new">Changelog (%1$s)</string>
+    <string name="update_changelog_title_current">Current Version Notes (v%1$s)</string>
+    <string name="update_release_default_title">Release Notes</string>
+    <string name="update_downloading_hint">Downloading update...</string>
+    <string name="update_btn_install_now">Install Update Now</string>
+    <string name="update_btn_download_now">Download Update Now</string>
+    <string name="update_section_settings">Update Settings</string>
+    <string name="update_pref_auto_check_title">Auto Check for Updates</string>
+    <string name="update_pref_auto_check_summary">Automatically check for latest release on startup</string>
+    <string name="update_pref_ignore_title">Ignore this version</string>
+    <string name="update_pref_ignore_checking">Checking...</string>
+    <string name="update_pref_ignore_already_latest">Already the latest version</string>
+    <string name="update_pref_ignore_ignored">Ignored version %1$s</string>
+    <string name="update_pref_ignore_desc">Ignore update prompt for version %1$s</string>
+    <string name="update_section_channel">Channel &amp; Actions</string>
+    <string name="update_pref_manual_check_title">Manual Check</string>
+    <string name="update_pref_manual_check_busy">Fetching remote release info...</string>
+    <string name="update_pref_manual_check_idle">Tap to check latest release from GitHub</string>
+    <string name="update_pref_github_releases_summary">View all releases on GitHub</string>
+    <string name="update_pref_os3_title">HyperOS 3 Shimmer Shader</string>
+    <string name="update_pref_os3_enabled">HyperOS 3 enhanced shimmer shader active</string>
+    <string name="update_pref_os3_disabled">HyperOS 2 classic shimmer shader active</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_rename_title">Edit Device Name</string>
+    <string name="dialog_rename_label">Device Alias</string>
+
+    <string name="dialog_port_title">Edit Server Port</string>
+    <string name="dialog_port_label">Port (1 - 65535)</string>
+
+    <string name="dialog_manual_ip_title">Send Directly via IP</string>
+    <string name="dialog_manual_ip_address_label">Target IP Address (e.g. 192.168.1.100)</string>
+    <string name="dialog_manual_ip_recent_history">Recent Connections</string>
+    <string name="dialog_manual_ip_port_label">Port (default 53317)</string>
+    <string name="dialog_manual_ip_btn_send">Connect &amp; Send</string>
+
+    <string name="dialog_send_text_title">Send Plain Text</string>
+    <string name="dialog_send_text_label">Type or paste text content to send</string>
+    <string name="dialog_send_text_btn_send">Send Text</string>
+
+    <string name="dialog_pin_title">Set Transfer PIN</string>
+    <string name="dialog_pin_desc">When set, other devices must enter this PIN to complete transfer handshake. Leave empty to disable PIN protection.</string>
+    <string name="dialog_pin_label">PIN Code (leave empty to disable)</string>
+
+    <string name="dialog_cert_title">TLS Certificate Fingerprint</string>
+    <string name="dialog_cert_desc">In HTTPS mode, LocalSend uses a self-signed X.509 certificate for end-to-end encryption. Verify this SHA-256 fingerprint to prevent MITM attacks.</string>
+    <string name="dialog_cert_label">SHA-256 Fingerprint</string>
+    <string name="dialog_cert_empty">Not generated or HTTPS disabled</string>
+    <string name="dialog_cert_btn_copy">Copy Fingerprint</string>
+    <string name="dialog_cert_btn_regenerate">Regenerate</string>
+
+    <string name="dialog_incoming_text_title">Incoming Text Message</string>
+    <string name="dialog_incoming_files_title">Incoming Transfer Request</string>
+    <string name="dialog_incoming_from_device">From: %1$s (%2$s)</string>
+    <string name="dialog_incoming_text_length">Text content (%1$d chars)</string>
+    <string name="dialog_incoming_files_summary">%1$d file(s), total %2$s</string>
+
+    <string name="sheet_add_content_title">Add Content to Send</string>
+    <string name="sheet_add_file_title">Files</string>
+    <string name="sheet_add_file_summary">Select any files from storage</string>
+    <string name="sheet_add_folder_title">Folder</string>
+    <string name="sheet_add_folder_summary">Add all files in folder recursively</string>
+    <string name="sheet_add_media_title">Media</string>
+    <string name="sheet_add_media_summary">Pick photos and videos from gallery</string>
+    <string name="sheet_add_apps_title">Apps (APK)</string>
+    <string name="sheet_add_apps_summary">Extract APKs of installed apps</string>
+    <string name="sheet_add_text_title">Plain Text</string>
+    <string name="sheet_add_text_summary">Type text or paste links to send</string>
+    <string name="sheet_add_clipboard_title">From Clipboard</string>
+    <string name="sheet_add_clipboard_summary">Quickly paste clipboard text or link</string>
+
+    <string name="app_picker_title">Select Apps (APK)</string>
+    <string name="app_picker_search_label">Search app name or package...</string>
+    <string name="app_picker_show_system_apps">Show system apps</string>
+    <string name="app_picker_selected_count">Selected %1$d / Total %2$d</string>
+    <string name="app_picker_refreshing">Refreshing...</string>
+    <string name="app_picker_deselect_all">Deselect All</string>
+    <string name="app_picker_select_all">Select All</string>
+    <string name="app_picker_empty">No matching apps found</string>
+    <string name="app_picker_system_tag">SYSTEM</string>
+    <string name="app_picker_btn_add_selected">Add Selected (%1$d)</string>
+
+    <string name="history_detail_text_title">Text Message Details</string>
+    <string name="history_detail_file_title">Transfer Details</string>
+    <string name="history_detail_sender">Sender: %1$s</string>
+    <string name="history_detail_receiver">Receiver: %1$s</string>
+    <string name="history_detail_device_ip">Device IP</string>
+    <string name="history_detail_time">Time</string>
+    <string name="history_detail_total">Total</string>
+    <string name="history_detail_total_summary">%1$d item(s) · %2$s</string>
+    <string name="history_detail_text_content">Text Content</string>
+    <string name="history_detail_btn_copy_text">Copy Full Text</string>
+    <string name="history_detail_included_files">Included Files (%1$d)</string>
+    <string name="history_detail_btn_delete_record">Delete Record</string>
+
+    <string name="preview_video_tag">Video</string>
+    <string name="preview_text_title">Text Preview</string>
+    <string name="preview_action_prev">Previous</string>
+    <string name="preview_action_next">Next</string>
+    <string name="preview_empty_text">(No text content)</string>
+    <string name="preview_text_stats">Length: %1$d chars • Size: %2$s</string>
+    <string name="preview_video_content_desc">Video Preview</string>
+    <string name="preview_file_stats">Size: %1$s • Type: %2$s</string>
+    <string name="preview_mime_type">MIME: %1$s</string>
+    <string name="preview_path">Path: %1$s</string>
+    <string name="preview_btn_copy_content">Copy Content</string>
+    <string name="preview_btn_remove_item">Remove Item</string>
+
+    <string name="session_waiting_peer">Waiting for recipient to accept...</string>
+    <string name="session_waiting_peer_confirm">Waiting for peer approval...</string>
+    <string name="session_waiting_self">Waiting for you to accept...</string>
+    <string name="session_syncing_text">Syncing text...</string>
+    <string name="session_text_delivered">Text delivered</string>
+    <string name="session_text_completed">Text transfer completed</string>
+    <string name="session_send_failed">Send failed: %1$s</string>
+    <string name="session_received_text_from">Text from %1$s</string>
+    <string name="session_send_to_alias">To: %1$s</string>
+    <string name="session_from_alias">From: %1$s</string>
+    <string name="session_btn_copy_text">Copy Text</string>
+    <string name="session_transfer_failed">Transfer failed: %1$s</string>
+    <string name="session_canceled">Transfer cancelled</string>
+    <string name="session_peer_declined">Peer declined</string>
+    <string name="session_unknown_error">Unknown error</string>
+    <string name="session_files_in_progress">%1$d file(s) • %2$s</string>
+    <string name="session_files_completed">Transfer complete • %1$d file(s) (%2$s)</string>
+    <string name="session_transferring_indexed">Transferring (%1$d/%2$d): %3$s</string>
+    <string name="session_transferring_single">Transferring: %1$s</string>
+    <string name="session_preparing_transfer">Preparing transfer...</string>
+    <string name="session_transfer_complete_check">✓ Transfer complete (%1$d file(s), %2$s)</string>
+    <string name="session_file_list_title">File List (%1$d/%2$d)</string>
+
+    <string name="webshare_dialog_title">Share via Browser Link (Web Share)</string>
+    <string name="webshare_dialog_hint">Devices on the same network can scan QR code or visit URL to transfer</string>
+    <string name="webshare_url_label">Web URL</string>
+    <string name="webshare_current_shared_count">Currently Shared (%1$d)</string>
+    <string name="webshare_more_items">... and %1$d more</string>
+    <string name="webshare_ready_title">Bi-directional Web Share Ready</string>
+    <string name="webshare_ready_desc_with_files">%1$d item(s) available for download. Browser can also send files back to phone.</string>
+    <string name="webshare_ready_desc_empty">Open link in browser to upload files directly to this phone. Add files in Send tab to share with browser.</string>
+    <string name="webshare_btn_stop_share">Stop Sharing</string>
+    <string name="webshare_btn_share_selected">Share Selected (%1$d)</string>
+
+    <string name="update_dialog_title">New Version Available</string>
+    <string name="update_dialog_no_changelog">No detailed changelog provided</string>
+    <string name="update_dialog_downloading">Downloading update%1$s</string>
+    <string name="update_dialog_ready_install">APK downloaded. Tap below to install now.</string>
+    <string name="update_dialog_download_failed">Download failed: %1$s</string>
+    <string name="update_dialog_network_hint">If connection is unstable, tap \"Browser Download\" to fetch APK via web.</string>
+    <string name="update_dialog_btn_cancel_download">Cancel Download</string>
+    <string name="update_dialog_btn_background_download">Background</string>
+    <string name="update_dialog_btn_redownload">Re-download</string>
+    <string name="update_dialog_btn_install">Install Now</string>
+    <string name="update_dialog_btn_browser">Browser Download</string>
+    <string name="update_dialog_btn_update_now">Update Now</string>
+    <string name="update_dialog_github_release_note">View release notes on GitHub ↗</string>
+
+    <!-- Notification & Live Updates -->
+    <string name="notif_channel_live_name">Live Transfer Updates</string>
+    <string name="notif_channel_live_desc">Shows Aqua Dynamics capsule &amp; real-time transfer progress</string>
+    <string name="notif_channel_receive_name">Receive Notifications</string>
+    <string name="notif_channel_receive_desc">Alerts for received files and text messages</string>
+    <string name="notif_channel_send_name">Send Notifications</string>
+    <string name="notif_channel_send_desc">Alerts for sent files and text messages</string>
+    <string name="notif_channel_service_name">Background Transfer Service</string>
+    <string name="notif_channel_service_desc">Keeps transfer alive in background</string>
+
+    <string name="notif_foreground_title">LocalSend is transferring in background</string>
+    <string name="notif_foreground_multiple">%1$d transfers in progress, maintaining network connection...</string>
+    <string name="notif_foreground_single">File transfer in progress, maintaining network connection...</string>
+    <string name="notif_incoming_text_title">Text from %1$s</string>
+    <string name="notif_incoming_file_title">File from %1$s</string>
+    <string name="notif_receive_completed_text">Received text from %1$s</string>
+    <string name="notif_receive_completed_files_title">File Transfer Complete</string>
+    <string name="notif_receive_completed_files_desc">Successfully received %2$d files from %1$s</string>
+    <string name="notif_send_completed_text_title">Text Message Delivered</string>
+    <string name="notif_send_completed_text_desc">Sent to %1$s</string>
+    <string name="notif_send_completed_files_title">File Transfer Complete</string>
+    <string name="notif_send_completed_files_desc">Successfully sent %1$d files to %2$s</string>
+    <string name="notif_canceled_receive">Receive Cancelled</string>
+    <string name="notif_canceled_send">Send Cancelled</string>
+    <string name="notif_canceled_peer_tag">Peer: %1$s</string>
+    <string name="notif_failed_receive">Receive Failed</string>
+    <string name="notif_failed_send">Send Failed</string>
+    <string name="notif_failed_default_err">Transfer Error</string>
+    <string name="notif_plain_text_message">Plain text message</string>
+    <string name="notif_files_count_and_size">%1$d files (%2$s)</string>
+
+    <string name="live_preparing">Preparing</string>
+    <string name="live_receiving">Receiving</string>
+    <string name="live_sending">Sending</string>
+    <string name="live_from_prefix">From</string>
+    <string name="live_to_prefix">To</string>
+    <string name="live_file_transfer">File Transfer</string>
+    <string name="live_files_count">%1$d files</string>
+    <string name="live_almost_done">Almost done</string>
+    <string name="live_remaining_seconds">%1$ds remaining</string>
+    <string name="live_remaining_minutes">%1$dm remaining</string>
+    <string name="live_remaining_min_sec">%1$dm %2$ds remaining</string>
+    <string name="live_remaining_hours">%1$dh remaining</string>
+    <string name="chip_text">Text</string>
+    <string name="chip_completed">Done</string>
+    <string name="chip_waiting_approval">Wait</string>
+    <string name="chip_incoming_prefix">"In "</string>
+    <string name="chip_outgoing_prefix">"Out "</string>
+
+    <!-- Status Labels -->
+    <string name="status_completed">Completed</string>
+    <string name="status_failed">Failed</string>
+    <string name="status_canceled">Cancelled</string>
+    <string name="status_processing">In Progress</string>
+    <string name="status_waiting">Waiting</string>
+</resources>
