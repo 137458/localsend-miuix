@@ -380,4 +380,34 @@
     <string name="status_canceled">已取消</string>
     <string name="status_processing">处理中</string>
     <string name="status_waiting">等待中</string>
+
+    <string name="eta_calculating">计算中...</string>
+    <string name="eta_seconds">剩余约 %1$d秒</string>
+    <string name="eta_minutes">剩余约 %1$d分%2$d秒</string>
+    <string name="eta_hours">剩余约 %1$d小时%2$d分</string>
+
+    <string name="msg_web_share_published">已将 %1$d 项内容发布到 Web 共享，浏览器端刷新即可下载</string>
+    <string name="msg_handshake_failed">握手失败</string>
+    <string name="msg_peer_declined_detail">对方拒绝接收：%1$s</string>
+    <string name="msg_file_not_accepted">接收方未接受该文件（未授予上传令牌）</string>
+    <string name="msg_upload_failed">上传失败</string>
+    <string name="msg_all_files_failed">所有文件传输失败</string>
+    <string name="msg_partial_files_failed">部分文件传输失败 (%1$d/%2$d)</string>
+    <string name="msg_device_alias_ip">设备 (%1$s)</string>
+    <string name="msg_text_auto_copied">已接收并自动复制文本：%1$s</string>
+    <string name="msg_text_received_from">已收到来自 %1$s 的文本消息</string>
+    <string name="msg_sent_to">内容已成功发送至 %1$s</string>
+    <string name="msg_folder_files_added">已成功添加文件夹中的 %1$d 个文件</string>
+    <string name="msg_certificate_regenerated">安全证书已重新生成，指纹已更新</string>
+    <string name="msg_cannot_connect">无法连接到目标设备</string>
+    <string name="msg_pin_required">接收方要求输入正确的 PIN 码（401）</string>
+    <string name="msg_peer_busy">对方正在处理其他传输会话，请稍后再试（409）</string>
+    <string name="msg_too_many_requests">请求过于频繁，请稍后再试（429）</string>
+    <string name="msg_peer_rejected_http">对方拒绝了接收请求: %1$d (%2$s)</string>
+    <string name="msg_upload_forbidden">上传被拒绝：令牌或来源 IP 无效（403）</string>
+    <string name="msg_sha256_mismatch">文件校验失败：SHA-256 不匹配（422）</string>
+    <string name="msg_session_not_found">会话或文件在对端不存在（404）</string>
+    <string name="msg_upload_http">上传失败: HTTP %1$d %2$s</string>
+    <string name="msg_peer_internal_error">对方内部错误（500）: %1$s</string>
+    <string name="msg_peer_http">对方返回 HTTP %1$d: %2$s</string>
 </resources>

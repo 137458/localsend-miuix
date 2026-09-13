@@ -6,7 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import org.localsend.miuix.R
+import org.localsend.miuix.core.AppJson
 import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
@@ -29,7 +30,7 @@ class LocalSendClient(
     companion object {
         private const val TAG = "LocalSendTransfer"
     }
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
+    private val json = AppJson.default
 
     data class HandshakeResult(
         val response: PrepareUploadResponseDto,
@@ -132,19 +133,18 @@ class LocalSendClient(
                     lastException = e
                 }
             }
-            Result.failure(lastException ?: Exception("无法连接到目标设备"))
+            Result.failure(lastException ?: Exception(context.getString(R.string.msg_cannot_connect)))
         } catch (e: Exception) {
             Log.e(TAG, "prepareUpload failed with exception: ${e.message}", e)
             Result.failure(e)
         }
     }
 
-    /** 将 prepare-upload 的错误码映射为用户可读的中文提示。 */
     private fun prepareErrorText(code: Int, body: String): String = when (code) {
-        HttpURLConnection.HTTP_UNAUTHORIZED -> "接收方要求输入正确的 PIN 码（401）"
-        HttpURLConnection.HTTP_CONFLICT -> "对方正在处理其他传输会话，请稍后再试（409）"
-        429 -> "请求过于频繁，请稍后再试（429）"
-        else -> "对方拒绝了接收请求: $code ($body)".trim()
+        HttpURLConnection.HTTP_UNAUTHORIZED -> context.getString(R.string.msg_pin_required)
+        HttpURLConnection.HTTP_CONFLICT -> context.getString(R.string.msg_peer_busy)
+        429 -> context.getString(R.string.msg_too_many_requests)
+        else -> context.getString(R.string.msg_peer_rejected_http, code, body).trim()
     }
 
     suspend fun uploadFile(
@@ -153,6 +153,7 @@ class LocalSendClient(
         fileItem: FileItem,
         token: String,
         maxRetries: Int = 2,
+        isCanceled: () -> Boolean = { false },
         onProgress: (bytesWritten: Long, speed: Long) -> Unit
     ): Result<Unit> = withContext(Dispatchers.IO) {
         var lastError: Throwable? = null
@@ -160,11 +161,15 @@ class LocalSendClient(
             if (attempt > 0) {
                 Log.w(TAG, "Retrying upload for '${fileItem.name}' (attempt $attempt/$maxRetries) after error: ${lastError?.message}")
             }
+            if (isCanceled()) {
+                return@withContext Result.failure(Exception(context.getString(R.string.session_canceled)))
+            }
             val result = uploadFileOnce(
                 targetDevice = targetDevice,
                 sessionId = sessionId,
                 fileItem = fileItem,
                 token = token,
+                isCanceled = isCanceled,
                 onProgress = onProgress
             )
             if (result.isSuccess) {
@@ -192,7 +197,7 @@ class LocalSendClient(
             }
             break
         }
-        Result.failure(lastError ?: Exception("上传失败"))
+        Result.failure(lastError ?: Exception(context.getString(R.string.msg_upload_failed)))
     }
 
     private fun uploadFileOnce(
@@ -200,6 +205,7 @@ class LocalSendClient(
         sessionId: String,
         fileItem: FileItem,
         token: String,
+        isCanceled: () -> Boolean,
         onProgress: (bytesWritten: Long, speed: Long) -> Unit
     ): Result<Unit> {
         var inputStream: InputStream? = null
@@ -249,6 +255,9 @@ class LocalSendClient(
 
             var read: Int
             while (inputStream.read(buffer).also { read = it } != -1) {
+                if (isCanceled()) {
+                    throw java.io.InterruptedIOException(context.getString(R.string.session_canceled))
+                }
                 outputStream.write(buffer, 0, read)
                 bytesWritten += read
                 bytesSinceLast += read
@@ -291,10 +300,10 @@ class LocalSendClient(
                 } catch (ignored: Exception) { null }
                 Log.e(TAG, "uploadFileOnce: upload rejected by peer for '${fileItem.name}', HTTP $responseCode: $errorBody")
                 val message = when (responseCode) {
-                    HttpURLConnection.HTTP_FORBIDDEN -> "上传被拒绝：令牌或来源 IP 无效（403）"
-                    422 -> "文件校验失败：SHA-256 不匹配（422）"
-                    404 -> "会话或文件在对端不存在（404）"
-                    else -> "上传失败: HTTP $responseCode ${errorBody?.take(100) ?: ""}".trim()
+                    HttpURLConnection.HTTP_FORBIDDEN -> context.getString(R.string.msg_upload_forbidden)
+                    422 -> context.getString(R.string.msg_sha256_mismatch)
+                    404 -> context.getString(R.string.msg_session_not_found)
+                    else -> context.getString(R.string.msg_upload_http, responseCode, errorBody?.take(100) ?: "").trim()
                 }
                 Result.failure(Exception(message))
             }
@@ -307,11 +316,11 @@ class LocalSendClient(
 
             val mappedException = if (responseCode != -1 && responseCode != 200 && responseCode != 204) {
                 val message = when (responseCode) {
-                    HttpURLConnection.HTTP_FORBIDDEN -> "对方拒绝上传（403）：令牌或 IP 地址无效"
-                    422 -> "文件校验失败（422）：SHA-256 不匹配"
-                    404 -> "会话或文件在对端不存在（404）"
-                    500 -> "对方内部错误（500）: ${errorBody ?: ""}".trim()
-                    else -> "对方返回 HTTP $responseCode: ${errorBody ?: ""}".trim()
+                    HttpURLConnection.HTTP_FORBIDDEN -> context.getString(R.string.msg_upload_forbidden)
+                    422 -> context.getString(R.string.msg_sha256_mismatch)
+                    404 -> context.getString(R.string.msg_session_not_found)
+                    500 -> context.getString(R.string.msg_peer_internal_error, errorBody ?: "").trim()
+                    else -> context.getString(R.string.msg_peer_http, responseCode, errorBody ?: "").trim()
                 }
                 Exception(message, e)
             } else {

@@ -62,12 +62,30 @@ object SslHelper {
 
     val trustAllHostnameVerifier: HostnameVerifier = HostnameVerifier { _, _ -> true }
 
-    fun trustAllHttps() {
-        try {
-            HttpsURLConnection.setDefaultSSLSocketFactory(sslSocketFactory)
-            HttpsURLConnection.setDefaultHostnameVerifier(trustAllHostnameVerifier)
-        } catch (e: Exception) {
-            e.printStackTrace()
+    /**
+     * Discovery-only TrustManager: LocalSend HTTPS peers use self-signed certs, so
+     * /info must complete TLS before the DTO fingerprint is known. Records the
+     * observed SHA-256 so callers can bind it to DeviceDto.fingerprint (protocol §2).
+     */
+    val lastDiscoveryCertFp = ThreadLocal<String>()
+
+    val discoveryTrustManager: X509TrustManager = object : X509TrustManager {
+        override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+        override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+            if (chain.isNullOrEmpty()) return
+            lastDiscoveryCertFp.set(FingerprintTrust.normalize(FingerprintTrust.sha256(chain[0])))
+        }
+        override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+    }
+
+    fun observedDiscoveryCertFp(): String = lastDiscoveryCertFp.get().orEmpty()
+
+    fun certSha256(connection: HttpsURLConnection): String {
+        return try {
+            val cert = connection.serverCertificates.firstOrNull() as? X509Certificate ?: return ""
+            FingerprintTrust.sha256(cert)
+        } catch (_: Exception) {
+            ""
         }
     }
 }
@@ -105,18 +123,20 @@ object FingerprintTrust {
         MessageDigest.getInstance("SHA-256").digest(cert.encoded)
             .joinToString("") { "%02x".format(it) }
 
+    /** True when [fingerprint] is currently pinned or previously trusted via discovery. */
+    fun isAccepted(fingerprint: String): Boolean {
+        val norm = normalize(fingerprint)
+        if (norm.isEmpty()) return false
+        return (pinCounts[norm]?.get() ?: 0) > 0 || trustedSet.contains(norm)
+    }
+
     /** 供 CIO/HttpURLConnection 注入的指纹校验 TrustManager。 */
     val trustManager: X509TrustManager = object : X509TrustManager {
         override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
         override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
             if (chain.isNullOrEmpty()) throw CertificateException("Empty certificate chain")
             val certFp = normalize(sha256(chain[0]))
-            val count = pinCounts[certFp]?.get() ?: 0
-            val hasExplicitPins = pinCounts.isNotEmpty()
-            
-            // 若有特定 pinned 指纹且当前证书不在 pinned 列表中，检查全局白名单
-            val isTrusted = count > 0 || trustedSet.contains(certFp) || !hasExplicitPins
-            if (isTrusted) {
+            if (isAccepted(certFp)) {
                 trustedSet.add(certFp)
             } else {
                 throw CertificateException("Untrusted server certificate fingerprint: $certFp")

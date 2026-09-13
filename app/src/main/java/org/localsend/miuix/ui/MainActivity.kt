@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
         TransferNotifier.ensure(applicationContext)
         requestNecessaryPermissions()
 
-        manager = LocalSendManager(applicationContext)
+        manager = LocalSendManager.getOrCreate(applicationContext)
         manager.start()
 
         // 仅在非配置变更（如首次冷启动）时处理外部调起的分享与打开文件意图
@@ -110,7 +110,9 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     override fun onDestroy() {
         super.onDestroy()
         eventDispatcher.dispose()
-        manager.stop()
+        // Discovery and HTTP engines live on the Application process, not this Activity.
+        // Stopping them here would drop in-flight transfers when the system recreates
+        // or reclaims the Activity while TransferService is still in the foreground.
     }
 
     companion object {

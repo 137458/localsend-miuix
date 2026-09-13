@@ -2,6 +2,7 @@ package org.localsend.miuix.model
 
 import android.net.Uri
 import kotlinx.serialization.Serializable
+import org.localsend.miuix.transfer.RemainingTime
 import java.util.UUID
 
 @Serializable
@@ -161,19 +162,8 @@ data class TransferSession(
     val currentFile: FileItem?
         get() = files.firstOrNull { it.status == TransferStatus.InProgress } ?: files.getOrNull(currentFileIndex)
 
-    val remainingTimeFormatted: String
-        get() {
-            if (status != TransferStatus.InProgress) return ""
-            if (speed <= 0 || totalBytes <= 0) return "计算中..."
-            val remainingBytes = (totalBytes - transferredBytes).coerceAtLeast(0L)
-            if (remainingBytes == 0L) return "即将完成"
-            val seconds = remainingBytes / speed
-            return when {
-                seconds < 60 -> "剩余约 ${seconds}秒"
-                seconds < 3600 -> "剩余约 ${seconds / 60}分${seconds % 60}秒"
-                else -> "剩余约 ${seconds / 3600}小时${(seconds % 3600) / 60}分"
-            }
-        }
+    val remainingTime: RemainingTime
+        get() = RemainingTime.of(status, speed, totalBytes, transferredBytes)
 }
 
 @Serializable

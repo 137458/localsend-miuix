@@ -14,12 +14,6 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.documentfile.provider.DocumentFile
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.get
-import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,9 +31,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import org.localsend.miuix.R
+import org.localsend.miuix.core.AppJson
 import org.localsend.miuix.core.LocalSendRoutes
+import org.localsend.miuix.discovery.DeviceDirectory
+import org.localsend.miuix.history.HistoryStore
 import org.localsend.miuix.model.AppSettings
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
@@ -59,13 +55,14 @@ import org.localsend.miuix.network.NetworkUtils
 import org.localsend.miuix.network.SslHelper
 import org.localsend.miuix.network.TlsStore
 import org.localsend.miuix.notification.TransferNotifier
+import org.localsend.miuix.transfer.TransferOutcome
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.X509TrustManager
 
 data class AppInfoItem(
     val label: String,
@@ -83,9 +80,12 @@ class LocalSendManager(private val context: Context) {
         TlsStore.init(context)
     }
 
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
+    private val json = AppJson.default
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val fingerprint = UUID.randomUUID().toString()
+    private val started = AtomicBoolean(false)
+    private val deviceDirectory = DeviceDirectory()
+    private val canceledSessionIds = ConcurrentHashMap.newKeySet<String>()
+    private val remoteSessionIds = ConcurrentHashMap<String, String>()
 
     // 默认保存位置说明：公共 Download/LocalSend（通过 MediaStore 写入，Android 10+ 免存储权限）
     private val defaultDownloadPath: String by lazy {
@@ -128,35 +128,13 @@ class LocalSendManager(private val context: Context) {
     private val _selectedFiles = MutableStateFlow<List<FileItem>>(emptyList())
     val selectedFiles: StateFlow<List<FileItem>> = _selectedFiles.asStateFlow()
 
-    private val historyFile = File(context.filesDir, "transfer_history.json")
-    private val historyJson = Json { ignoreUnknownKeys = true; prettyPrint = false }
-
-    private fun loadPersistedHistory(): List<TransferHistoryItem> {
-        return try {
-            if (historyFile.exists()) {
-                val content = historyFile.readText()
-                if (content.isNotBlank()) {
-                    historyJson.decodeFromString<List<TransferHistoryItem>>(content)
-                } else emptyList()
-            } else {
-                emptyList()
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
+    private val historyStore = HistoryStore(File(context.filesDir, HistoryStore.FILENAME))
 
     private fun persistHistory(items: List<TransferHistoryItem>) {
         scope.launch(Dispatchers.IO) {
             try {
-                val tempFile = File(context.filesDir, "transfer_history.json.tmp")
-                tempFile.writeText(historyJson.encodeToString(items))
-                if (!tempFile.renameTo(historyFile)) {
-                    tempFile.copyTo(historyFile, overwrite = true)
-                    tempFile.delete()
-                }
-            } catch (e: Exception) {
-                // Ignore file write error
+                historyStore.persist(items)
+            } catch (_: Exception) {
             }
         }
     }
@@ -167,7 +145,7 @@ class LocalSendManager(private val context: Context) {
     private val _activeSessions = MutableStateFlow<List<TransferSession>>(emptyList())
     val activeSessions: StateFlow<List<TransferSession>> = _activeSessions.asStateFlow()
 
-    private val _transferHistory = MutableStateFlow<List<TransferHistoryItem>>(loadPersistedHistory())
+    private val _transferHistory = MutableStateFlow(historyStore.load())
     val transferHistory: StateFlow<List<TransferHistoryItem>> = _transferHistory.asStateFlow()
 
     private val _isScanning = MutableStateFlow(false)
@@ -258,6 +236,10 @@ class LocalSendManager(private val context: Context) {
     )
 
     fun start() {
+        if (!started.compareAndSet(false, true)) {
+            onResume()
+            return
+        }
         scope.launch(Dispatchers.IO) {
             server.start()
             discoveryService.start()
@@ -274,6 +256,7 @@ class LocalSendManager(private val context: Context) {
     }
 
     fun stop() {
+        if (!started.compareAndSet(true, false)) return
         discoveryService.stop()
         server.stop()
         org.localsend.miuix.service.TransferService.stop(context)
@@ -331,49 +314,12 @@ class LocalSendManager(private val context: Context) {
         }
     }
 
-    private fun isSameDevice(a: Device, b: Device): Boolean {
-        if (a.fingerprint.isNotBlank() && b.fingerprint.isNotBlank()) {
-            return a.fingerprint == b.fingerprint
-        }
-        return a.ip == b.ip && a.port == b.port
-    }
-
     private fun upsertDevice(device: Device) {
         if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
             FingerprintTrust.trust(device.fingerprint)
         }
-        scope.launch {
-            _nearbyDevices.update { current ->
-                val now = System.currentTimeMillis()
-                val alive = current.filter { now - it.lastSeen < DEVICE_TTL_MS }
-                val index = alive.indexOfFirst { isSameDevice(it, device) }
-
-                if (index < 0) {
-                    alive + device
-                } else {
-                    val known = alive[index]
-                    // 融合多网卡地址：合并已知所有 IP
-                    val allConfirmedIps = (known.allIps + device.allIps).distinct()
-                    val primaryLocalIp = NetworkUtils.getPrimaryIp()
-
-                    // 选择最优主显示 IP：优先选择与本机主要活跃网卡同子网的 IP，兜底保留最新响应的 IP
-                    val bestIp = if (primaryLocalIp != null && allConfirmedIps.any { NetworkUtils.isSameSubnet(it, primaryLocalIp) }) {
-                        allConfirmedIps.first { NetworkUtils.isSameSubnet(it, primaryLocalIp) }
-                    } else {
-                        device.ip
-                    }
-                    val altIps = allConfirmedIps.filter { it != bestIp }
-
-                    val merged = device.copy(
-                        ip = bestIp,
-                        alternateIps = altIps,
-                        deviceModel = device.deviceModel ?: known.deviceModel,
-                        lastSeen = maxOf(known.lastSeen, device.lastSeen)
-                    )
-
-                    alive.toMutableList().apply { set(index, merged) }
-                }
-            }
+        synchronized(deviceDirectory) {
+            _nearbyDevices.value = deviceDirectory.upsert(device)
         }
     }
 
@@ -390,7 +336,7 @@ class LocalSendManager(private val context: Context) {
 
         if (targetDevice.deviceType == DeviceType.web || targetDevice.port == 0) {
             startShare(filesToSend)
-            _sessionMessage.value = "已将 ${filesToSend.size} 项内容发布到 Web 共享，浏览器端刷新即可下载"
+            _sessionMessage.value = context.getString(R.string.msg_web_share_published, filesToSend.size)
             return
         }
 
@@ -411,11 +357,18 @@ class LocalSendManager(private val context: Context) {
         scope.launch(Dispatchers.IO) {
             FingerprintTrust.pin(targetDevice.fingerprint)
             try {
+                if (canceledSessionIds.contains(sessionId)) {
+                    session.status = TransferStatus.Canceled
+                    session.endTime = System.currentTimeMillis()
+                    updateSessionState(session)
+                    return@launch
+                }
                 val prepResult = client.prepareUpload(targetDevice, filesToSend)
                 if (prepResult.isFailure) {
                     session.status = TransferStatus.Failed
-                    session.errorMessage = prepResult.exceptionOrNull()?.message ?: "Handshake failed"
-                    _sessionMessage.value = "对方拒绝接收：${session.errorMessage}"
+                    session.errorMessage = prepResult.exceptionOrNull()?.message
+                        ?: context.getString(R.string.msg_handshake_failed)
+                    _sessionMessage.value = context.getString(R.string.msg_peer_declined_detail, session.errorMessage)
                     updateSessionState(session)
                     return@launch
                 }
@@ -425,6 +378,9 @@ class LocalSendManager(private val context: Context) {
                 val activeDevice = handshake.activeDevice
                 val remoteSessionId = responseDto.sessionId
                 val fileTokens = responseDto.files
+                if (remoteSessionId.isNotBlank()) {
+                    remoteSessionIds[sessionId] = remoteSessionId
+                }
 
                 if (activeDevice.ip != targetDevice.ip) {
                     upsertDevice(activeDevice)
@@ -453,6 +409,12 @@ class LocalSendManager(private val context: Context) {
                 Log.i(TAG, "Starting transfer session $remoteSessionId to '${activeDevice.alias}' (${activeDevice.url}), ${filesToSend.size} files, ${fileTokens.size} tokens granted")
 
                 for ((index, fileItem) in filesToSend.withIndex()) {
+                    if (canceledSessionIds.contains(sessionId)) {
+                        session.status = TransferStatus.Canceled
+                        session.endTime = System.currentTimeMillis()
+                        updateSessionState(session)
+                        return@launch
+                    }
                     val token = fileTokens[fileItem.id]
                     if (token == null) {
                         // 若该项为纯文本消息且其内容已在 prepare-upload 握手阶段通过 preview 完整提供，
@@ -469,7 +431,7 @@ class LocalSendManager(private val context: Context) {
 
                         Log.w(TAG, "File '${fileItem.name}' (id=${fileItem.id}) has no token from peer! Skipping upload.")
                         fileItem.status = TransferStatus.Failed
-                        fileItem.error = "接收方未接受该文件（未授予上传令牌）"
+                        fileItem.error = context.getString(R.string.msg_file_not_accepted)
                         updateSessionState(session)
                         continue
                     }
@@ -481,7 +443,8 @@ class LocalSendManager(private val context: Context) {
                         targetDevice = activeDevice,
                         sessionId = remoteSessionId,
                         fileItem = fileItem,
-                        token = token
+                        token = token,
+                        isCanceled = { canceledSessionIds.contains(sessionId) }
                     ) { bytesWritten, speed ->
                         fileItem.bytesTransferred = bytesWritten
                         fileItem.speed = speed
@@ -493,13 +456,20 @@ class LocalSendManager(private val context: Context) {
                         updateSessionState(session)
                     }
 
+                    if (canceledSessionIds.contains(sessionId)) {
+                        session.status = TransferStatus.Canceled
+                        session.endTime = System.currentTimeMillis()
+                        updateSessionState(session)
+                        return@launch
+                    }
                     if (uploadResult.isSuccess) {
                         Log.i(TAG, "File [${index + 1}/${filesToSend.size}] completed: '${fileItem.name}'")
                         fileItem.status = TransferStatus.Completed
                         fileItem.progress = 1f
                         fileItem.bytesTransferred = fileItem.size
                     } else {
-                        val errMsg = uploadResult.exceptionOrNull()?.message ?: "Upload failed"
+                        val errMsg = uploadResult.exceptionOrNull()?.message
+                            ?: context.getString(R.string.msg_upload_failed)
                         Log.e(TAG, "File [${index + 1}/${filesToSend.size}] failed: '${fileItem.name}', error: $errMsg")
                         fileItem.status = TransferStatus.Failed
                         fileItem.error = errMsg
@@ -511,17 +481,16 @@ class LocalSendManager(private val context: Context) {
                     }
                 }
 
-                val failedCount = filesToSend.count { it.status == TransferStatus.Failed }
-                if (failedCount == filesToSend.size) {
-                    session.status = TransferStatus.Failed
-                    session.errorMessage = filesToSend.firstNotNullOfOrNull { it.error } ?: "所有文件传输失败"
-                } else if (failedCount > 0) {
-                    session.status = TransferStatus.Completed
-                    session.errorMessage = "部分文件传输失败 ($failedCount/${filesToSend.size})"
-                } else {
-                    session.status = TransferStatus.Completed
-                    session.errorMessage = null
-                }
+                val outcome = TransferOutcome.aggregate(
+                    files = filesToSend,
+                    currentStatus = if (canceledSessionIds.contains(sessionId)) TransferStatus.Canceled else session.status,
+                    allFailedMessage = context.getString(R.string.msg_all_files_failed),
+                    partialFailedMessage = { failed, total ->
+                        context.getString(R.string.msg_partial_files_failed, failed, total)
+                    }
+                )
+                session.status = outcome.status
+                session.errorMessage = outcome.errorMessage
                 session.endTime = System.currentTimeMillis()
                 updateSessionState(session)
             } finally {
@@ -553,6 +522,12 @@ class LocalSendManager(private val context: Context) {
                     if (conn.responseCode == HttpURLConnection.HTTP_OK) {
                         val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                         val dto = json.decodeFromString<DeviceDto>(body)
+                        val observedFp = (conn as? HttpsURLConnection)?.let { SslHelper.certSha256(it) }.orEmpty()
+                        if (proto == "https" &&
+                            !org.localsend.miuix.network.CertificateBinding.dtoMatchesCert(dto.fingerprint, observedFp)
+                        ) {
+                            continue
+                        }
                         targetDevice = Device.fromDto(dto, ip)
                         if (targetDevice.protocol.equals("https", ignoreCase = true) && targetDevice.fingerprint.isNotBlank()) {
                             FingerprintTrust.trust(targetDevice.fingerprint)
@@ -566,7 +541,7 @@ class LocalSendManager(private val context: Context) {
             }
 
             val finalDevice = targetDevice ?: Device(
-                alias = "设备 ($ip)",
+                alias = context.getString(R.string.msg_device_alias_ip, ip),
                 fingerprint = "",
                 port = port,
                 protocol = "http",
@@ -601,14 +576,14 @@ class LocalSendManager(private val context: Context) {
                         val text = session.singleTextMessageContent!!
                         if (_settings.value.autoCopyText) {
                             copyTextToClipboard(text)
-                            _sessionMessage.value = "已接收并自动复制文本：${text.take(20)}"
+                            _sessionMessage.value = context.getString(R.string.msg_text_auto_copied, text.take(20))
                         } else {
-                            _sessionMessage.value = "已收到来自 ${session.device.alias} 的文本消息"
+                            _sessionMessage.value = context.getString(R.string.msg_text_received_from, session.device.alias)
                         }
                     }
                     vibrateIfEnabled()
                 } else if (!session.isIncoming && session.status == TransferStatus.Completed) {
-                    _sessionMessage.value = "内容已成功发送至 ${session.device.alias}"
+                    _sessionMessage.value = context.getString(R.string.msg_sent_to, session.device.alias)
                     vibrateIfEnabled()
                 }
 
@@ -711,6 +686,7 @@ class LocalSendManager(private val context: Context) {
     }
 
     fun cancelTransfer(sessionId: String) {
+        canceledSessionIds.add(sessionId)
         val session = _activeSessions.value.firstOrNull { it.sessionId == sessionId } ?: return
         session.status = TransferStatus.Canceled
         session.endTime = System.currentTimeMillis()
@@ -718,7 +694,8 @@ class LocalSendManager(private val context: Context) {
 
         scope.launch(Dispatchers.IO) {
             if (!session.isIncoming) {
-                client.cancelUpload(session.device, sessionId)
+                val remoteId = remoteSessionIds[sessionId] ?: sessionId
+                client.cancelUpload(session.device, remoteId)
             }
         }
     }
@@ -876,7 +853,7 @@ class LocalSendManager(private val context: Context) {
         if (items.isNotEmpty()) {
             withContext(Dispatchers.Main) {
                 addFiles(items)
-                _sessionMessage.value = "已成功添加文件夹中的 ${items.size} 个文件"
+                _sessionMessage.value = context.getString(R.string.msg_folder_files_added, items.size)
             }
         }
     }
@@ -891,7 +868,7 @@ class LocalSendManager(private val context: Context) {
                 discoveryService.sendAnnouncement()
             }
             withContext(Dispatchers.Main) {
-                _sessionMessage.value = "安全证书已重新生成，指纹已更新"
+                _sessionMessage.value = context.getString(R.string.msg_certificate_regenerated)
             }
         }
     }
@@ -975,7 +952,13 @@ class LocalSendManager(private val context: Context) {
 
         fun getInstance(): LocalSendManager? = instance
 
-        private const val DEVICE_TTL_MS = 90_000L
+        fun getOrCreate(context: Context): LocalSendManager {
+            instance?.let { return it }
+            synchronized(this) {
+                instance?.let { return it }
+                return LocalSendManager(context.applicationContext).also { instance = it }
+            }
+        }
         private const val KEY_ALIAS = org.localsend.miuix.core.PreferenceKeys.KEY_ALIAS
         private const val KEY_PORT = org.localsend.miuix.core.PreferenceKeys.KEY_PORT
         private const val KEY_QUICK_SAVE = org.localsend.miuix.core.PreferenceKeys.KEY_QUICK_SAVE

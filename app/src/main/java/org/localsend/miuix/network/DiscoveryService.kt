@@ -21,8 +21,10 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
+import org.localsend.miuix.core.AppJson
 import org.localsend.miuix.core.LocalSendRoutes
+import org.localsend.miuix.core.NetworkConstants
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
 import java.net.DatagramPacket
@@ -31,7 +33,6 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.MulticastSocket
 import java.util.concurrent.atomic.AtomicInteger
-import javax.net.ssl.X509TrustManager
 
 class DiscoveryService(
     private val context: Context,
@@ -39,7 +40,7 @@ class DiscoveryService(
     private val getLocalDevice: () -> Device,
     private val onDeviceDiscovered: (Device) -> Unit
 ) {
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
+    private val json = AppJson.default
     private val scanDispatcher = Dispatchers.IO.limitedParallelism(32)
     private var multicastJob: Job? = null
     private var periodicBroadcastJob: Job? = null
@@ -51,7 +52,7 @@ class DiscoveryService(
             followRedirects = false
             engine {
                 https {
-                    trustManager = SslHelper.trustAllCerts[0] as X509TrustManager
+                    trustManager = SslHelper.discoveryTrustManager
                 }
             }
             install(ContentNegotiation) {
@@ -96,7 +97,7 @@ class DiscoveryService(
         try {
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             if (wifiManager != null && multicastLock == null) {
-                multicastLock = wifiManager.createMulticastLock("LocalSendMiuixMulticastLock").apply {
+                multicastLock = wifiManager.createMulticastLock(NetworkConstants.MULTICAST_LOCK_TAG).apply {
                     setReferenceCounted(true)
                     acquire()
                 }
@@ -123,10 +124,10 @@ class DiscoveryService(
             while (isActive) {
                 var socket: MulticastSocket? = null
                 try {
-                    val group = InetAddress.getByName("224.0.0.167")
+                    val group = InetAddress.getByName(NetworkConstants.DEFAULT_MULTICAST_IP)
                     socket = MulticastSocket(null).apply {
                         reuseAddress = true
-                        bind(InetSocketAddress(53317))
+                        bind(InetSocketAddress(NetworkConstants.DEFAULT_PORT))
                         joinGroup(group)
                         soTimeout = 3000
                     }
@@ -199,7 +200,7 @@ class DiscoveryService(
                 val dto = localDevice.toDto(announce = true)
                 val payload = json.encodeToString(DeviceDto.serializer(), dto).toByteArray(Charsets.UTF_8)
 
-                val multicastGroup = InetAddress.getByName("224.0.0.167")
+                val multicastGroup = InetAddress.getByName(NetworkConstants.DEFAULT_MULTICAST_IP)
                 val broadcasts = NetworkUtils.getBroadcastAddresses()
 
                 DatagramSocket().use { socket ->
@@ -207,7 +208,7 @@ class DiscoveryService(
 
                     // 1. Send to multicast 224.0.0.167
                     try {
-                        val packet1 = DatagramPacket(payload, payload.size, multicastGroup, 53317)
+                        val packet1 = DatagramPacket(payload, payload.size, multicastGroup, NetworkConstants.DEFAULT_PORT)
                         socket.send(packet1)
                     } catch (ignored: Exception) {}
 
@@ -215,7 +216,7 @@ class DiscoveryService(
                     for (bcast in broadcasts) {
                         try {
                             val addr = InetAddress.getByName(bcast)
-                            val packet2 = DatagramPacket(payload, payload.size, addr, 53317)
+                            val packet2 = DatagramPacket(payload, payload.size, addr, NetworkConstants.DEFAULT_PORT)
                             socket.send(packet2)
                         } catch (ignored: Exception) {}
                     }
@@ -266,7 +267,7 @@ class DiscoveryService(
                                 for (route in listOf(LocalSendRoutes.INFO_V2, LocalSendRoutes.INFO_V1)) {
                                     if (found) break
                                     try {
-                                        val url = "$proto://$targetIp:53317$route"
+                                        val url = "$proto://$targetIp:${NetworkConstants.DEFAULT_PORT}$route"
                                         val response = httpClient.get(url)
                                         val dto = response.body<DeviceDto>()
                                         if (dto.fingerprint != localDevice.fingerprint) {

@@ -255,7 +255,17 @@ fun SettingsScreen(
                     ArrowPreference(
                         title = stringResource(R.string.settings_pref_license_title),
                         summary = stringResource(R.string.settings_pref_license_summary),
-                        onClick = {}
+                        onClick = {
+                            try {
+                                val intent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://www.apache.org/licenses/LICENSE-2.0")
+                                ).apply {
+                                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }
                     )
                 }
             }

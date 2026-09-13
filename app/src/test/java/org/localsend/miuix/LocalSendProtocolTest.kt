@@ -100,7 +100,7 @@ class LocalSendProtocolTest {
         assertEquals(40, session.progressPercent)
         assertEquals(1, session.currentFileIndex)
         assertEquals("file2.mp4", session.currentFile?.name)
-        assertEquals("剩余约 3秒", session.remainingTimeFormatted)
+        assertEquals(org.localsend.miuix.transfer.RemainingTime.Seconds(3), session.remainingTime)
     }
 
     @Test

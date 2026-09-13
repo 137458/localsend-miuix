@@ -380,4 +380,34 @@
     <string name="status_canceled">Cancelled</string>
     <string name="status_processing">In Progress</string>
     <string name="status_waiting">Waiting</string>
+
+    <string name="eta_calculating">Calculating...</string>
+    <string name="eta_seconds">~%1$ds left</string>
+    <string name="eta_minutes">~%1$dm %2$ds left</string>
+    <string name="eta_hours">~%1$dh %2$dm left</string>
+
+    <string name="msg_web_share_published">Published %1$d item(s) to Web Share. Refresh the browser to download.</string>
+    <string name="msg_handshake_failed">Handshake failed</string>
+    <string name="msg_peer_declined_detail">Peer declined: %1$s</string>
+    <string name="msg_file_not_accepted">Peer did not accept this file (no upload token)</string>
+    <string name="msg_upload_failed">Upload failed</string>
+    <string name="msg_all_files_failed">All files failed to transfer</string>
+    <string name="msg_partial_files_failed">Some files failed (%1$d/%2$d)</string>
+    <string name="msg_device_alias_ip">Device (%1$s)</string>
+    <string name="msg_text_auto_copied">Received and copied text: %1$s</string>
+    <string name="msg_text_received_from">Received a text message from %1$s</string>
+    <string name="msg_sent_to">Sent successfully to %1$s</string>
+    <string name="msg_folder_files_added">Added %1$d files from the folder</string>
+    <string name="msg_certificate_regenerated">Certificate regenerated, fingerprint updated</string>
+    <string name="msg_cannot_connect">Unable to connect to the target device</string>
+    <string name="msg_pin_required">Recipient requires the correct PIN (401)</string>
+    <string name="msg_peer_busy">Peer is busy with another transfer, try again later (409)</string>
+    <string name="msg_too_many_requests">Too many requests, try again later (429)</string>
+    <string name="msg_peer_rejected_http">Peer rejected the request: %1$d (%2$s)</string>
+    <string name="msg_upload_forbidden">Upload rejected: invalid token or source IP (403)</string>
+    <string name="msg_sha256_mismatch">File verification failed: SHA-256 mismatch (422)</string>
+    <string name="msg_session_not_found">Session or file not found on peer (404)</string>
+    <string name="msg_upload_http">Upload failed: HTTP %1$d %2$s</string>
+    <string name="msg_peer_internal_error">Peer internal error (500): %1$s</string>
+    <string name="msg_peer_http">Peer returned HTTP %1$d: %2$s</string>
 </resources>

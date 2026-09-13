@@ -39,7 +39,7 @@ import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
+import org.localsend.miuix.core.AppJson
 import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
@@ -76,7 +76,7 @@ class LocalSendServer(
     private val onSessionUpdated: (TransferSession) -> Unit
 ) {
     private var engine: ApplicationEngine? = null
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
+    private val json = AppJson.default
     private val activeSessions = ConcurrentHashMap<String, TransferSession>()
     private val sessionTokens = ConcurrentHashMap<String, MutableMap<String, String>>() // sessionId -> (fileId -> token)
 

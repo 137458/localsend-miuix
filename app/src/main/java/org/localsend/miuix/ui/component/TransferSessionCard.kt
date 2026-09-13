@@ -50,6 +50,7 @@ import org.localsend.miuix.R
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.transfer.RemainingTime
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -421,9 +422,10 @@ private fun FileTransferCardContent(
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.primary
                 )
-                if (session.remainingTimeFormatted.isNotEmpty()) {
+                val remainingLabel = remainingTimeLabel(session)
+                if (remainingLabel.isNotEmpty()) {
                     Text(
-                        text = " • ${session.remainingTimeFormatted}",
+                        text = " • $remainingLabel",
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
@@ -486,6 +488,18 @@ private fun FileTransferCardContent(
             initialIndex = previewInitialIndex,
             onDismissRequest = { previewInitialIndex = -1 }
         )
+    }
+}
+
+@Composable
+private fun remainingTimeLabel(session: TransferSession): String {
+    return when (val remaining = session.remainingTime) {
+        RemainingTime.Hidden -> ""
+        RemainingTime.Calculating -> stringResource(R.string.eta_calculating)
+        RemainingTime.AlmostDone -> stringResource(R.string.live_almost_done)
+        is RemainingTime.Seconds -> stringResource(R.string.eta_seconds, remaining.value)
+        is RemainingTime.Minutes -> stringResource(R.string.eta_minutes, remaining.minutes, remaining.seconds)
+        is RemainingTime.Hours -> stringResource(R.string.eta_hours, remaining.hours, remaining.minutes)
     }
 }
 
@@ -837,9 +851,10 @@ private fun InlineFileTransferProgress(
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.primary
                 )
-                if (session.remainingTimeFormatted.isNotEmpty()) {
+                val remainingLabel = remainingTimeLabel(session)
+                if (remainingLabel.isNotEmpty()) {
                     Text(
-                        text = " • ${session.remainingTimeFormatted}",
+                        text = " • $remainingLabel",
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
