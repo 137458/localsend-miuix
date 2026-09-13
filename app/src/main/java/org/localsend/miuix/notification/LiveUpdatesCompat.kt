@@ -22,6 +22,14 @@ import org.localsend.miuix.model.TransferSession
  */
 object LiveUpdatesCompat {
 
+    /** JVM-test fallbacks when no Context is available. Production always passes a Context. */
+    const val CHIP_TEXT = "Text"
+    const val CHIP_COMPLETED = "Done"
+    const val CHIP_WAITING = "Wait"
+    const val CHIP_PREPARING = "..."
+    const val CHIP_IN = "In "
+    const val CHIP_OUT = "Out "
+
     @Volatile
     private var cachedLargeIcon: Bitmap? = null
 
@@ -163,10 +171,10 @@ object LiveUpdatesCompat {
      * 格式化胶囊芯片短文本：状态简字 + 速度和剩余时间（控制在 8~10 字符内，适配状态栏芯片排版）。
      */
     fun formatChipSpeedEta(session: TransferSession, context: Context? = null): String {
-        if (session.isTextMessage) return context?.getString(R.string.chip_text) ?: "文本"
-        if (session.status == org.localsend.miuix.model.TransferStatus.Completed) return context?.getString(R.string.chip_completed) ?: "已完成"
-        if (session.status == org.localsend.miuix.model.TransferStatus.WaitingApproval) return context?.getString(R.string.chip_waiting_approval) ?: "待确认"
-        if (session.speed <= 0) return context?.getString(R.string.live_preparing) ?: "准备中"
+        if (session.isTextMessage) return context?.getString(R.string.chip_text) ?: CHIP_TEXT
+        if (session.status == org.localsend.miuix.model.TransferStatus.Completed) return context?.getString(R.string.chip_completed) ?: CHIP_COMPLETED
+        if (session.status == org.localsend.miuix.model.TransferStatus.WaitingApproval) return context?.getString(R.string.chip_waiting_approval) ?: CHIP_WAITING
+        if (session.speed <= 0) return context?.getString(R.string.live_preparing) ?: CHIP_PREPARING
 
         val speedMb = session.speed.toDouble() / (1024.0 * 1024.0)
         val speedStr = if (speedMb >= 1.0) {
@@ -186,7 +194,11 @@ object LiveUpdatesCompat {
             else -> "${etaSec / 3600L}h"
         }
 
-        val prefix = if (session.isIncoming) (context?.getString(R.string.chip_incoming_prefix) ?: "收 ") else (context?.getString(R.string.chip_outgoing_prefix) ?: "发 ")
+        val prefix = if (session.isIncoming) {
+            context?.getString(R.string.chip_incoming_prefix) ?: CHIP_IN
+        } else {
+            context?.getString(R.string.chip_outgoing_prefix) ?: CHIP_OUT
+        }
         val speedEta = if (etaStr.isNotEmpty()) "$speedStr $etaStr" else speedStr
         return "$prefix$speedEta"
     }

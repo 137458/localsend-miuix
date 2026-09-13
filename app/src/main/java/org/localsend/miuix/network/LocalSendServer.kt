@@ -39,6 +39,7 @@ import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.localsend.miuix.R
 import org.localsend.miuix.core.AppJson
 import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.model.Device
@@ -53,6 +54,7 @@ import org.localsend.miuix.model.SaveTarget
 import org.localsend.miuix.model.ShareSession
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.webshare.WebShareCopy
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -118,7 +120,7 @@ class LocalSendServer(
     private fun openSaveStream(fileItem: FileItem, target: SaveTarget): OutputStream = when (target) {
         is SaveTarget.MediaStoreTarget -> {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                throw IllegalStateException("MediaStore 保存需要 Android 10 (API 29) 及以上")
+                throw IllegalStateException(context.getString(R.string.msg_mediastore_requires_q))
             }
             val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
             val displayName = uniqueMediaName(fileItem.name)
@@ -132,23 +134,23 @@ class LocalSendServer(
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val uri = context.contentResolver.insert(collection, values)
-                ?: throw IllegalStateException("无法在公共下载目录中创建文件")
+                ?: throw IllegalStateException(context.getString(R.string.msg_cannot_create_public_download))
             // 记录实际写入的 Uri（文件名可能被系统自动加后缀），完成后用于清除 PENDING
             fileItem.mediaStoreUri = uri
             fileItem.name = displayName
             context.contentResolver.openOutputStream(uri)
-                ?: throw IllegalStateException("无法打开公共下载目录中的文件")
+                ?: throw IllegalStateException(context.getString(R.string.msg_cannot_open_public_download))
         }
         is SaveTarget.UriTarget -> {
             val parent = DocumentFile.fromTreeUri(context, target.treeUri)
-                ?: throw IllegalStateException("无法访问自定义保存目录")
+                ?: throw IllegalStateException(context.getString(R.string.msg_cannot_access_custom_dir))
             val existing = parent.listFiles().mapNotNull { it.name }.toHashSet()
             val uniqueName = uniqueTreeName(fileItem.name, existing)
             val created = parent.createFile(fileItem.mimeType, uniqueName)
-                ?: throw IllegalStateException("无法在自定义保存目录中创建文件")
+                ?: throw IllegalStateException(context.getString(R.string.msg_cannot_create_custom_file))
             fileItem.name = uniqueName
             context.contentResolver.openOutputStream(created.uri)
-                ?: throw IllegalStateException("无法在自定义保存目录中创建文件")
+                ?: throw IllegalStateException(context.getString(R.string.msg_cannot_create_custom_file))
         }
     }
 
@@ -439,7 +441,7 @@ class LocalSendServer(
         return false
     }
 
-    private fun buildWebShareHtml(alias: String, session: ShareSession?): String {
+    private fun buildWebShareHtml(alias: String, session: ShareSession?, copy: WebShareCopy): String {
         val hasSessionFiles = session != null && session.files.isNotEmpty()
         val textItems = session?.files?.filter { it.isTextMessage && !it.textContent.isNullOrEmpty() } ?: emptyList()
         val binaryFiles = session?.files?.filterNot { it.isTextMessage && !it.textContent.isNullOrEmpty() } ?: emptyList()
@@ -452,7 +454,7 @@ class LocalSendServer(
                     <pre class="text-content" id="text-${textItem.id}">$escapedText</pre>
                     <button class="btn btn-sec" onclick="copyText('text-${textItem.id}')">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                        复制文本
+                        ${copy.copyText}
                     </button>
                 </div>
                 """.trimIndent()
@@ -462,9 +464,9 @@ class LocalSendServer(
                 <div class="section-header">
                     <span class="section-title">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                        共享文本
+                        ${copy.sharedText}
                     </span>
-                    <span class="section-tag">${textItems.size} 条</span>
+                    <span class="section-tag">${copy.textCountLabel(textItems.size)}</span>
                 </div>
                 $textCards
             </div>
@@ -488,7 +490,7 @@ class LocalSendServer(
                     </div>
                     <a class="btn btn-primary" href="$downloadUrl" download="${escapeHtml(file.name)}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        下载
+                        ${copy.download}
                     </a>
                 </div>
                 """.trimIndent()
@@ -498,11 +500,11 @@ class LocalSendServer(
                 <div class="section-header">
                     <span class="section-title">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                        共享文件
+                        ${copy.sharedFiles}
                     </span>
                     <div style="display:inline-flex;align-items:center;gap:8px;">
-                        ${if (binaryFiles.size > 1 && session != null) """<a href="${LocalSendRoutes.DOWNLOAD_ZIP}?sessionId=${session.sessionId}" class="btn-zip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> 打包下载全部 (.zip)</a>""" else ""}
-                        <span class="section-tag">${binaryFiles.size} 个</span>
+                        ${if (binaryFiles.size > 1 && session != null) """<a href="${LocalSendRoutes.DOWNLOAD_ZIP}?sessionId=${session.sessionId}" class="btn-zip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${copy.zipAll}</a>""" else ""}
+                        <span class="section-tag">${binaryFiles.size} ${copy.fileCountLabel}</span>
                     </div>
                 </div>
                 <div class="file-list">$rows</div>
@@ -513,18 +515,18 @@ class LocalSendServer(
         val noShareHint = if (!hasSessionFiles) {
             """
             <div class="empty-hint">
-                <p>当前发送端未添加共享内容，但您可以直接向手机上传文件</p>
+                <p>${copy.emptyHint}</p>
             </div>
             """.trimIndent()
         } else ""
 
         return """
             <!DOCTYPE html>
-            <html lang="zh-CN">
+            <html lang="${copy.htmlLang}">
             <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                <title>${escapeHtml(alias)} - LocalSend 局域网快传</title>
+                <title>${escapeHtml(copy.pageTitle(alias))}</title>
                 <style>
                     :root {
                         --bg: #f4f5f8;
@@ -770,10 +772,10 @@ class LocalSendServer(
                     <div class="header-card">
                         <div class="device-badge">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
-                            局域网在线
+                            ${copy.lanOnline}
                         </div>
                         <div class="header-title">${escapeHtml(alias)}</div>
-                        <div class="header-sub">通过局域网高速安全传输，无需外网连接</div>
+                        <div class="header-sub">${copy.headerSub}</div>
                     </div>
                     $noShareHint
                     $textSectionHtml
@@ -782,28 +784,28 @@ class LocalSendServer(
                         <div class="section-header">
                             <span class="section-title">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                                上传文件到手机
+                                ${copy.uploadToPhone}
                             </span>
-                            <span class="section-tag">双向快传</span>
+                            <span class="section-tag">${copy.bidirectional}</span>
                         </div>
                         <div class="upload-dropzone" id="uploadDropzone">
                             <div class="dropzone-icon">
                                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                             </div>
-                            <div class="dropzone-text">点击选择文件 或 拖拽文件到此处</div>
-                            <div class="dropzone-hint">支持任意格式文件与多文件同时上传</div>
+                            <div class="dropzone-text">${copy.dropzoneText}</div>
+                            <div class="dropzone-hint">${copy.dropzoneHint}</div>
                         </div>
                         <input type="file" id="fileInput" multiple style="display:none">
                         <div class="upload-status-box" id="uploadStatusBox">
                             <div class="status-row">
-                                <span id="uploadStatusTitle" style="font-weight:600; color:var(--text-main)">准备上传...</span>
+                                <span id="uploadStatusTitle" style="font-weight:600; color:var(--text-main)">${copy.preparingUpload}</span>
                                 <span id="uploadStatusPercent">0%</span>
                             </div>
                             <div class="progress-bar-wrap">
                                 <div class="progress-bar" id="uploadProgressBar"></div>
                             </div>
                             <div class="status-row">
-                                <span id="uploadDetail">等待中...</span>
+                                <span id="uploadDetail">${copy.waiting}</span>
                                 <span id="uploadCount">0/0</span>
                             </div>
                         </div>
@@ -814,12 +816,13 @@ class LocalSendServer(
                     <div class="drag-overlay-icon">
                         <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                     </div>
-                    <div class="drag-overlay-title">松开鼠标即可上传至手机</div>
+                    <div class="drag-overlay-title">${copy.dropOverlay}</div>
                 </div>
 
-                <div id="toast" class="toast">已复制到剪贴板</div>
+                <div id="toast" class="toast">${copy.copied}</div>
 
                 <script>
+                    var I18N = ${copy.toJsObject()};
                     function showToast(msg) {
                         var t = document.getElementById('toast');
                         t.innerText = msg;
@@ -831,9 +834,9 @@ class LocalSendServer(
                         var el = document.getElementById(id);
                         if (!el) return;
                         navigator.clipboard.writeText(el.innerText).then(function() {
-                            showToast('已复制到剪贴板');
+                            showToast(I18N.copied);
                         }).catch(function() {
-                            showToast('复制失败，请手动选择复制');
+                            showToast(I18N.copyFailed);
                         });
                     }
 
@@ -922,11 +925,11 @@ class LocalSendServer(
                     function startUpload(fileList) {
                         isUploading = true;
                         statusBox.style.display = 'block';
-                        statusTitle.innerText = '正在等待手机端确认...';
+                        statusTitle.innerText = I18N.waitingConfirm;
                         statusTitle.style.color = 'var(--text-main)';
                         statusPercent.innerText = '0%';
                         progressBar.style.width = '0%';
-                        detailText.innerText = '请在手机上点击同意接收';
+                        detailText.innerText = I18N.tapAccept;
                         countText.innerText = '0/' + fileList.length;
 
                         var filesMap = {};
@@ -945,7 +948,7 @@ class LocalSendServer(
 
                         var requestBody = {
                             info: {
-                                alias: '浏览器 Web 端',
+                                alias: I18N.webAlias,
                                 version: '2.1',
                                 deviceModel: navigator.userAgent.indexOf('Mac') !== -1 ? 'Mac Browser' : (navigator.userAgent.indexOf('Windows') !== -1 ? 'PC Browser' : 'Web Client'),
                                 deviceType: 'web',
@@ -973,28 +976,28 @@ class LocalSendServer(
                                     var res = JSON.parse(xhr.responseText);
                                     uploadAllFiles(res.sessionId, res.files, fileBlobs, totalCount);
                                 } catch(e) {
-                                    finishError('解析响应失败');
+                                    finishError(I18N.parseFailed);
                                 }
                             } else if (xhr.status === 401) {
-                                var pinPrompt = prompt(isFirst ? '该设备启用了 PIN 码保护，请输入 PIN 码：' : 'PIN 码错误，请重新输入：');
+                                var pinPrompt = prompt(isFirst ? I18N.pinPrompt : I18N.pinRetry);
                                 if (!pinPrompt) {
-                                    finishError('未提供 PIN 码，上传已终止');
+                                    finishError(I18N.pinMissing);
                                     return;
                                 }
                                 currentPin = pinPrompt;
                                 executePrepare(reqBody, fileBlobs, totalCount, false);
                             } else if (xhr.status === 403) {
-                                finishError('手机端拒绝了此次接收请求');
+                                finishError(I18N.rejected);
                             } else if (xhr.status === 409) {
-                                finishError('手机端正在处理其他传输，请稍后再试');
+                                finishError(I18N.busy);
                             } else if (xhr.status === 429) {
-                                finishError('请求过于频繁，请稍后再试');
+                                finishError(I18N.tooMany);
                             } else {
-                                finishError('上传握手失败 (HTTP ' + xhr.status + ')');
+                                finishError(I18N.handshakeFailed + ' (HTTP ' + xhr.status + ')');
                             }
                         };
                         xhr.onerror = function() {
-                            finishError('网络连接失败，请检查局域网连接');
+                            finishError(I18N.networkFailed);
                         };
                         xhr.send(JSON.stringify(reqBody));
                     }
@@ -1005,13 +1008,13 @@ class LocalSendServer(
 
                         function uploadNext(index) {
                             if (index >= fileIds.length) {
-                                statusTitle.innerText = '上传完成';
+                                statusTitle.innerText = I18N.uploadComplete;
                                 statusTitle.style.color = 'var(--success)';
                                 statusPercent.innerText = '100%';
                                 progressBar.style.width = '100%';
-                                detailText.innerText = '所有文件已成功保存到手机';
+                                detailText.innerText = I18N.allSaved;
                                 countText.innerText = totalCount + '/' + totalCount;
-                                showToast('所有文件已成功传输至手机');
+                                showToast(I18N.allTransferred);
                                 setTimeout(function() {
                                     isUploading = false;
                                     statusBox.style.display = 'none';
@@ -1022,7 +1025,7 @@ class LocalSendServer(
                             var fId = fileIds[index];
                             var blob = fileBlobs[fId];
                             var token = tokens[fId];
-                            statusTitle.innerText = '正在上传: ' + blob.name;
+                            statusTitle.innerText = I18N.uploadingPrefix + blob.name;
                             countText.innerText = (index + 1) + '/' + totalCount;
 
                             var uploadUrl = '/api/localsend/v2/upload?sessionId=' + encodeURIComponent(sessionId) +
@@ -1047,12 +1050,12 @@ class LocalSendServer(
                                     completed++;
                                     uploadNext(index + 1);
                                 } else {
-                                    finishError('上传文件 ' + blob.name + ' 失败 (HTTP ' + xhr.status + ')');
+                                    finishError(I18N.fileFailed + ' ' + blob.name + ' (HTTP ' + xhr.status + ')');
                                 }
                             };
 
                             xhr.onerror = function() {
-                                finishError('上传文件 ' + blob.name + ' 时网络中断');
+                                finishError(I18N.fileInterrupted + ' ' + blob.name);
                             };
 
                             xhr.send(blob);
@@ -1063,7 +1066,7 @@ class LocalSendServer(
 
                     function finishError(msg) {
                         isUploading = false;
-                        statusTitle.innerText = '上传失败';
+                        statusTitle.innerText = I18N.uploadFailed;
                         statusTitle.style.color = 'var(--danger)';
                         detailText.innerText = msg;
                         showToast(msg);
@@ -1071,16 +1074,16 @@ class LocalSendServer(
 
                     function registerBrowserDevice() {
                         var fp = getFingerprint();
-                        var model = 'Web 浏览器';
+                        var model = I18N.modelWeb;
                         var ua = navigator.userAgent;
-                        if (ua.indexOf('Mac') !== -1) model = 'Mac 浏览器';
-                        else if (ua.indexOf('Windows') !== -1) model = 'PC 浏览器';
-                        else if (ua.indexOf('iPhone') !== -1) model = 'iPhone 浏览器';
-                        else if (ua.indexOf('iPad') !== -1) model = 'iPad 浏览器';
-                        else if (ua.indexOf('Android') !== -1) model = 'Android 浏览器';
+                        if (ua.indexOf('Mac') !== -1) model = I18N.modelMac;
+                        else if (ua.indexOf('Windows') !== -1) model = I18N.modelPc;
+                        else if (ua.indexOf('iPhone') !== -1) model = I18N.modelIphone;
+                        else if (ua.indexOf('iPad') !== -1) model = I18N.modelIpad;
+                        else if (ua.indexOf('Android') !== -1) model = I18N.modelAndroid;
 
                         var reqBody = {
-                            alias: '浏览器 Web 端',
+                            alias: I18N.webAlias,
                             version: '2.1',
                             deviceModel: model,
                             deviceType: 'web',
@@ -1129,17 +1132,10 @@ class LocalSendServer(
                 val rawIp = call.request.origin.remoteHost
                 val remoteIp = rawIp.removePrefix("::ffff:").removePrefix("/").trim()
                 val userAgent = call.request.headers[HttpHeaders.UserAgent] ?: ""
-                val model = when {
-                    userAgent.contains("Macintosh") || userAgent.contains("Mac OS") -> "Mac 浏览器"
-                    userAgent.contains("Windows") -> "PC 浏览器"
-                    userAgent.contains("iPhone") -> "iPhone 浏览器"
-                    userAgent.contains("iPad") -> "iPad 浏览器"
-                    userAgent.contains("Android") -> "Android 浏览器"
-                    userAgent.contains("Linux") -> "Linux 浏览器"
-                    else -> "Web 浏览器"
-                }
+                val copy = WebShareCopy.fromAcceptLanguage(call.request.headers[HttpHeaders.AcceptLanguage])
+                val model = WebShareCopy.browserModel(userAgent, copy)
                 val webDevice = Device(
-                    alias = "浏览器 Web 端 ($remoteIp)",
+                    alias = copy.webAliasFor(remoteIp),
                     version = "2.1",
                     deviceModel = model,
                     deviceType = DeviceType.web,
@@ -1153,7 +1149,7 @@ class LocalSendServer(
 
                 val shares = getShares()
                 val session = shares.firstOrNull()
-                val html = buildWebShareHtml(getLocalDevice().alias, session)
+                val html = buildWebShareHtml(getLocalDevice().alias, session, copy)
                 call.respondText(html, ContentType.Text.Html)
             }
 

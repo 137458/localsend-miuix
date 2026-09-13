@@ -410,4 +410,10 @@
     <string name="msg_upload_http">Upload failed: HTTP %1$d %2$s</string>
     <string name="msg_peer_internal_error">Peer internal error (500): %1$s</string>
     <string name="msg_peer_http">Peer returned HTTP %1$d: %2$s</string>
+    <string name="msg_github_api_failed">GitHub API request failed: HTTP %1$d</string>
+    <string name="msg_mediastore_requires_q">Saving via MediaStore requires Android 10 (API 29) or later</string>
+    <string name="msg_cannot_create_public_download">Unable to create a file in the public Downloads folder</string>
+    <string name="msg_cannot_open_public_download">Unable to open the file in the public Downloads folder</string>
+    <string name="msg_cannot_access_custom_dir">Unable to access the custom save folder</string>
+    <string name="msg_cannot_create_custom_file">Unable to create a file in the custom save folder</string>
 </resources>

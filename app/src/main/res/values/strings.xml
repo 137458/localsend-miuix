@@ -410,4 +410,10 @@
     <string name="msg_upload_http">上传失败: HTTP %1$d %2$s</string>
     <string name="msg_peer_internal_error">对方内部错误（500）: %1$s</string>
     <string name="msg_peer_http">对方返回 HTTP %1$d: %2$s</string>
+    <string name="msg_github_api_failed">GitHub API 请求失败: HTTP %1$d</string>
+    <string name="msg_mediastore_requires_q">MediaStore 保存需要 Android 10 (API 29) 及以上</string>
+    <string name="msg_cannot_create_public_download">无法在公共下载目录中创建文件</string>
+    <string name="msg_cannot_open_public_download">无法打开公共下载目录中的文件</string>
+    <string name="msg_cannot_access_custom_dir">无法访问自定义保存目录</string>
+    <string name="msg_cannot_create_custom_file">无法在自定义保存目录中创建文件</string>
 </resources>

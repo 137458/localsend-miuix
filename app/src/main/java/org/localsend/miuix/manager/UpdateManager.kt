@@ -92,7 +92,9 @@ class UpdateManager(private val context: Context) {
             }
 
             if (!response.status.isSuccess()) {
-                return@withContext Result.failure(Exception("GitHub API 请求失败: HTTP ${response.status.value}"))
+                return@withContext Result.failure(
+                    Exception(context.getString(org.localsend.miuix.R.string.msg_github_api_failed, response.status.value))
+                )
             }
 
             val bodyText = response.bodyAsText()
@@ -230,4 +232,4 @@ class UpdateManager(private val context: Context) {
             context.startActivity(intent)
         } catch (_: Exception) {}
     }
-}
+}
