@@ -57,6 +57,7 @@
     <string name="toast_latest_version">Already the latest version (v%1$s)</string>
     <string name="toast_check_update_failed">Failed to check for updates: %1$s</string>
     <string name="toast_download_apk_failed">Download failed: %1$s</string>
+    <string name="enumeration_separator">, </string>
 
     <!-- Receive Screen -->
     <string name="receive_title">Receive</string>
@@ -118,8 +119,10 @@
     <string name="settings_pref_notif_perm_title">Notifications &amp; Live Updates</string>
     <string name="settings_pref_notif_perm_enabled">Enabled (Transfer progress &amp; capsule notifications active)</string>
     <string name="settings_pref_notif_perm_disabled">Disabled (Tap to grant or open system settings)</string>
+    <string name="settings_pref_wide_nav_rail_title">Wide Screen Side Navigation</string>
+    <string name="settings_pref_wide_nav_rail_summary">Display navigation rail on the side when screen is wide, defaults to bottom bar</string>
     <string name="settings_section_receive">Receive Settings</string>
-    <string name="settings_pref_quick_save_desc">Automatically accept all incoming transfer requests</string>
+    <string name="settings_pref_quick_save_desc">Automatically accept transfer requests from local network without prompt</string>
     <string name="settings_pref_auto_copy_desc">Automatically copy received text messages to clipboard</string>
     <string name="settings_pref_save_history_title">Save Transfer History</string>
     <string name="settings_pref_save_history_desc">Keep logs of completed and cancelled transfers</string>
@@ -251,6 +254,8 @@
     <string name="app_picker_refreshing">Refreshing...</string>
     <string name="app_picker_deselect_all">Deselect All</string>
     <string name="app_picker_select_all">Select All</string>
+    <string name="app_picker_select_all_filtered">Select all filtered (%1$d)</string>
+    <string name="app_picker_deselect_all_filtered">Deselect all filtered (%1$d)</string>
     <string name="app_picker_empty">No matching apps found</string>
     <string name="app_picker_system_tag">SYSTEM</string>
     <string name="app_picker_btn_add_selected">Add Selected (%1$d)</string>

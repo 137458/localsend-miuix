@@ -20,7 +20,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
+import org.localsend.miuix.core.ExternalLinks
 import org.localsend.miuix.manager.LocalSendManager
+import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.ui.component.CertFingerprintDialog
 import org.localsend.miuix.ui.component.PinDialog
@@ -156,6 +158,14 @@ fun SettingsScreen(
                             }
                         }
                     )
+                    SwitchPreference(
+                        title = stringResource(R.string.settings_pref_wide_nav_rail_title),
+                        summary = stringResource(R.string.settings_pref_wide_nav_rail_summary),
+                        checked = settings.wideScreenNavigationRail,
+                        onCheckedChange = { checked ->
+                            manager.updateSettings { it.copy(wideScreenNavigationRail = checked) }
+                        }
+                    )
                 }
             }
 
@@ -222,7 +232,8 @@ fun SettingsScreen(
                     ArrowPreference(
                         title = stringResource(R.string.settings_pref_cert_fp_title),
                         summary = if (settings.useHttps) stringResource(R.string.settings_pref_cert_fp_enabled) else stringResource(R.string.settings_pref_cert_fp_disabled),
-                        onClick = { showCertDialog = true }
+                        enabled = settings.useHttps,
+                        onClick = { if (settings.useHttps) showCertDialog = true }
                     )
                 }
             }
@@ -239,32 +250,16 @@ fun SettingsScreen(
                     )
                     ArrowPreference(
                         title = stringResource(R.string.settings_pref_github_title),
-                        summary = "https://github.com/137458/localsend-miuix",
+                        summary = ExternalLinks.GITHUB_REPO,
                         onClick = {
-                            try {
-                                val intent = android.content.Intent(
-                                    android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse("https://github.com/137458/localsend-miuix")
-                                ).apply {
-                                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                }
-                                context.startActivity(intent)
-                            } catch (_: Exception) {}
+                            UpdateManager(context).openInBrowser(context, ExternalLinks.GITHUB_REPO)
                         }
                     )
                     ArrowPreference(
                         title = stringResource(R.string.settings_pref_license_title),
                         summary = stringResource(R.string.settings_pref_license_summary),
                         onClick = {
-                            try {
-                                val intent = android.content.Intent(
-                                    android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse("https://www.apache.org/licenses/LICENSE-2.0")
-                                ).apply {
-                                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                }
-                                context.startActivity(intent)
-                            } catch (_: Exception) {}
+                            UpdateManager(context).openInBrowser(context, ExternalLinks.APACHE_LICENSE)
                         }
                     )
                 }

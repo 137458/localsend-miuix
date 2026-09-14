@@ -11,3 +11,4 @@ local.properties
 **/build/
 .kotlin/
 release-assets/
+hs_err_pid*.log

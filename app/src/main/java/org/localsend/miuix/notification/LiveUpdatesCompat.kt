@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import org.localsend.miuix.R
+import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferSession
 
 /**
@@ -176,14 +177,7 @@ object LiveUpdatesCompat {
         if (session.status == org.localsend.miuix.model.TransferStatus.WaitingApproval) return context?.getString(R.string.chip_waiting_approval) ?: CHIP_WAITING
         if (session.speed <= 0) return context?.getString(R.string.live_preparing) ?: CHIP_PREPARING
 
-        val speedMb = session.speed.toDouble() / (1024.0 * 1024.0)
-        val speedStr = if (speedMb >= 1.0) {
-            val rounded = kotlin.math.round(speedMb * 10) / 10.0
-            if (rounded == kotlin.math.floor(rounded)) "${rounded.toInt()}M/s" else "${rounded}M/s"
-        } else {
-            val speedKb = (session.speed / 1024L).coerceAtLeast(1L)
-            "${speedKb}K/s"
-        }
+        val speedStr = FileItem.formatSpeed(session.speed, compact = true)
 
         val remainingBytes = (session.totalBytes - session.transferredBytes).coerceAtLeast(0L)
         val etaSec = if (session.speed > 0) remainingBytes / session.speed else 0L

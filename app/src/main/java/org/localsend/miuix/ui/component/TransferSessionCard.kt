@@ -540,7 +540,7 @@ private fun FileDetailItem(
                 )
                 if (file.status == TransferStatus.InProgress && file.speed > 0) {
                     Text(
-                        text = "${FileItem.formatFileSize(file.speed)}/s",
+                        text = FileItem.formatSpeed(file.speed),
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.primary
                     )

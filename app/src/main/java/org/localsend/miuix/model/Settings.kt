@@ -26,7 +26,8 @@ data class AppSettings(
     val lastSelectedTabIndex: Int = 0, // 记录离开时的 Tab 索引，进程恢复时自动还原页面
     val autoCheckUpdate: Boolean = true,
     val ignoredVersion: String? = null,
-    val isOs3Effect: Boolean = true
+    val isOs3Effect: Boolean = true,
+    val wideScreenNavigationRail: Boolean = false
 ) {
     companion object {
         private val ADJECTIVES = listOf(

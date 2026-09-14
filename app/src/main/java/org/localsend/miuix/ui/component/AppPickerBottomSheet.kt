@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -219,14 +220,23 @@ fun AppPickerBottomSheet(
                 }
             }
 
+            val configuration = LocalConfiguration.current
+            val maxListHeight = (configuration.screenHeightDp * 0.55f).dp.coerceIn(240.dp, 600.dp)
+
             if (filteredApps.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
+                    val selectAllLabel = when {
+                        searchQuery.isNotBlank() && isAllFilteredSelected -> stringResource(R.string.app_picker_deselect_all_filtered, filteredApps.size)
+                        searchQuery.isNotBlank() && !isAllFilteredSelected -> stringResource(R.string.app_picker_select_all_filtered, filteredApps.size)
+                        isAllFilteredSelected -> stringResource(R.string.app_picker_deselect_all)
+                        else -> stringResource(R.string.app_picker_select_all)
+                    }
                     Text(
-                        text = if (isAllFilteredSelected) stringResource(R.string.app_picker_deselect_all) else stringResource(R.string.app_picker_select_all),
+                        text = selectAllLabel,
                         style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
                         color = MiuixTheme.colorScheme.primary,
                         modifier = Modifier
@@ -248,7 +258,7 @@ fun AppPickerBottomSheet(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(260.dp),
+                        .height((maxListHeight * 0.7f).coerceIn(180.dp, 260.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp))
@@ -270,7 +280,7 @@ fun AppPickerBottomSheet(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 380.dp),
+                        .heightIn(max = maxListHeight),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     items(

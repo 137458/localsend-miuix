@@ -57,6 +57,7 @@
     <string name="toast_latest_version">已是最新版本 (v%1$s)</string>
     <string name="toast_check_update_failed">检查更新失败: %1$s</string>
     <string name="toast_download_apk_failed">下载失败: %1$s</string>
+    <string name="enumeration_separator">、</string>
 
     <!-- 接收主页面 -->
     <string name="receive_title">接收</string>
@@ -66,7 +67,7 @@
     <string name="receive_pref_ip_port_summary">局域网 IPv4 地址与服务端口</string>
     <string name="receive_section_options">接收选项</string>
     <string name="receive_pref_quick_save_title">快速保存</string>
-    <string name="receive_pref_quick_save_summary">自动接受同局域网所有设备的传输请求，无需每次手动确认</string>
+    <string name="receive_pref_quick_save_summary">自动接收同局域网所有设备的传输请求，无需每次手动确认</string>
     <string name="receive_pref_auto_copy_title">自动复制文本</string>
     <string name="receive_pref_auto_copy_summary">收到纯文本消息时自动写入系统剪贴板</string>
     <string name="receive_section_incoming_count">正在接收 (%1$d)</string>
@@ -118,8 +119,10 @@
     <string name="settings_pref_notif_perm_title">系统通知与焦点通知权限</string>
     <string name="settings_pref_notif_perm_enabled">已开启 (传输进度与焦点胶囊提示正常)</string>
     <string name="settings_pref_notif_perm_disabled">未开启 (点击授权或前往系统设置开启通知)</string>
+    <string name="settings_pref_wide_nav_rail_title">宽屏侧边栏导航</string>
+    <string name="settings_pref_wide_nav_rail_summary">屏幕宽度充足时在左侧展示侧边栏，默认使用底栏</string>
     <string name="settings_section_receive">接收设置</string>
-    <string name="settings_pref_quick_save_desc">自动接收所有传入的发送请求</string>
+    <string name="settings_pref_quick_save_desc">自动接收同局域网所有设备的传输请求，无需每次手动确认</string>
     <string name="settings_pref_auto_copy_desc">收到纯文本消息时自动复制到剪贴板</string>
     <string name="settings_pref_save_history_title">保存传输历史</string>
     <string name="settings_pref_save_history_desc">将完成和取消的传输记录存入历史页面</string>
@@ -251,6 +254,8 @@
     <string name="app_picker_refreshing">刷新中...</string>
     <string name="app_picker_deselect_all">取消全选</string>
     <string name="app_picker_select_all">全选当前</string>
+    <string name="app_picker_select_all_filtered">全选当前筛选 (%1$d 项)</string>
+    <string name="app_picker_deselect_all_filtered">取消全选筛选 (%1$d 项)</string>
     <string name="app_picker_empty">没有找到符合条件的应用</string>
     <string name="app_picker_system_tag">系统</string>
     <string name="app_picker_btn_add_selected">添加所选 (%1$d)</string>

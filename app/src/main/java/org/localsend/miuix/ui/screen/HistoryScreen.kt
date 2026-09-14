@@ -261,8 +261,9 @@ private fun HistoryItemCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 } else {
+                    val separator = stringResource(R.string.enumeration_separator)
                     Text(
-                        text = if (item.fileNames.isNotEmpty()) item.fileNames.joinToString("、") else stringResource(R.string.history_files_count, item.fileCount),
+                        text = if (item.fileNames.isNotEmpty()) item.fileNames.joinToString(separator) else stringResource(R.string.history_files_count, item.fileCount),
                         style = MiuixTheme.textStyles.body2,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis

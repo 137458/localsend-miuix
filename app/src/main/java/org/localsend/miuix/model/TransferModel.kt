@@ -106,6 +106,23 @@ data class FileItem(
                 " KMGTPE"[z]
             )
         }
+
+        fun formatSpeed(bytesPerSec: Long, compact: Boolean = false): String {
+            if (bytesPerSec < 1024) return "$bytesPerSec B/s"
+            return if (compact) {
+                val mb = bytesPerSec.toDouble() / (1024.0 * 1024.0)
+                if (mb >= 1.0) {
+                    val rounded = kotlin.math.round(mb * 10) / 10.0
+                    val numStr = if (rounded == kotlin.math.floor(rounded)) "${rounded.toInt()}" else "$rounded"
+                    "${numStr}M/s"
+                } else {
+                    val kb = (bytesPerSec / 1024L).coerceAtLeast(1L)
+                    "${kb}K/s"
+                }
+            } else {
+                "${formatFileSize(bytesPerSec)}/s"
+            }
+        }
     }
 }
 
@@ -143,7 +160,7 @@ data class TransferSession(
         get() = (progress * 100).toInt()
 
     val formattedSpeed: String
-        get() = "${FileItem.formatFileSize(speed)}/s"
+        get() = FileItem.formatSpeed(speed)
 
     val formattedTotalSize: String
         get() = FileItem.formatFileSize(totalBytes)

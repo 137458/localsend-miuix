@@ -23,6 +23,12 @@ object PreferenceKeys {
     const val KEY_AUTO_CHECK_UPDATE = "auto_check_update"
     const val KEY_IGNORED_VERSION = "ignored_version"
     const val KEY_IS_OS3_EFFECT = "is_os3_effect"
+    const val KEY_WIDE_SCREEN_NAVIGATION_RAIL = "wide_screen_navigation_rail"
+}
+
+object ExternalLinks {
+    const val GITHUB_REPO = "https://github.com/137458/localsend-miuix"
+    const val APACHE_LICENSE = "https://www.apache.org/licenses/LICENSE-2.0"
 }
 
 object LocalSendRoutes {

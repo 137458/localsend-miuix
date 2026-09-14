@@ -233,7 +233,7 @@ fun UpdateDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val speedText = if (downloadSpeed > 0L) " · ${FileItem.formatFileSize(downloadSpeed)}/s" else ""
+                        val speedText = if (downloadSpeed > 0L) " · ${FileItem.formatSpeed(downloadSpeed)}" else ""
                         Text(
                             text = stringResource(R.string.update_dialog_downloading, speedText),
                             style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),

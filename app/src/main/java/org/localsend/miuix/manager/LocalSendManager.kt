@@ -128,7 +128,8 @@ class LocalSendManager(private val context: Context) {
             lastSelectedTabIndex = prefs.getInt(KEY_LAST_TAB, 0),
             autoCheckUpdate = prefs.getBoolean(KEY_AUTO_CHECK_UPDATE, true),
             ignoredVersion = prefs.getString(KEY_IGNORED_VERSION, null),
-            isOs3Effect = prefs.getBoolean(KEY_IS_OS3_EFFECT, true)
+            isOs3Effect = prefs.getBoolean(KEY_IS_OS3_EFFECT, true),
+            wideScreenNavigationRail = prefs.getBoolean(KEY_WIDE_SCREEN_NAVIGATION_RAIL, false)
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -982,6 +983,7 @@ class LocalSendManager(private val context: Context) {
             .putBoolean(KEY_AUTO_CHECK_UPDATE, s.autoCheckUpdate)
             .putString(KEY_IGNORED_VERSION, s.ignoredVersion)
             .putBoolean(KEY_IS_OS3_EFFECT, s.isOs3Effect)
+            .putBoolean(KEY_WIDE_SCREEN_NAVIGATION_RAIL, s.wideScreenNavigationRail)
             .apply()
     }
 
@@ -1018,5 +1020,6 @@ class LocalSendManager(private val context: Context) {
         private const val KEY_AUTO_CHECK_UPDATE = org.localsend.miuix.core.PreferenceKeys.KEY_AUTO_CHECK_UPDATE
         private const val KEY_IGNORED_VERSION = org.localsend.miuix.core.PreferenceKeys.KEY_IGNORED_VERSION
         private const val KEY_IS_OS3_EFFECT = org.localsend.miuix.core.PreferenceKeys.KEY_IS_OS3_EFFECT
+        private const val KEY_WIDE_SCREEN_NAVIGATION_RAIL = org.localsend.miuix.core.PreferenceKeys.KEY_WIDE_SCREEN_NAVIGATION_RAIL
     }
 }

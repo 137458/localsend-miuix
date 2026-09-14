@@ -14,8 +14,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import org.localsend.miuix.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
@@ -32,6 +34,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
@@ -58,6 +61,8 @@ import org.localsend.miuix.ui.screen.SettingsScreen
 import org.localsend.miuix.ui.screen.UpdateScreen
 import top.yukonga.miuix.kmp.basic.Badge
 import top.yukonga.miuix.kmp.basic.NavigationItem
+import top.yukonga.miuix.kmp.basic.NavigationRail
+import top.yukonga.miuix.kmp.basic.NavigationRailItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -311,82 +316,117 @@ fun App(manager: LocalSendManager) {
             transition = NavTransitions.MiuixDefault
         ) {
             entry<AppRoute.Main> {
+                val configuration = LocalConfiguration.current
+                val isWideScreen = configuration.screenWidthDp >= 600
+                val useNavigationRail = isWideScreen && settings.wideScreenNavigationRail
+
                 Scaffold(
                     bottomBar = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp + navBarBottomPadding),
-                            contentAlignment = Alignment.BottomCenter
-                        ) {
-                            LiquidGlassBottomBar(
-                                items = navigationItems,
-                                selectedIndex = { pagerState.currentPage },
-                                onSelected = { index ->
-                                    scope.launch {
-                                        if (kotlin.math.abs(pagerState.currentPage - index) > 1) {
-                                            pagerState.scrollToPage(index)
-                                        } else {
-                                            pagerState.animateScrollToPage(index)
+                        if (!useNavigationRail) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 12.dp + navBarBottomPadding),
+                                contentAlignment = Alignment.BottomCenter
+                            ) {
+                                LiquidGlassBottomBar(
+                                    items = navigationItems,
+                                    selectedIndex = { pagerState.currentPage },
+                                    onSelected = { index ->
+                                        scope.launch {
+                                            if (kotlin.math.abs(pagerState.currentPage - index) > 1) {
+                                                pagerState.scrollToPage(index)
+                                            } else {
+                                                pagerState.animateScrollToPage(index)
+                                            }
                                         }
+                                    },
+                                    backdrop = backdrop,
+                                    badge = { index ->
+                                        if (index == 0 && pendingIncomingSession != null) {
+                                            { Badge { Text("1") } }
+                                        } else null
                                     }
-                                },
-                                backdrop = backdrop,
-                                badge = { index ->
-                                    if (index == 0 && pendingIncomingSession != null) {
-                                        { Badge { Text("1") } }
-                                    } else null
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 ) { innerPadding ->
-                    Box(
+                    Row(
                         modifier = Modifier
                             .fillMaxSize()
                             .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
                     ) {
-                        HorizontalPager(
-                            state = pagerState,
-                            beyondViewportPageCount = 2,
-                            modifier = Modifier.fillMaxSize()
-                        ) { page ->
-                            val pagePadding = PaddingValues(
-                                top = innerPadding.calculateTopPadding(),
-                                bottom = innerPadding.calculateBottomPadding()
-                            )
-                            when (page) {
-                                0 -> ReceiveScreen(
-                                    manager = manager,
-                                    contentPadding = pagePadding,
-                                    onOpenRenameDialog = { showRenameDialog = true },
-                                    onOpenHistory = { backStack.add(AppRoute.History) }
+                        if (useNavigationRail) {
+                            NavigationRail(
+                                modifier = Modifier.fillMaxHeight(),
+                                defaultWindowInsetsPadding = true
+                            ) {
+                                navigationItems.forEachIndexed { index, item ->
+                                    NavigationRailItem(
+                                        selected = pagerState.currentPage == index,
+                                        onClick = {
+                                            scope.launch {
+                                                if (kotlin.math.abs(pagerState.currentPage - index) > 1) {
+                                                    pagerState.scrollToPage(index)
+                                                } else {
+                                                    pagerState.animateScrollToPage(index)
+                                                }
+                                            }
+                                        },
+                                        icon = item.icon,
+                                        label = item.label
+                                    )
+                                }
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        ) {
+                            HorizontalPager(
+                                state = pagerState,
+                                beyondViewportPageCount = 2,
+                                modifier = Modifier.fillMaxSize()
+                            ) { page ->
+                                val pagePadding = PaddingValues(
+                                    top = innerPadding.calculateTopPadding(),
+                                    bottom = innerPadding.calculateBottomPadding()
                                 )
-                                1 -> SendScreen(
-                                    manager = manager,
-                                    contentPadding = pagePadding,
-                                    onOpenAddSheet = { showAddContentSheet = true },
-                                    onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
-                                    onPickFolder = { folderPickerLauncher.launch(null) },
-                                    onPickMedia = {
-                                        mediaPickerLauncher.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                                        )
-                                    },
-                                    onPickApps = { showAppPickerSheet = true },
-                                    onSendText = { showSendTextDialog = true },
-                                    onPasteClipboard = pickClipboard,
-                                    onOpenWebShare = { showWebShareDialog = true },
-                                    onManualIp = { showManualIpDialog = true }
-                                )
-                                2 -> SettingsScreen(
-                                    manager = manager,
-                                    contentPadding = pagePadding,
-                                    onOpenRenameDialog = { showRenameDialog = true },
-                                    onOpenPortDialog = { showPortDialog = true },
-                                    onPickDirectory = { directoryPickerLauncher.launch(null) },
-                                    onNavigateToUpdate = { backStack.add(AppRoute.Update) }
-                                )
+                                when (page) {
+                                    0 -> ReceiveScreen(
+                                        manager = manager,
+                                        contentPadding = pagePadding,
+                                        onOpenRenameDialog = { showRenameDialog = true },
+                                        onOpenHistory = { backStack.add(AppRoute.History) }
+                                    )
+                                    1 -> SendScreen(
+                                        manager = manager,
+                                        contentPadding = pagePadding,
+                                        onOpenAddSheet = { showAddContentSheet = true },
+                                        onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
+                                        onPickFolder = { folderPickerLauncher.launch(null) },
+                                        onPickMedia = {
+                                            mediaPickerLauncher.launch(
+                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                                            )
+                                        },
+                                        onPickApps = { showAppPickerSheet = true },
+                                        onSendText = { showSendTextDialog = true },
+                                        onPasteClipboard = pickClipboard,
+                                        onOpenWebShare = { showWebShareDialog = true },
+                                        onManualIp = { showManualIpDialog = true }
+                                    )
+                                    2 -> SettingsScreen(
+                                        manager = manager,
+                                        contentPadding = pagePadding,
+                                        onOpenRenameDialog = { showRenameDialog = true },
+                                        onOpenPortDialog = { showPortDialog = true },
+                                        onPickDirectory = { directoryPickerLauncher.launch(null) },
+                                        onNavigateToUpdate = { backStack.add(AppRoute.Update) }
+                                    )
+                                }
                             }
                         }
                     }
