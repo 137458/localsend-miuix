@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -45,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import org.localsend.miuix.BuildConfig
 import org.localsend.miuix.R
+import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateCheckResult
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.FileItem
@@ -75,6 +77,7 @@ import java.io.File
  */
 @Composable
 fun UpdateScreen(
+    manager: LocalSendManager,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -83,13 +86,11 @@ fun UpdateScreen(
     val topAppBarScrollBehavior = MiuixScrollBehavior()
     val lazyListState = rememberLazyListState()
 
+    val settings by manager.settings.collectAsState()
+
     var releaseInfo by remember { mutableStateOf<UpdateCheckResult?>(null) }
     var isChecking by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
-    var isOs3Effect by remember { mutableStateOf(true) }
-
-    var ignoredVersion by remember { mutableStateOf<String?>(null) }
-    var autoCheckUpdate by remember { mutableStateOf(true) }
 
     var isDownloading by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
@@ -108,7 +109,9 @@ fun UpdateScreen(
             result.onSuccess { info ->
                 releaseInfo = info
                 if (info.hasUpdate) {
-                    showDialog = true
+                    if (userInitiated || info.latestVersion != settings.ignoredVersion) {
+                        showDialog = true
+                    }
                 } else if (userInitiated) {
                     Toast.makeText(context, context.getString(R.string.toast_latest_version, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
                 }
@@ -122,7 +125,9 @@ fun UpdateScreen(
     }
 
     LaunchedEffect(Unit) {
-        doCheck(userInitiated = false)
+        if (settings.autoCheckUpdate) {
+            doCheck(userInitiated = false)
+        }
     }
 
     val scrollProgress by remember {
@@ -168,7 +173,7 @@ fun UpdateScreen(
     ) { innerPadding ->
         BgEffectBackground(
             dynamicBackground = isRuntimeShaderSupported(),
-            isOs3Effect = isOs3Effect,
+            isOs3Effect = settings.isOs3Effect,
             isFullSize = true,
             modifier = Modifier.fillMaxSize(),
             alpha = { 1f - scrollProgress },
@@ -402,9 +407,9 @@ fun UpdateScreen(
                             summary = stringResource(R.string.update_pref_auto_check_summary),
                             endActions = {
                                 Switch(
-                                    checked = autoCheckUpdate,
+                                    checked = settings.autoCheckUpdate,
                                     onCheckedChange = { checked ->
-                                        autoCheckUpdate = checked
+                                        manager.updateSettings { it.copy(autoCheckUpdate = checked) }
                                     },
                                 )
                             },
@@ -415,14 +420,14 @@ fun UpdateScreen(
                             summary = when {
                                 isChecking -> stringResource(R.string.update_pref_ignore_checking)
                                 !hasNew -> stringResource(R.string.update_pref_ignore_already_latest)
-                                ignoredVersion == releaseInfo?.latestVersion -> stringResource(R.string.update_pref_ignore_ignored, releaseInfo?.latestVersion ?: "")
+                                settings.ignoredVersion == releaseInfo?.latestVersion -> stringResource(R.string.update_pref_ignore_ignored, releaseInfo?.latestVersion ?: "")
                                 else -> stringResource(R.string.update_pref_ignore_desc, releaseInfo?.latestVersion ?: "")
                             },
                             endActions = {
                                 Switch(
-                                    checked = hasNew && ignoredVersion == releaseInfo?.latestVersion,
+                                    checked = hasNew && settings.ignoredVersion == releaseInfo?.latestVersion,
                                     onCheckedChange = { checked ->
-                                        ignoredVersion = if (checked) releaseInfo?.latestVersion else null
+                                        manager.updateSettings { it.copy(ignoredVersion = if (checked) releaseInfo?.latestVersion else null) }
                                     },
                                     enabled = hasNew,
                                 )
@@ -464,11 +469,13 @@ fun UpdateScreen(
 
                         BasicComponent(
                             title = stringResource(R.string.update_pref_os3_title),
-                            summary = if (isOs3Effect) stringResource(R.string.update_pref_os3_enabled) else stringResource(R.string.update_pref_os3_disabled),
+                            summary = if (settings.isOs3Effect) stringResource(R.string.update_pref_os3_enabled) else stringResource(R.string.update_pref_os3_disabled),
                             endActions = {
                                 Switch(
-                                    checked = isOs3Effect,
-                                    onCheckedChange = { isOs3Effect = it },
+                                    checked = settings.isOs3Effect,
+                                    onCheckedChange = { checked ->
+                                        manager.updateSettings { it.copy(isOs3Effect = checked) }
+                                    },
                                 )
                             },
                         )
@@ -488,7 +495,7 @@ fun UpdateScreen(
                     updateManager.openInBrowser(context, url)
                 },
                 onIgnore = { ver ->
-                    ignoredVersion = ver
+                    manager.updateSettings { it.copy(ignoredVersion = ver) }
                     showDialog = false
                 },
             )

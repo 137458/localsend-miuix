@@ -125,7 +125,10 @@ class LocalSendManager(private val context: Context) {
             downloadDisplay = prefs.getString(KEY_DOWNLOAD_DISPLAY, null),
             downloadPath = defaultDownloadPath,
             vibrateOnComplete = prefs.getBoolean(KEY_VIBRATE, true),
-            lastSelectedTabIndex = prefs.getInt(KEY_LAST_TAB, 0)
+            lastSelectedTabIndex = prefs.getInt(KEY_LAST_TAB, 0),
+            autoCheckUpdate = prefs.getBoolean(KEY_AUTO_CHECK_UPDATE, true),
+            ignoredVersion = prefs.getString(KEY_IGNORED_VERSION, null),
+            isOs3Effect = prefs.getBoolean(KEY_IS_OS3_EFFECT, true)
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -327,9 +330,6 @@ class LocalSendManager(private val context: Context) {
     }
 
     private fun upsertDevice(device: Device) {
-        if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
-            FingerprintTrust.trust(device.fingerprint)
-        }
         synchronized(deviceDirectory) {
             _nearbyDevices.value = deviceDirectory.upsert(device)
         }
@@ -975,6 +975,9 @@ class LocalSendManager(private val context: Context) {
             .putInt(KEY_THEME, s.themeModeIndex)
             .putBoolean(KEY_VIBRATE, s.vibrateOnComplete)
             .putInt(KEY_LAST_TAB, s.lastSelectedTabIndex)
+            .putBoolean(KEY_AUTO_CHECK_UPDATE, s.autoCheckUpdate)
+            .putString(KEY_IGNORED_VERSION, s.ignoredVersion)
+            .putBoolean(KEY_IS_OS3_EFFECT, s.isOs3Effect)
             .apply()
     }
 
@@ -1008,5 +1011,8 @@ class LocalSendManager(private val context: Context) {
         private const val KEY_VIBRATE = org.localsend.miuix.core.PreferenceKeys.KEY_VIBRATE
         private const val KEY_LAST_TAB = org.localsend.miuix.core.PreferenceKeys.KEY_LAST_TAB
         private const val KEY_RECENT_MANUAL_IPS = org.localsend.miuix.core.PreferenceKeys.KEY_RECENT_MANUAL_IPS
+        private const val KEY_AUTO_CHECK_UPDATE = org.localsend.miuix.core.PreferenceKeys.KEY_AUTO_CHECK_UPDATE
+        private const val KEY_IGNORED_VERSION = org.localsend.miuix.core.PreferenceKeys.KEY_IGNORED_VERSION
+        private const val KEY_IS_OS3_EFFECT = org.localsend.miuix.core.PreferenceKeys.KEY_IS_OS3_EFFECT
     }
 }

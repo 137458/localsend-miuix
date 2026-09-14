@@ -20,6 +20,9 @@ object PreferenceKeys {
     const val KEY_VIBRATE = "vibrate_on_complete"
     const val KEY_LAST_TAB = "last_selected_tab"
     const val KEY_RECENT_MANUAL_IPS = "recent_manual_ips"
+    const val KEY_AUTO_CHECK_UPDATE = "auto_check_update"
+    const val KEY_IGNORED_VERSION = "ignored_version"
+    const val KEY_IS_OS3_EFFECT = "is_os3_effect"
 }
 
 object LocalSendRoutes {

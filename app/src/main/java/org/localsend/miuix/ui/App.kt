@@ -139,10 +139,11 @@ fun App(manager: LocalSendManager) {
     var showUpdateDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        if (!settings.autoCheckUpdate) return@LaunchedEffect
         scope.launch(Dispatchers.IO) {
             val result = updateManager.checkForUpdate()
             result.onSuccess { info ->
-                if (info.hasUpdate) {
+                if (info.hasUpdate && info.latestVersion != settings.ignoredVersion) {
                     availableUpdate = info
                     showUpdateDialog = true
                 }
@@ -283,7 +284,6 @@ fun App(manager: LocalSendManager) {
         } else null
 
         val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val bottomBarTotalPadding = 84.dp + navBarBottomPadding
 
         // 6. miuix-nav 根导航栈管理
         val backStack = rememberNavBackStack<AppRoute>(AppRoute.Main)
@@ -353,7 +353,7 @@ fun App(manager: LocalSendManager) {
                         ) { page ->
                             val pagePadding = PaddingValues(
                                 top = innerPadding.calculateTopPadding(),
-                                bottom = bottomBarTotalPadding
+                                bottom = innerPadding.calculateBottomPadding()
                             )
                             when (page) {
                                 0 -> ReceiveScreen(
@@ -408,6 +408,7 @@ fun App(manager: LocalSendManager) {
                 swipeDismiss = NavSwipeDirection.LeftToRight
             ) {
                 UpdateScreen(
+                    manager = manager,
                     onBack = { backStack.removeLastOrNull() }
                 )
             }
@@ -524,6 +525,10 @@ fun App(manager: LocalSendManager) {
                 onDismiss = { showUpdateDialog = false },
                 onUpdate = { url ->
                     updateManager.openInBrowser(context, url)
+                },
+                onIgnore = { ver ->
+                    manager.updateSettings { it.copy(ignoredVersion = ver) }
+                    showUpdateDialog = false
                 }
             )
         }

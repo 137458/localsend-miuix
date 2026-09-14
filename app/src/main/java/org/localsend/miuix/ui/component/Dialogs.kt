@@ -191,7 +191,7 @@ fun ManualIpDialog(
                 label = stringResource(R.string.dialog_manual_ip_address_label),
                 useLabelAsPlaceholder = true,
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 modifier = Modifier.fillMaxWidth()
             )
 

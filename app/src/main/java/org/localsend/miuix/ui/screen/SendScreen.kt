@@ -37,9 +37,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -117,6 +120,7 @@ fun SendScreen(
         }
     }
 
+    val coroutineScope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
     var previewingIndex by remember { mutableIntStateOf(-1) }
     var isFileListExpanded by remember { mutableStateOf(false) }
@@ -152,10 +156,13 @@ fun SendScreen(
         PullToRefresh(
             isRefreshing = isRefreshing,
             onRefresh = {
-                isRefreshing = true
-                manager.refreshDevices()
-                manager.scanSubnet()
-                isRefreshing = false
+                coroutineScope.launch {
+                    isRefreshing = true
+                    manager.refreshDevices()
+                    manager.scanSubnet()
+                    delay(1000)
+                    isRefreshing = false
+                }
             },
             pullToRefreshState = pullToRefreshState,
             refreshTexts = listOf(refreshPull, refreshRelease, refreshRefreshing, refreshComplete),

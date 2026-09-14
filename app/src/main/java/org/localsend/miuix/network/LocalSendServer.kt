@@ -1358,8 +1358,7 @@ class LocalSendServer(
                 activeSessions[sessionId] = session
                 onSessionUpdated(session)
 
-                val isTextSession = fileItems.all { it.isTextMessage || it.mimeType == "text/plain" || it.mimeType == "text" }
-                val accepted = if (isQuickSave() && !isTextSession) {
+                val accepted = if (isQuickSave()) {
                     true
                 } else {
                     onIncomingRequest(session)

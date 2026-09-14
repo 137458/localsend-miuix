@@ -23,7 +23,10 @@ data class AppSettings(
     val pin: String? = null,
     val themeModeIndex: Int = 0, // 0: System, 1: Light, 2: Dark, 3: MonetSystem, 4: MonetLight, 5: MonetDark
     val vibrateOnComplete: Boolean = true,
-    val lastSelectedTabIndex: Int = 0 // 记录离开时的 Tab 索引，进程恢复时自动还原页面
+    val lastSelectedTabIndex: Int = 0, // 记录离开时的 Tab 索引，进程恢复时自动还原页面
+    val autoCheckUpdate: Boolean = true,
+    val ignoredVersion: String? = null,
+    val isOs3Effect: Boolean = true
 ) {
     companion object {
         private val ADJECTIVES = listOf(

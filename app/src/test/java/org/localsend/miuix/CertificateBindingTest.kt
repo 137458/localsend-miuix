@@ -36,4 +36,15 @@ class CertificateBindingTest {
             FingerprintTrust.clear()
         }
     }
+
+    @Test
+    fun unverifiedAnnouncementFingerprintMustNotBeTrustedByDefault() {
+        FingerprintTrust.clear()
+        try {
+            val announcementFp = "12:34:56:78:90:ab:cd:ef"
+            assertFalse(FingerprintTrust.isAccepted(announcementFp))
+        } finally {
+            FingerprintTrust.clear()
+        }
+    }
 }

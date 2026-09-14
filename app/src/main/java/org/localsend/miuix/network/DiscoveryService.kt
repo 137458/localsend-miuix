@@ -150,9 +150,6 @@ class DiscoveryService(
                                 val dto = json.decodeFromString<DeviceDto>(text)
                                 if (dto.fingerprint != localDevice.fingerprint) {
                                     val device = Device.fromDto(dto, senderIp)
-                                    if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
-                                        FingerprintTrust.trust(device.fingerprint)
-                                    }
                                     onDeviceDiscovered(device)
 
                                     // If it is an announcement, send back direct register response
@@ -272,9 +269,6 @@ class DiscoveryService(
                                         val dto = response.body<DeviceDto>()
                                         if (dto.fingerprint != localDevice.fingerprint) {
                                             val device = Device.fromDto(dto, targetIp)
-                                            if (device.protocol.equals("https", ignoreCase = true) && device.fingerprint.isNotBlank()) {
-                                                FingerprintTrust.trust(device.fingerprint)
-                                            }
                                             onDeviceDiscovered(device)
                                             sendDirectResponse(device)
                                             found = true
