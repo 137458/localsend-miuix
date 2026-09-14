@@ -122,33 +122,46 @@ class LocalSendServer(
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                 throw IllegalStateException(context.getString(R.string.msg_mediastore_requires_q))
             }
+            val pathInfo = org.localsend.miuix.util.SavePathHelper.resolve(fileItem.name)
+            val baseDir = Environment.DIRECTORY_DOWNLOADS + "/LocalSend"
+            val relativePath = org.localsend.miuix.util.SavePathHelper.buildMediaStoreRelativePath(baseDir, pathInfo.subDirectory)
             val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-            val displayName = uniqueMediaName(fileItem.name)
+            val displayName = uniqueMediaName(pathInfo.fileName, relativePath)
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
                 put(MediaStore.MediaColumns.MIME_TYPE, fileItem.mimeType)
-                put(
-                    MediaStore.MediaColumns.RELATIVE_PATH,
-                    Environment.DIRECTORY_DOWNLOADS + "/LocalSend"
-                )
+                put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val uri = context.contentResolver.insert(collection, values)
                 ?: throw IllegalStateException(context.getString(R.string.msg_cannot_create_public_download))
             // 记录实际写入的 Uri（文件名可能被系统自动加后缀），完成后用于清除 PENDING
             fileItem.mediaStoreUri = uri
-            fileItem.name = displayName
+            fileItem.name = if (pathInfo.subDirectory.isNotEmpty()) "${pathInfo.subDirectory}/$displayName" else displayName
             context.contentResolver.openOutputStream(uri)
                 ?: throw IllegalStateException(context.getString(R.string.msg_cannot_open_public_download))
         }
         is SaveTarget.UriTarget -> {
-            val parent = DocumentFile.fromTreeUri(context, target.treeUri)
+            val root = DocumentFile.fromTreeUri(context, target.treeUri)
                 ?: throw IllegalStateException(context.getString(R.string.msg_cannot_access_custom_dir))
-            val existing = parent.listFiles().mapNotNull { it.name }.toHashSet()
-            val uniqueName = uniqueTreeName(fileItem.name, existing)
-            val created = parent.createFile(fileItem.mimeType, uniqueName)
+            val pathInfo = org.localsend.miuix.util.SavePathHelper.resolve(fileItem.name)
+            val segments = org.localsend.miuix.util.SavePathHelper.splitSegments(pathInfo.subDirectory)
+            var currentDir = root
+            for (segment in segments) {
+                val found = currentDir.findFile(segment)
+                currentDir = if (found != null && found.isDirectory) {
+                    found
+                } else {
+                    currentDir.createDirectory(segment)
+                        ?: throw IllegalStateException(context.getString(R.string.msg_cannot_create_custom_file))
+                }
+            }
+            val existing = currentDir.listFiles().mapNotNull { it.name }.toHashSet()
+            val uniqueName = uniqueTreeName(pathInfo.fileName, existing)
+            val created = currentDir.createFile(fileItem.mimeType, uniqueName)
                 ?: throw IllegalStateException(context.getString(R.string.msg_cannot_create_custom_file))
-            fileItem.name = uniqueName
+            fileItem.name = if (pathInfo.subDirectory.isNotEmpty()) "${pathInfo.subDirectory}/$uniqueName" else uniqueName
+            fileItem.mediaStoreUri = created.uri
             context.contentResolver.openOutputStream(created.uri)
                 ?: throw IllegalStateException(context.getString(R.string.msg_cannot_create_custom_file))
         }
@@ -165,15 +178,15 @@ class LocalSendServer(
 
     private val allocatedMediaNames = ConcurrentHashMap.newKeySet<String>()
 
-    /** 基于 MediaStore 公共下载目录的子目录列表生成不重复的文件名。 */
-    private fun uniqueMediaName(name: String): String {
+    /** 基于 MediaStore 指定子目录列表生成不重复的文件名。 */
+    private fun uniqueMediaName(name: String, relativePath: String = Environment.DIRECTORY_DOWNLOADS + "/LocalSend/"): String {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return name
         val existing = HashSet<String>()
         try {
             val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
             val projection = arrayOf(MediaStore.MediaColumns.DISPLAY_NAME)
             val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} = ?"
-            val selectionArgs = arrayOf(Environment.DIRECTORY_DOWNLOADS + "/LocalSend/")
+            val selectionArgs = arrayOf(relativePath)
             context.contentResolver.query(collection, projection, selection, selectionArgs, null)
                 ?.use { cursor ->
                     val index = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
@@ -209,15 +222,12 @@ class LocalSendServer(
     /** 删除已写入的文件（用于 sha256 校验失败后的清理）。 */
     private fun deleteSavedFile(fileItem: FileItem, target: SaveTarget) {
         try {
-            when (target) {
-                is SaveTarget.MediaStoreTarget -> {
-                    val uri = fileItem.mediaStoreUri ?: return
-                    context.contentResolver.delete(uri, null, null)
-                }
-                is SaveTarget.UriTarget -> {
-                    val parent = DocumentFile.fromTreeUri(context, target.treeUri)
-                    parent?.findFile(fileItem.name)?.delete()
-                }
+            val uri = fileItem.mediaStoreUri
+            if (uri != null) {
+                context.contentResolver.delete(uri, null, null)
+            } else if (target is SaveTarget.UriTarget) {
+                val parent = DocumentFile.fromTreeUri(context, target.treeUri)
+                parent?.findFile(fileItem.name)?.delete()
             }
         } catch (ignored: Exception) {}
     }

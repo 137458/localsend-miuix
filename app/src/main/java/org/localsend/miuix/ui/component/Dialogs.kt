@@ -399,6 +399,68 @@ fun PinDialog(
 }
 
 @Composable
+fun TargetDevicePinDialog(
+    show: Boolean,
+    targetAlias: String,
+    onDismissRequest: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var pin by remember { mutableStateOf("") }
+    if (show) {
+        WindowDialog(
+            show = true,
+            title = stringResource(R.string.dialog_target_pin_title),
+            onDismissRequest = onDismissRequest
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.dialog_target_pin_desc, targetAlias),
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                TextField(
+                    value = pin,
+                    onValueChange = { pin = it },
+                    label = stringResource(R.string.dialog_target_pin_label),
+                    useLabelAsPlaceholder = true,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onDismissRequest,
+                        colors = ButtonDefaults.buttonColors(),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.btn_cancel))
+                    }
+                    Button(
+                        onClick = {
+                            onConfirm(pin.trim())
+                            onDismissRequest()
+                        },
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.btn_confirm))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun CertFingerprintDialog(
     show: Boolean,
     fingerprint: String,

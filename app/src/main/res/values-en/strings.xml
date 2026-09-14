@@ -213,6 +213,10 @@
     <string name="dialog_pin_desc">When set, other devices must enter this PIN to complete transfer handshake. Leave empty to disable PIN protection.</string>
     <string name="dialog_pin_label">PIN Code (leave empty to disable)</string>
 
+    <string name="dialog_target_pin_title">Enter Target PIN</string>
+    <string name="dialog_target_pin_desc">Target device \"%1$s\" requires PIN protection. Please enter its transfer PIN to continue.</string>
+    <string name="dialog_target_pin_label">Transfer PIN</string>
+
     <string name="dialog_cert_title">TLS Certificate Fingerprint</string>
     <string name="dialog_cert_desc">In HTTPS mode, LocalSend uses a self-signed X.509 certificate for end-to-end encryption. Verify this SHA-256 fingerprint to prevent MITM attacks.</string>
     <string name="dialog_cert_label">SHA-256 Fingerprint</string>

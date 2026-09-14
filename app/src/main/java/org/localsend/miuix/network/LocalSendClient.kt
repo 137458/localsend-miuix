@@ -22,13 +22,19 @@ import java.net.URLEncoder
 import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
 
+class TargetPinRequiredException(message: String = "PIN required") : IllegalStateException(message)
+
 class LocalSendClient(
     private val context: Context,
-    private val getLocalDevice: () -> Device,
-    private val getPin: () -> String?
+    private val getLocalDevice: () -> Device
 ) {
     companion object {
         private const val TAG = "LocalSendTransfer"
+
+        fun buildPrepareUploadUrl(baseUrl: String, targetPin: String?): String {
+            val pin = targetPin?.trim()?.takeIf { it.isNotEmpty() } ?: return "$baseUrl${LocalSendRoutes.PREPARE_UPLOAD}"
+            return "$baseUrl${LocalSendRoutes.PREPARE_UPLOAD}?pin=${URLEncoder.encode(pin, "UTF-8")}"
+        }
     }
     private val json = AppJson.default
 
@@ -40,7 +46,8 @@ class LocalSendClient(
 
     suspend fun prepareUpload(
         targetDevice: Device,
-        files: List<FileItem>
+        files: List<FileItem>,
+        targetPin: String? = null
     ): Result<HandshakeResult> = withContext(Dispatchers.IO) {
         try {
             // 发送方按规范计算小文本文件的 sha256（协议中为可选字段）；
@@ -67,11 +74,7 @@ class LocalSendClient(
                 var connection: HttpURLConnection? = null
                 try {
                     val candidateDevice = if (host == targetDevice.ip) targetDevice else targetDevice.copy(ip = host)
-                    val urlBuilder = StringBuilder("${candidateDevice.url}${LocalSendRoutes.PREPARE_UPLOAD}")
-                    getPin()?.takeIf { it.isNotEmpty() }?.let { 
-                        urlBuilder.append("?pin=").append(URLEncoder.encode(it, "UTF-8")) 
-                    }
-                    val url = urlBuilder.toString()
+                    val url = buildPrepareUploadUrl(candidateDevice.url, targetPin)
                     Log.d(TAG, "prepareUpload: sending handshake via native TLS to $url (candidate host: $host)")
 
                     FingerprintTrust.pin(targetDevice.fingerprint)
@@ -115,12 +118,15 @@ class LocalSendClient(
                                     completedImmediately = true
                                 )
                             )
-                        } else {
                             val errorBody = try {
                                 connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
                             } catch (ignored: Exception) { null }
                             Log.e(TAG, "prepareUpload: rejected by $host, HTTP $responseCode: $errorBody")
-                            return@withContext Result.failure(Exception(prepareErrorText(responseCode, errorBody ?: "")))
+                            val errMsg = prepareErrorText(responseCode, errorBody ?: "")
+                            if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                                return@withContext Result.failure(TargetPinRequiredException(errMsg))
+                            }
+                            return@withContext Result.failure(Exception(errMsg))
                         }
                     } finally {
                         FingerprintTrust.unpin(targetDevice.fingerprint)

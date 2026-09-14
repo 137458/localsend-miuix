@@ -79,6 +79,7 @@ fun App(manager: LocalSendManager) {
     val sessionMessage by manager.sessionMessage.collectAsState()
     val requestedTabIndex by manager.requestedTabIndex.collectAsState()
     val recentManualIps by manager.recentManualIps.collectAsState()
+    val pendingTargetPinPrompt by manager.pendingTargetPinPrompt.collectAsState()
 
     // 传输提示（如"对方拒绝接收"）以 Toast 呈现，显示后即消费
     LaunchedEffect(sessionMessage) {
@@ -506,6 +507,15 @@ fun App(manager: LocalSendManager) {
                 Toast.makeText(context, context.getString(R.string.toast_connecting_ip, ip, port), Toast.LENGTH_SHORT).show()
             }
         )
+
+        if (pendingTargetPinPrompt != null) {
+            org.localsend.miuix.ui.component.TargetDevicePinDialog(
+                show = true,
+                targetAlias = pendingTargetPinPrompt?.device?.alias ?: "",
+                onDismissRequest = { pendingTargetPinPrompt?.onDismiss?.invoke() },
+                onConfirm = { pin -> pendingTargetPinPrompt?.onPinEntered?.invoke(pin) }
+            )
+        }
 
         if (availableUpdate != null) {
             UpdateDialog(

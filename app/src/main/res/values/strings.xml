@@ -213,6 +213,10 @@
     <string name="dialog_pin_desc">设置 PIN 码后，其它设备向您发送内容时必须输入相同的 PIN 码才能完成握手。留空则表示不启用 PIN 保护。</string>
     <string name="dialog_pin_label">PIN 码（留空关闭）</string>
 
+    <string name="dialog_target_pin_title">输入对端设备验证码</string>
+    <string name="dialog_target_pin_desc">目标设备 \"%1$s\" 设置了接收保护，请输入该设备配置的传输 PIN 码完成握手。</string>
+    <string name="dialog_target_pin_label">传输 PIN 码</string>
+
     <string name="dialog_cert_title">TLS 安全证书指纹</string>
     <string name="dialog_cert_desc">LocalSend 在 HTTPS 模式下使用本设备生成的自签名 X.509 证书进行端到端加密。对方设备可通过比对此 SHA-256 指纹确认未遭受中间人攻击。</string>
     <string name="dialog_cert_label">SHA-256 指纹</string>

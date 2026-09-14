@@ -43,6 +43,7 @@ import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.HistoryFileEntry
 import org.localsend.miuix.model.SaveTarget
+import org.localsend.miuix.network.TargetPinRequiredException
 import org.localsend.miuix.model.ShareSession
 import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferSession
@@ -71,6 +72,13 @@ data class AppInfoItem(
     val sourceDir: String,
     val apkSize: Long,
     val isSystemApp: Boolean
+)
+
+data class PinPromptRequest(
+    val sessionId: String,
+    val device: Device,
+    val onPinEntered: (String) -> Unit,
+    val onDismiss: () -> Unit
 )
 
 class LocalSendManager(private val context: Context) {
@@ -202,10 +210,14 @@ class LocalSendManager(private val context: Context) {
         }
     )
 
+    private val targetDevicePins = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    private val _pendingTargetPinPrompt = MutableStateFlow<PinPromptRequest?>(null)
+    val pendingTargetPinPrompt: StateFlow<PinPromptRequest?> = _pendingTargetPinPrompt.asStateFlow()
+
     private val client = LocalSendClient(
         context = context,
-        getLocalDevice = { getLocalDevice() },
-        getPin = { _settings.value.pin }
+        getLocalDevice = { getLocalDevice() }
     )
 
     private val server = LocalSendServer(
@@ -363,7 +375,29 @@ class LocalSendManager(private val context: Context) {
                     updateSessionState(session)
                     return@launch
                 }
-                val prepResult = client.prepareUpload(targetDevice, filesToSend)
+                val deviceKey = targetDevice.fingerprint.ifEmpty { targetDevice.ip }
+                var currentPin = targetDevicePins[deviceKey]
+                var prepResult = client.prepareUpload(targetDevice, filesToSend, targetPin = currentPin)
+                if (prepResult.isFailure && prepResult.exceptionOrNull() is TargetPinRequiredException) {
+                    val deferred = CompletableDeferred<String?>()
+                    _pendingTargetPinPrompt.value = PinPromptRequest(
+                        sessionId = sessionId,
+                        device = targetDevice,
+                        onPinEntered = { pin ->
+                            deferred.complete(pin)
+                            _pendingTargetPinPrompt.value = null
+                        },
+                        onDismiss = {
+                            deferred.complete(null)
+                            _pendingTargetPinPrompt.value = null
+                        }
+                    )
+                    val enteredPin = deferred.await()
+                    if (!enteredPin.isNullOrBlank()) {
+                        targetDevicePins[deviceKey] = enteredPin
+                        prepResult = client.prepareUpload(targetDevice, filesToSend, targetPin = enteredPin)
+                    }
+                }
                 if (prepResult.isFailure) {
                     session.status = TransferStatus.Failed
                     session.errorMessage = prepResult.exceptionOrNull()?.message
