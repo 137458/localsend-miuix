@@ -115,9 +115,9 @@ fun HistoryDetailDialog(
                             },
                             style = MiuixTheme.textStyles.footnote1,
                             color = when (item.status) {
-                                TransferStatus.Completed -> Color(0xFF16A34A)
-                                TransferStatus.Failed -> Color(0xFFDC2626)
-                                else -> Color(0xFFF59E0B)
+                                TransferStatus.Completed -> MiuixTheme.colorScheme.primary
+                                TransferStatus.Failed -> MiuixTheme.colorScheme.error
+                                else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
                             }
                         )
                     }
@@ -330,7 +330,7 @@ fun HistoryDetailDialog(
                     },
                     colors = ButtonDefaults.buttonColors(
                         color = MiuixTheme.colorScheme.error,
-                        contentColor = Color.White
+                        contentColor = MiuixTheme.colorScheme.onError
                     ),
                     modifier = Modifier.weight(1f)
                 ) {

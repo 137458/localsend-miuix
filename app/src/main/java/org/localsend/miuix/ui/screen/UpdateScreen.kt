@@ -65,9 +65,9 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.io.File
 
@@ -402,20 +402,16 @@ fun UpdateScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp),
                     ) {
-                        BasicComponent(
+                        SwitchPreference(
                             title = stringResource(R.string.update_pref_auto_check_title),
                             summary = stringResource(R.string.update_pref_auto_check_summary),
-                            endActions = {
-                                Switch(
-                                    checked = settings.autoCheckUpdate,
-                                    onCheckedChange = { checked ->
-                                        manager.updateSettings { it.copy(autoCheckUpdate = checked) }
-                                    },
-                                )
+                            checked = settings.autoCheckUpdate,
+                            onCheckedChange = { checked ->
+                                manager.updateSettings { it.copy(autoCheckUpdate = checked) }
                             },
                         )
 
-                        BasicComponent(
+                        SwitchPreference(
                             title = stringResource(R.string.update_pref_ignore_title),
                             summary = when {
                                 isChecking -> stringResource(R.string.update_pref_ignore_checking)
@@ -423,15 +419,11 @@ fun UpdateScreen(
                                 settings.ignoredVersion == releaseInfo?.latestVersion -> stringResource(R.string.update_pref_ignore_ignored, releaseInfo?.latestVersion ?: "")
                                 else -> stringResource(R.string.update_pref_ignore_desc, releaseInfo?.latestVersion ?: "")
                             },
-                            endActions = {
-                                Switch(
-                                    checked = hasNew && settings.ignoredVersion == releaseInfo?.latestVersion,
-                                    onCheckedChange = { checked ->
-                                        manager.updateSettings { it.copy(ignoredVersion = if (checked) releaseInfo?.latestVersion else null) }
-                                    },
-                                    enabled = hasNew,
-                                )
+                            checked = hasNew && settings.ignoredVersion == releaseInfo?.latestVersion,
+                            onCheckedChange = { checked ->
+                                manager.updateSettings { it.copy(ignoredVersion = if (checked) releaseInfo?.latestVersion else null) }
                             },
+                            enabled = hasNew,
                         )
                     }
                 }
@@ -467,18 +459,16 @@ fun UpdateScreen(
                             },
                         )
 
-                        BasicComponent(
-                            title = stringResource(R.string.update_pref_os3_title),
-                            summary = if (settings.isOs3Effect) stringResource(R.string.update_pref_os3_enabled) else stringResource(R.string.update_pref_os3_disabled),
-                            endActions = {
-                                Switch(
-                                    checked = settings.isOs3Effect,
-                                    onCheckedChange = { checked ->
-                                        manager.updateSettings { it.copy(isOs3Effect = checked) }
-                                    },
-                                )
-                            },
-                        )
+                        if (isRuntimeShaderSupported()) {
+                            SwitchPreference(
+                                title = stringResource(R.string.update_pref_os3_title),
+                                summary = if (settings.isOs3Effect) stringResource(R.string.update_pref_os3_enabled) else stringResource(R.string.update_pref_os3_disabled),
+                                checked = settings.isOs3Effect,
+                                onCheckedChange = { checked ->
+                                    manager.updateSettings { it.copy(isOs3Effect = checked) }
+                                },
+                            )
+                        }
                     }
                 }
             }

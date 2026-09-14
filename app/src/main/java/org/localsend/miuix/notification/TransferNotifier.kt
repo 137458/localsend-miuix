@@ -19,7 +19,7 @@ import org.localsend.miuix.ui.MainActivity
 
 /**
  * 传输通知管理器。用于在后台或快速保存自动接收时，向用户提示传输进度与结果，
- * 并接入 ColorOS 流体云（Aqua Dynamics）与原生 Android 16+ Live Updates 胶囊显示。
+ * 并接入 HyperOS 焦点通知与原生 Android 16+ Live Updates 胶囊显示。
  */
 object TransferNotifier {
 
@@ -130,7 +130,7 @@ object TransferNotifier {
     }
 
     /**
-     * 跳转至系统当前应用的通知设置页面，以便用户手动授权或开启各渠道通知与流体云开关。
+     * 跳转至系统当前应用的通知设置页面，以便用户手动授权或开启各渠道通知与焦点通知开关。
      */
     fun openNotificationSettings(context: Context) {
         if (Build.VERSION.SDK_INT >= 36) {
@@ -242,7 +242,7 @@ object TransferNotifier {
         if (!isAllowed(context)) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notifId = sessionNotifId(session)
-        // 传输已终结，先清除进行中的流体云胶囊/进度通知
+        // 传输已终结，先清除进行中的焦点胶囊/进度通知
         nm.cancel(notifId)
 
         val channel = if (session.isIncoming) CHANNEL_RECEIVE else CHANNEL_SEND

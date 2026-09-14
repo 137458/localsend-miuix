@@ -524,7 +524,7 @@ fun CertFingerprintDialog(
                         onRegenerate()
                         onDismissRequest()
                     },
-                    colors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.error, contentColor = androidx.compose.ui.graphics.Color.White),
+                    colors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.error, contentColor = MiuixTheme.colorScheme.onError),
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(stringResource(R.string.dialog_cert_btn_regenerate))

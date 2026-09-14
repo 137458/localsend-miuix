@@ -567,7 +567,7 @@ private fun FileDetailItem(
             TransferStatus.Completed -> Icon(
                 imageVector = Icons.Default.CheckCircle,
                 contentDescription = stringResource(R.string.status_completed),
-                tint = Color(0xFF4CAF50),
+                tint = MiuixTheme.colorScheme.primary,
                 modifier = Modifier.size(18.dp)
             )
             TransferStatus.InProgress -> Text(
@@ -663,7 +663,7 @@ private fun InlineTextMessageProgress(
                 style = MiuixTheme.textStyles.footnote1,
                 color = when (session.status) {
                     TransferStatus.Failed -> MiuixTheme.colorScheme.error
-                    TransferStatus.Completed -> Color(0xFF4CAF50)
+                    TransferStatus.Completed -> MiuixTheme.colorScheme.primary
                     TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
                     else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
                 },
@@ -736,7 +736,7 @@ private fun InlineFileTransferProgress(
                 TransferStatus.Completed -> Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = null,
-                    tint = Color(0xFF4CAF50),
+                    tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp)
                 )
                 TransferStatus.Failed -> Icon(
@@ -784,7 +784,7 @@ private fun InlineFileTransferProgress(
                 },
                 style = MiuixTheme.textStyles.footnote1,
                 color = when (session.status) {
-                    TransferStatus.Completed -> Color(0xFF4CAF50)
+                    TransferStatus.Completed -> MiuixTheme.colorScheme.primary
                     TransferStatus.Failed -> MiuixTheme.colorScheme.error
                     TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
                     else -> MiuixTheme.colorScheme.onSurface

@@ -93,7 +93,7 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
-        <!-- 传输通知与流体云胶囊快捷操作接收器 -->
+        <!-- 传输通知与焦点胶囊快捷操作接收器 -->
         <receiver
             android:name=".notification.TransferActionReceiver"
             android:exported="false" />

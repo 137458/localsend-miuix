@@ -115,8 +115,8 @@
     <string name="settings_pref_theme_title">应用主题</string>
     <string name="settings_pref_vibrate_title">传输完成震动反馈</string>
     <string name="settings_pref_vibrate_summary">发送或接收完成时触发触感震动</string>
-    <string name="settings_pref_notif_perm_title">系统通知与流体云权限</string>
-    <string name="settings_pref_notif_perm_enabled">已开启 (传输进度与流体云胶囊提示正常)</string>
+    <string name="settings_pref_notif_perm_title">系统通知与焦点通知权限</string>
+    <string name="settings_pref_notif_perm_enabled">已开启 (传输进度与焦点胶囊提示正常)</string>
     <string name="settings_pref_notif_perm_disabled">未开启 (点击授权或前往系统设置开启通知)</string>
     <string name="settings_section_receive">接收设置</string>
     <string name="settings_pref_quick_save_desc">自动接收所有传入的发送请求</string>
@@ -329,9 +329,9 @@
     <string name="update_dialog_btn_update_now">立即更新</string>
     <string name="update_dialog_github_release_note">前往 GitHub 查看详细发布说明 ↗</string>
 
-    <!-- 系统通知与流体云胶囊 -->
+    <!-- 系统通知与焦点胶囊 -->
     <string name="notif_channel_live_name">传输实时进度</string>
-    <string name="notif_channel_live_desc">显示流体云胶囊与实时传输进度</string>
+    <string name="notif_channel_live_desc">显示焦点胶囊与实时传输进度</string>
     <string name="notif_channel_receive_name">接收通知</string>
     <string name="notif_channel_receive_desc">接收文件与文本时的结果提示</string>
     <string name="notif_channel_send_name">发送通知</string>

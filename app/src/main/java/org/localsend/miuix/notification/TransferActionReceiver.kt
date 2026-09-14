@@ -7,7 +7,7 @@ import org.localsend.miuix.manager.LocalSendManager
 
 /**
  * 传输动作广播接收器。
- * 用于响应系统通知栏、流体云胶囊等外部界面的快捷操作（如一键取消传输）。
+ * 用于响应系统通知栏、焦点胶囊等外部界面的快捷操作（如一键取消传输）。
  */
 class TransferActionReceiver : BroadcastReceiver() {
 

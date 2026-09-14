@@ -14,11 +14,11 @@ import org.localsend.miuix.R
 import org.localsend.miuix.model.TransferSession
 
 /**
- * 原生 Android 实时通知（Live Updates）与 ColorOS 流体云适配器。
- * 遵循 Android 16+ (API 36+) 官方规范，与 ColorOS 14/15/16 深度对齐：
+ * 原生 Android 实时通知（Live Updates）与 HyperOS 焦点通知适配器。
+ * 遵循 Android 16+ (API 36+) 官方规范，并良好兼容主流定制系统状态栏胶囊：
  * 1. 采用 NotificationCompat.Builder 配置 setRequestPromotedOngoing(true) 与 setShortCriticalText(...)；
  * 2. 注入 NotificationCompat.ProgressStyle 多文件分段实时进度与自适应样式；
- * 3. 规范化 ColorOS / OxygenOS 泛在服务流体云（Aqua Dynamics）胶囊参数，优化状态栏胶囊与卡片层级展示。
+ * 3. 规范化胶囊参数，优化状态栏胶囊与卡片层级展示。
  */
 object LiveUpdatesCompat {
 
@@ -45,7 +45,7 @@ object LiveUpdatesCompat {
     }
 
     /**
-     * 构建具备原生实时活动（Live Updates）与流体云胶囊特性的 Notification。
+     * 构建具备原生实时活动（Live Updates）与焦点胶囊特性的 Notification。
      */
     fun buildLiveNotification(
         context: Context,

@@ -188,7 +188,7 @@ fun HistoryScreen(
                         },
                         colors = ButtonDefaults.buttonColors(
                             color = MiuixTheme.colorScheme.error,
-                            contentColor = Color.White
+                            contentColor = MiuixTheme.colorScheme.onError
                         ),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -208,8 +208,10 @@ private fun HistoryItemCard(
 ) {
     val context = LocalContext.current
     val primary = MiuixTheme.colorScheme.primary
-    val statusInfo = remember(primary, item.status, context) {
-        statusInfo(context = context, status = item.status, primaryColor = primary)
+    val error = MiuixTheme.colorScheme.error
+    val summary = MiuixTheme.colorScheme.onSurfaceVariantSummary
+    val statusInfo = remember(primary, error, summary, item.status, context) {
+        statusInfo(context = context, status = item.status, primaryColor = primary, errorColor = error, summaryColor = summary)
     }
 
     Card(
@@ -220,13 +222,13 @@ private fun HistoryItemCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = if (item.isTextMessage) Icons.Default.ChatBubbleOutline else if (item.isIncoming) Icons.Default.Download else Icons.AutoMirrored.Filled.Send,
                 contentDescription = null,
-                tint = if (item.isTextMessage) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.primary,
+                tint = primary,
                 modifier = Modifier.size(24.dp)
             )
 
@@ -298,9 +300,9 @@ private fun HistoryItemCard(
 
 private data class StatusInfo(val label: String, val color: Color)
 
-private fun statusInfo(context: Context, status: TransferStatus, primaryColor: Color): StatusInfo = when (status) {
-    TransferStatus.Completed -> StatusInfo(context.getString(R.string.status_completed), Color(0xFF16A34A))
-    TransferStatus.Failed -> StatusInfo(context.getString(R.string.status_failed), Color(0xFFDC2626))
-    TransferStatus.Canceled -> StatusInfo(context.getString(R.string.status_canceled), Color(0xFFF59E0B))
+private fun statusInfo(context: Context, status: TransferStatus, primaryColor: Color, errorColor: Color, summaryColor: Color): StatusInfo = when (status) {
+    TransferStatus.Completed -> StatusInfo(context.getString(R.string.status_completed), primaryColor)
+    TransferStatus.Failed -> StatusInfo(context.getString(R.string.status_failed), errorColor)
+    TransferStatus.Canceled -> StatusInfo(context.getString(R.string.status_canceled), summaryColor)
     else -> StatusInfo(context.getString(R.string.status_processing), primaryColor)
 }

@@ -156,7 +156,7 @@ class LocalSendManager(private val context: Context) {
     private val _activeSessions = MutableStateFlow<List<TransferSession>>(emptyList())
     val activeSessions: StateFlow<List<TransferSession>> = _activeSessions.asStateFlow()
 
-    private val _transferHistory = MutableStateFlow(historyStore.load())
+    private val _transferHistory = MutableStateFlow<List<TransferHistoryItem>>(emptyList())
     val transferHistory: StateFlow<List<TransferHistoryItem>> = _transferHistory.asStateFlow()
 
     private val _isScanning = MutableStateFlow(false)
@@ -256,6 +256,8 @@ class LocalSendManager(private val context: Context) {
             return
         }
         scope.launch(Dispatchers.IO) {
+            val history = historyStore.load()
+            _transferHistory.value = history
             server.start()
             discoveryService.start()
             preloadInstalledApps()
@@ -926,6 +928,8 @@ class LocalSendManager(private val context: Context) {
         } catch (ignored: Exception) {}
         updateSettings { it.copy(downloadTreeUri = uri.toString(), downloadDisplay = display, downloadPath = display) }
     }
+
+    fun getServerPort(): Int = server.getBoundPort()
 
     fun applyPortChange(newPort: Int) {
         if (newPort == _settings.value.port) return

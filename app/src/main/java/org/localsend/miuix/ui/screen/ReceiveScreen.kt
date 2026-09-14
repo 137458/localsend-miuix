@@ -1,5 +1,8 @@
 package org.localsend.miuix.ui.screen
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -71,6 +74,8 @@ fun ReceiveScreen(
 
     val localIps = remember { NetworkUtils.getLocalIpAddresses() }
     val primaryIp = localIps.firstOrNull() ?: "127.0.0.1"
+    val boundPort = manager.getServerPort()
+    val displayPort = if (boundPort > 0) boundPort else settings.port
     val scrollBehavior = MiuixScrollBehavior()
 
     Column(
@@ -116,9 +121,14 @@ fun ReceiveScreen(
                         onClick = onOpenRenameDialog
                     )
                     ArrowPreference(
-                        title = "$primaryIp:${settings.port}",
+                        title = "$primaryIp:$displayPort",
                         summary = if (localIps.size > 1) stringResource(R.string.receive_pref_all_ips_summary, localIps.joinToString(", ")) else stringResource(R.string.receive_pref_ip_port_summary),
-                        onClick = {}
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("LocalSend IP", "$primaryIp:$displayPort")
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                        }
                     )
                 }
             }
@@ -151,7 +161,7 @@ fun ReceiveScreen(
             if (incomingSessions.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = stringResource(R.string.receive_section_incoming_count, incomingSessions.count { it.status == TransferStatus.InProgress }))
+                    SmallTitle(text = stringResource(R.string.receive_section_incoming_count, incomingSessions.count { it.status == TransferStatus.InProgress || it.status == TransferStatus.WaitingApproval }))
                 }
                 items(incomingSessions, key = { it.sessionId }) { session ->
                     TransferSessionCard(
