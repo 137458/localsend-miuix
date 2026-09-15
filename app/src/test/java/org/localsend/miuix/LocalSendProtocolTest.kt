@@ -258,5 +258,32 @@ class LocalSendProtocolTest {
         assertEquals(org.localsend.miuix.model.TransferStatus.Completed, textItem.status)
         assertEquals(org.localsend.miuix.model.TransferStatus.InProgress, binaryItem.status)
     }
+
+    @Test
+    fun testHttp2ResponseHeadersDoNotContainConnectionHeader() {
+        // RFC 7540 §8.1.2.2 & RFC 9113 §8.2.2:
+        // HTTP/2 prohibits connection-specific headers (Connection, Keep-Alive, etc.).
+        // Presence of Connection header causes Hyper / rhttp client to fail with PROTOCOL_ERROR (Reset stream).
+        val http2Headers = org.localsend.miuix.network.LocalSendServer.getUploadResponseHeaders("HTTP/2.0")
+        org.junit.Assert.assertFalse(
+            "HTTP/2 response must not contain Connection header",
+            http2Headers.containsKey(io.ktor.http.HttpHeaders.Connection)
+        )
+        org.junit.Assert.assertFalse(
+            "HTTP/2 response must not contain connection-specific headers",
+            http2Headers.keys.any { it.lowercase() in org.localsend.miuix.network.LocalSendServer.FORBIDDEN_HTTP2_HEADERS }
+        )
+
+        val http2AlternativeHeaders = org.localsend.miuix.network.LocalSendServer.getUploadResponseHeaders("HTTP/2")
+        org.junit.Assert.assertFalse(
+            "HTTP/2 alternative response must not contain Connection header",
+            http2AlternativeHeaders.containsKey(io.ktor.http.HttpHeaders.Connection)
+        )
+
+        // For HTTP/1.1, Connection: keep-alive is permissible
+        val http1Headers = org.localsend.miuix.network.LocalSendServer.getUploadResponseHeaders("HTTP/1.1")
+        assertEquals("keep-alive", http1Headers[io.ktor.http.HttpHeaders.Connection])
+    }
 }
+
 

@@ -1505,7 +1505,9 @@ class LocalSendServer(
                     checkSessionFinished(session, sessionId)
                     onSessionUpdated(session)
 
-                    call.response.header(HttpHeaders.Connection, "keep-alive")
+                    getUploadResponseHeaders(call.request.origin.version).forEach { (name, value) ->
+                        call.response.header(name, value)
+                    }
                     call.respond(HttpStatusCode.OK, mapOf("message" to "File uploaded successfully"))
                 } catch (e: Throwable) {
                     e.printStackTrace()
@@ -1534,4 +1536,24 @@ class LocalSendServer(
             }
         }
     }
+
+    companion object {
+        val FORBIDDEN_HTTP2_HEADERS = setOf(
+            "connection",
+            "keep-alive",
+            "proxy-connection",
+            "transfer-encoding",
+            "upgrade"
+        )
+
+        fun getUploadResponseHeaders(httpVersion: String?): Map<String, String> {
+            val isHttp2 = httpVersion?.contains("2") == true
+            return if (isHttp2) {
+                emptyMap()
+            } else {
+                mapOf(HttpHeaders.Connection to "keep-alive")
+            }
+        }
+    }
 }
+
