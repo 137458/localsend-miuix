@@ -612,8 +612,12 @@ class LocalSendManager(private val context: Context) {
                     if (session.isTextMessage && !session.singleTextMessageContent.isNullOrEmpty()) {
                         val text = session.singleTextMessageContent!!
                         if (_settings.value.autoCopyText) {
-                            copyTextToClipboard(text)
-                            _sessionMessage.value = context.getString(R.string.msg_text_auto_copied, text.take(20))
+                            if (text.length <= 65536) {
+                                copyTextToClipboard(text)
+                                _sessionMessage.value = context.getString(R.string.msg_text_auto_copied, text.take(20))
+                            } else {
+                                _sessionMessage.value = context.getString(R.string.msg_text_received_from, session.device.alias)
+                            }
                         } else {
                             _sessionMessage.value = context.getString(R.string.msg_text_received_from, session.device.alias)
                         }

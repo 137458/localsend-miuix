@@ -45,6 +45,11 @@ import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.HistoryDetailDialog
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import org.localsend.miuix.ui.component.BlurredBar
+import org.localsend.miuix.ui.component.blurBackdropSource
+import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -68,45 +73,59 @@ fun HistoryScreen(
 ) {
     val history by manager.transferHistory.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
+    val backdrop = rememberBlurBackdrop()
+    val colorScheme = MiuixTheme.colorScheme
     var selectedItem by remember { mutableStateOf<TransferHistoryItem?>(null) }
     var showClearConfirmDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = stringResource(R.string.history_title),
+            BlurredBar(
+                backdrop = backdrop,
                 scrollBehavior = scrollBehavior,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
-                    }
-                },
-                actions = {
-                    if (history.isNotEmpty()) {
-                        IconButton(onClick = { showClearConfirmDialog = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.history_dialog_clear_title),
-                                tint = MiuixTheme.colorScheme.error
-                            )
+            ) {
+                TopAppBar(
+                    title = stringResource(R.string.history_title),
+                    scrollBehavior = scrollBehavior,
+                    color = if (backdrop != null) Color.Transparent else colorScheme.surface,
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                        }
+                    },
+                    actions = {
+                        if (history.isNotEmpty()) {
+                            IconButton(onClick = { showClearConfirmDialog = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.history_dialog_clear_title),
+                                    tint = MiuixTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
         }
     ) { innerPadding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(
-                top = innerPadding.calculateTopPadding() + 8.dp,
-                bottom = innerPadding.calculateBottomPadding() + 16.dp,
-                start = 12.dp,
-                end = 12.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .background(colorScheme.surface)
+                .blurBackdropSource(backdrop)
         ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(
+                    top = innerPadding.calculateTopPadding() + 8.dp,
+                    bottom = innerPadding.calculateBottomPadding() + 16.dp,
+                    start = 12.dp,
+                    end = 12.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
             if (history.isEmpty()) {
                 item {
                     SmallTitle(text = stringResource(R.string.history_empty_title))
@@ -142,6 +161,7 @@ fun HistoryScreen(
                         }
                     )
                 }
+            }
             }
         }
     }

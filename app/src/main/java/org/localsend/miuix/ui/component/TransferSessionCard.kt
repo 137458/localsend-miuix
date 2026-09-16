@@ -184,7 +184,7 @@ private fun TextMessageCardContent(
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Text(
-            text = previewText,
+            text = if (previewText.length > 2048) previewText.take(2048) + "…" else previewText,
             style = MiuixTheme.textStyles.body2,
             maxLines = 5,
             overflow = TextOverflow.Ellipsis,
@@ -195,7 +195,7 @@ private fun TextMessageCardContent(
     // 3. 复制 / 打开链接快捷操作
     if (session.isIncoming && (session.status == TransferStatus.Completed || session.status == TransferStatus.InProgress)) {
         val detectedUrl = remember(previewText) {
-            val trimmed = previewText.trim()
+            val trimmed = previewText.take(2048).trim()
             if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
                 if (!trimmed.contains(" ") && !trimmed.contains("\n")) {
                     trimmed

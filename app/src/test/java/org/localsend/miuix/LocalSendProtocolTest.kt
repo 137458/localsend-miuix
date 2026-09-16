@@ -284,6 +284,42 @@ class LocalSendProtocolTest {
         val http1Headers = org.localsend.miuix.network.LocalSendServer.getUploadResponseHeaders("HTTP/1.1")
         assertEquals("keep-alive", http1Headers[io.ktor.http.HttpHeaders.Connection])
     }
+
+    @Test
+    fun testLargeTxtFileIsNotConsideredTextMessage() {
+        val txtFile = FileItem(
+            id = "file-txt-1",
+            name = "large_log.txt",
+            size = 10_000_000L,
+            mimeType = "text/plain",
+            textContent = null
+        )
+        // 关键断言：纯文本文件（如 10MB txt 文件）绝不能被误判为纯文本消息
+        org.junit.Assert.assertFalse("Large txt file must not be treated as text message", txtFile.isTextMessage)
+    }
+
+    @Test
+    fun testFileDtoMappingWithoutPreviewIsNotTextMessage() {
+        val dto = FileDto(
+            id = "dto-1",
+            fileName = "book.txt",
+            size = 5_000_000L,
+            fileType = "text/plain",
+            preview = null
+        )
+        val isTextMsg = !dto.preview.isNullOrEmpty() && (dto.fileType == "text" || dto.fileType == "text/plain") && dto.size <= org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE
+        val item = FileItem(
+            id = dto.id,
+            name = dto.fileName,
+            size = dto.size,
+            mimeType = dto.fileType,
+            textContent = if (isTextMsg) dto.preview else null,
+            isTextMessage = isTextMsg
+        )
+        org.junit.Assert.assertFalse(item.isTextMessage)
+        org.junit.Assert.assertNull(item.textContent)
+    }
 }
+
 
 

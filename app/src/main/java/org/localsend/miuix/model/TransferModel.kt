@@ -59,6 +59,12 @@ enum class TransferStatus {
     Failed
 }
 
+/**
+ * 纯文本消息内联传输或内存缓冲的最大安全大小（512 KB）。
+ * 超过此大小的文件一律作为普通二进制文件流式存盘，严禁载入内存或误当作即时文本消息。
+ */
+const val MAX_INLINE_TEXT_SIZE = 512 * 1024L
+
 data class FileItem(
     val id: String = UUID.randomUUID().toString(),
     var name: String,
@@ -76,19 +82,17 @@ data class FileItem(
     var speed: Long = 0L,
     var error: String? = null,
     // 通过 MediaStore 写入公共目录时，记录插入出的 Uri，用于完成后清除 IS_PENDING 标记
-    var mediaStoreUri: Uri? = null
+    var mediaStoreUri: Uri? = null,
+    val isTextMessage: Boolean = textContent != null
 ) {
-    val isTextMessage: Boolean
-        get() = textContent != null || mimeType.startsWith("text/")
-
     fun toDto(): FileDto {
         return FileDto(
             id = id,
             fileName = name,
             size = size,
-            fileType = mimeType,
+            fileType = if (isTextMessage) "text" else mimeType,
             sha256 = expectedSha256,
-            preview = textContent?.take(2000)
+            preview = if (isTextMessage) textContent?.take(2000) else null
         )
     }
 

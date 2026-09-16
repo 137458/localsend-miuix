@@ -59,6 +59,12 @@ import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.FilePreviewDialog
 import org.localsend.miuix.ui.component.FileThumbnail
 import org.localsend.miuix.ui.component.InlineTransferProgress
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
+import org.localsend.miuix.ui.component.BlurredBar
+import org.localsend.miuix.ui.component.blurBackdropSource
+import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -67,6 +73,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -132,54 +139,72 @@ fun SendScreen(
     val refreshRefreshing = stringResource(R.string.send_pull_refresh_refreshing)
     val refreshComplete = stringResource(R.string.send_pull_refresh_complete)
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        TopAppBar(
-            title = stringResource(R.string.send_title),
-            scrollBehavior = scrollBehavior,
-            actions = {
-                IconButton(onClick = onManualIp) {
-                    Icon(imageVector = AppIcons.Send, contentDescription = stringResource(R.string.action_input_ip))
-                }
-                IconButton(
-                    onClick = {
-                        manager.refreshDevices()
-                        Toast.makeText(context, context.getString(R.string.toast_multicast_sent), Toast.LENGTH_SHORT).show()
-                    }
-                ) {
-                    Icon(imageVector = AppIcons.Refresh, contentDescription = stringResource(R.string.action_refresh))
-                }
-            }
-        )
+    val backdrop = rememberBlurBackdrop()
+    val colorScheme = MiuixTheme.colorScheme
 
-        PullToRefresh(
-            isRefreshing = isRefreshing,
-            onRefresh = {
-                coroutineScope.launch {
-                    isRefreshing = true
-                    manager.refreshDevices()
-                    manager.scanSubnet()
-                    delay(1000)
-                    isRefreshing = false
-                }
-            },
-            pullToRefreshState = pullToRefreshState,
-            refreshTexts = listOf(refreshPull, refreshRelease, refreshRefreshing, refreshComplete),
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            BlurredBar(
+                backdrop = backdrop,
+                scrollBehavior = scrollBehavior,
+            ) {
+                TopAppBar(
+                    title = stringResource(R.string.send_title),
+                    scrollBehavior = scrollBehavior,
+                    color = if (backdrop != null) Color.Transparent else colorScheme.surface,
+                    actions = {
+                        IconButton(onClick = onManualIp) {
+                            Icon(imageVector = AppIcons.Send, contentDescription = stringResource(R.string.action_input_ip))
+                        }
+                        IconButton(
+                            onClick = {
+                                manager.refreshDevices()
+                                Toast.makeText(context, context.getString(R.string.toast_multicast_sent), Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Icon(imageVector = AppIcons.Refresh, contentDescription = stringResource(R.string.action_refresh))
+                        }
+                    }
+                )
+            }
+        }
+    ) { innerPadding ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection)
+                .background(colorScheme.surface)
+                .blurBackdropSource(backdrop)
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    top = 8.dp,
-                    bottom = contentPadding.calculateBottomPadding() + 16.dp,
-                    start = 12.dp,
-                    end = 12.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            PullToRefresh(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    coroutineScope.launch {
+                        isRefreshing = true
+                        manager.refreshDevices()
+                        manager.scanSubnet()
+                        delay(1000)
+                        isRefreshing = false
+                    }
+                },
+                pullToRefreshState = pullToRefreshState,
+                contentPadding = PaddingValues(top = innerPadding.calculateTopPadding()),
+                topAppBarScrollBehavior = scrollBehavior,
+                refreshTexts = listOf(refreshPull, refreshRelease, refreshRefreshing, refreshComplete),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection)
             ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        top = innerPadding.calculateTopPadding() + 8.dp,
+                        bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                        start = 12.dp,
+                        end = 12.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                 // Section 1: Quick Action Grid (6 types)
                 item {
                     SmallTitle(text = stringResource(R.string.send_section_quick_pick))
@@ -512,6 +537,7 @@ fun SendScreen(
             }
         }
     }
+}
 
     if (previewingIndex >= 0 && previewingIndex < selectedFiles.size) {
         FilePreviewDialog(

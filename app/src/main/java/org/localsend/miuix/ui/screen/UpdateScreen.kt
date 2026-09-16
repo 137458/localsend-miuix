@@ -20,6 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import org.localsend.miuix.ui.component.BlurredBar
+import org.localsend.miuix.ui.component.blurBackdropSource
+import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -148,36 +152,47 @@ fun UpdateScreen(
 
     val density = LocalDensity.current
     var logoHeightDp by remember { mutableStateOf(240.dp) }
+    val backdrop = rememberBlurBackdrop()
 
     Scaffold(
         topBar = {
-            val barColor = if (scrollProgress == 1f) MiuixTheme.colorScheme.surface else Color.Transparent
+            val barColor = if (backdrop != null) Color.Transparent else if (scrollProgress == 1f) MiuixTheme.colorScheme.surface else Color.Transparent
             val titleColor = MiuixTheme.colorScheme.onSurface.copy(
                 alpha = ((scrollProgress - 0.35f) / 0.65f).coerceIn(0f, 1f),
             )
-            SmallTopAppBar(
-                title = stringResource(R.string.update_screen_title),
+            BlurredBar(
+                backdrop = backdrop,
                 scrollBehavior = topAppBarScrollBehavior,
-                color = barColor,
-                titleColor = titleColor,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
-                        )
-                    }
-                },
-            )
+            ) {
+                SmallTopAppBar(
+                    title = stringResource(R.string.update_screen_title),
+                    scrollBehavior = topAppBarScrollBehavior,
+                    color = barColor,
+                    titleColor = titleColor,
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back),
+                            )
+                        }
+                    },
+                )
+            }
         },
     ) { innerPadding ->
-        BgEffectBackground(
-            dynamicBackground = isRuntimeShaderSupported(),
-            isOs3Effect = settings.isOs3Effect,
-            isFullSize = true,
-            modifier = Modifier.fillMaxSize(),
-            alpha = { 1f - scrollProgress },
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .blurBackdropSource(backdrop)
         ) {
+            BgEffectBackground(
+                dynamicBackground = isRuntimeShaderSupported(),
+                isOs3Effect = settings.isOs3Effect,
+                isFullSize = true,
+                modifier = Modifier.fillMaxSize(),
+                alpha = { 1f - scrollProgress },
+            ) {
             // ── 顶部官方规范 Hero 视觉 ──
             Column(
                 modifier = Modifier
@@ -272,7 +287,9 @@ fun UpdateScreen(
             // ── 滚动内容列表 ──
             LazyColumn(
                 state = lazyListState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
                     bottom = innerPadding.calculateBottomPadding() + 24.dp,
@@ -473,6 +490,7 @@ fun UpdateScreen(
                 }
             }
         }
+    }
 
         // 官方 Miuix 风格更新弹窗
         if (showDialog && releaseInfo != null) {

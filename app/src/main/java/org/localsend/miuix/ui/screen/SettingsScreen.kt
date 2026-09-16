@@ -28,11 +28,19 @@ import org.localsend.miuix.ui.component.CertFingerprintDialog
 import org.localsend.miuix.ui.component.PinDialog
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
+import org.localsend.miuix.ui.component.BlurredBar
+import org.localsend.miuix.ui.component.blurBackdropSource
+import org.localsend.miuix.ui.component.rememberBlurBackdrop
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import org.localsend.miuix.notification.TransferNotifier
@@ -49,6 +57,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val settings by manager.settings.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
+    val backdrop = rememberBlurBackdrop()
+    val colorScheme = MiuixTheme.colorScheme
 
     var showPinDialog by remember { mutableStateOf(false) }
     var showCertDialog by remember { mutableStateOf(false) }
@@ -84,35 +94,48 @@ fun SettingsScreen(
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        TopAppBar(
-            title = stringResource(R.string.settings_title),
-            scrollBehavior = scrollBehavior
-        )
-
-        LazyColumn(
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            BlurredBar(
+                backdrop = backdrop,
+                scrollBehavior = scrollBehavior,
+            ) {
+                TopAppBar(
+                    title = stringResource(R.string.settings_title),
+                    scrollBehavior = scrollBehavior,
+                    color = if (backdrop != null) Color.Transparent else colorScheme.surface,
+                )
+            }
+        }
+    ) { innerPadding ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(
-                top = 8.dp,
-                bottom = contentPadding.calculateBottomPadding() + 16.dp,
-                start = 12.dp,
-                end = 12.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .background(colorScheme.surface)
+                .blurBackdropSource(backdrop)
         ) {
-            // Section 1: General Settings
-            item {
-                SmallTitle(text = stringResource(R.string.settings_section_general))
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_pref_alias_title),
-                        summary = settings.alias,
-                        onClick = onOpenRenameDialog
-                    )
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(
+                    top = innerPadding.calculateTopPadding() + 8.dp,
+                    bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                    start = 12.dp,
+                    end = 12.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Section 1: General Settings
+                item {
+                    SmallTitle(text = stringResource(R.string.settings_section_general))
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_pref_alias_title),
+                            summary = settings.alias,
+                            onClick = onOpenRenameDialog
+                        )
                     WindowDropdownPreference(
                         title = stringResource(R.string.settings_pref_device_type_title),
                         items = deviceTypeOptions,
@@ -265,6 +288,7 @@ fun SettingsScreen(
                 }
             }
         }
+    }
     }
 
     PinDialog(

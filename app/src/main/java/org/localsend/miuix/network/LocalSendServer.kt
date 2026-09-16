@@ -1333,15 +1333,19 @@ class LocalSendServer(
 
                 val sessionId = UUID.randomUUID().toString()
                 val fileItems = request.files.values.map { dto ->
+                    val isTextMessage = !dto.preview.isNullOrEmpty() &&
+                        (dto.fileType == "text" || dto.fileType == "text/plain") &&
+                        dto.size <= org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE
                     FileItem(
                         id = dto.id,
                         name = dto.fileName,
                         size = dto.size,
                         mimeType = dto.fileType,
-                        textContent = dto.preview,
+                        textContent = if (isTextMessage) dto.preview else null,
                         token = UUID.randomUUID().toString(),
                         expectedSha256 = dto.sha256,
-                        status = TransferStatus.WaitingApproval
+                        status = TransferStatus.WaitingApproval,
+                        isTextMessage = isTextMessage
                     )
                 }
 
@@ -1432,7 +1436,7 @@ class LocalSendServer(
                         } else {
                             null
                         }
-                        val textBuffer = if (fileItem.isTextMessage || fileItem.mimeType.startsWith("text/")) {
+                        val textBuffer = if (fileItem.isTextMessage && fileItem.size <= org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE) {
                             java.io.ByteArrayOutputStream()
                         } else null
 

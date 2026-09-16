@@ -42,6 +42,12 @@ import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.network.NetworkUtils
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.TransferSessionCard
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
+import org.localsend.miuix.ui.component.BlurredBar
+import org.localsend.miuix.ui.component.blurBackdropSource
+import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -49,6 +55,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -77,32 +84,47 @@ fun ReceiveScreen(
     val boundPort = manager.getServerPort()
     val displayPort = if (boundPort > 0) boundPort else settings.port
     val scrollBehavior = MiuixScrollBehavior()
+    val backdrop = rememberBlurBackdrop()
+    val colorScheme = MiuixTheme.colorScheme
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        TopAppBar(
-            title = stringResource(R.string.receive_title),
-            scrollBehavior = scrollBehavior,
-            actions = {
-                IconButton(onClick = onOpenHistory) {
-                    Icon(imageVector = AppIcons.History, contentDescription = stringResource(R.string.action_history))
-                }
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            BlurredBar(
+                backdrop = backdrop,
+                scrollBehavior = scrollBehavior,
+            ) {
+                TopAppBar(
+                    title = stringResource(R.string.receive_title),
+                    scrollBehavior = scrollBehavior,
+                    color = if (backdrop != null) Color.Transparent else colorScheme.surface,
+                    actions = {
+                        IconButton(onClick = onOpenHistory) {
+                            Icon(imageVector = AppIcons.History, contentDescription = stringResource(R.string.action_history))
+                        }
+                    }
+                )
             }
-        )
-
-        LazyColumn(
+        }
+    ) { innerPadding ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(
-                top = 8.dp,
-                bottom = contentPadding.calculateBottomPadding() + 16.dp,
-                start = 12.dp,
-                end = 12.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .background(colorScheme.surface)
+                .blurBackdropSource(backdrop)
         ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(
+                    top = innerPadding.calculateTopPadding() + 8.dp,
+                    bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                    start = 12.dp,
+                    end = 12.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
             // Section 1: Device Info Card
             item {
                 SmallTitle(text = stringResource(R.string.receive_section_local_device))
@@ -203,4 +225,5 @@ fun ReceiveScreen(
             }
         }
     }
+}
 }
