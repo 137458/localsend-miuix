@@ -12,3 +12,4 @@ local.properties
 .kotlin/
 release-assets/
 hs_err_pid*.log
+docs/research/
