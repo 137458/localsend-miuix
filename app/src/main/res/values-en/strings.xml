@@ -124,6 +124,8 @@
     <string name="settings_section_receive">Receive Settings</string>
     <string name="settings_pref_quick_save_desc">Automatically accept transfer requests from local network without prompt</string>
     <string name="settings_pref_auto_copy_desc">Automatically copy received text messages to clipboard</string>
+    <string name="settings_pref_save_text_as_file_title">Save Text as File</string>
+    <string name="settings_pref_save_text_as_file_desc">Save received text messages as .txt files in the download folder; default is off</string>
     <string name="settings_pref_save_history_title">Save Transfer History</string>
     <string name="settings_pref_save_history_desc">Keep logs of completed and cancelled transfers</string>
     <string name="settings_pref_download_path_title">Download Directory</string>

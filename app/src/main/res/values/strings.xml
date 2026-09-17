@@ -124,6 +124,8 @@
     <string name="settings_section_receive">接收设置</string>
     <string name="settings_pref_quick_save_desc">自动接收同局域网所有设备的传输请求，无需每次手动确认</string>
     <string name="settings_pref_auto_copy_desc">收到纯文本消息时自动复制到剪贴板</string>
+    <string name="settings_pref_save_text_as_file_title">将文本保存为文件</string>
+    <string name="settings_pref_save_text_as_file_desc">接收纯文本消息时在存储目录生成 .txt 文件，默认关闭仅复制并记录在历史</string>
     <string name="settings_pref_save_history_title">保存传输历史</string>
     <string name="settings_pref_save_history_desc">将完成和取消的传输记录存入历史页面</string>
     <string name="settings_pref_download_path_title">文件保存目录</string>

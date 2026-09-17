@@ -214,6 +214,14 @@ fun SettingsScreen(
                         }
                     )
                     SwitchPreference(
+                        title = stringResource(R.string.settings_pref_save_text_as_file_title),
+                        summary = stringResource(R.string.settings_pref_save_text_as_file_desc),
+                        checked = settings.saveTextAsFile,
+                        onCheckedChange = { checked ->
+                            manager.updateSettings { it.copy(saveTextAsFile = checked) }
+                        }
+                    )
+                    SwitchPreference(
                         title = stringResource(R.string.settings_pref_save_history_title),
                         summary = stringResource(R.string.settings_pref_save_history_desc),
                         checked = settings.saveToHistory,

@@ -75,7 +75,8 @@ class LocalSendServer(
     private val getShares: () -> List<ShareSession>,
     private val onDeviceDiscovered: (Device) -> Unit,
     private val onIncomingRequest: suspend (session: TransferSession) -> Boolean,
-    private val onSessionUpdated: (TransferSession) -> Unit
+    private val onSessionUpdated: (TransferSession) -> Unit,
+    private val getSaveTextAsFile: () -> Boolean = { false }
 ) {
     private var engine: ApplicationEngine? = null
     private val json = AppJson.default
@@ -988,6 +989,8 @@ class LocalSendServer(
                                 } catch(e) {
                                     finishError(I18N.parseFailed);
                                 }
+                            } else if (xhr.status === 204) {
+                                finishSuccess();
                             } else if (xhr.status === 401) {
                                 var pinPrompt = prompt(isFirst ? I18N.pinPrompt : I18N.pinRetry);
                                 if (!pinPrompt) {
@@ -1369,18 +1372,27 @@ class LocalSendServer(
                 }
 
                 if (accepted) {
-                    session.status = TransferStatus.InProgress
-                    val tokenMap = mutableMapOf<String, String>()
-                    fileItems.forEach { item ->
-                        tokenMap[item.id] = item.token ?: item.id
+                    val decision = resolvePrepareUploadDecision(fileItems, getSaveTextAsFile())
+                    if (decision.shouldRespondNoContent) {
+                        session.status = TransferStatus.Completed
+                        session.transferredBytes = session.totalBytes
+                        session.endTime = System.currentTimeMillis()
+                        activeSessions.remove(sessionId)
+                        sessionTokens.remove(sessionId)
+                        onSessionUpdated(session)
+                        call.respond(HttpStatusCode.NoContent)
+                        return@post
                     }
-                    sessionTokens[sessionId] = tokenMap
+
+                    session.status = TransferStatus.InProgress
+                    session.transferredBytes = fileItems.filter { it.status == TransferStatus.Completed }.sumOf { it.bytesTransferred }
+                    sessionTokens[sessionId] = decision.tokenMap.toMutableMap()
                     onSessionUpdated(session)
 
                     call.respond(
                         PrepareUploadResponseDto(
                             sessionId = sessionId,
-                            files = tokenMap
+                            files = decision.tokenMap
                         )
                     )
                 } else {
@@ -1557,6 +1569,57 @@ class LocalSendServer(
             } else {
                 mapOf(HttpHeaders.Connection to "keep-alive")
             }
+        }
+
+        data class PrepareUploadDecision(
+            val shouldRespondNoContent: Boolean,
+            val tokenMap: Map<String, String>,
+            val isSessionCompletedImmediately: Boolean
+        )
+
+        /**
+         * 依据 LocalSend 协议 §4.1 与配置，决定 prepare-upload 响应及各文件项的 Upload Token 与生命周期。
+         */
+        fun resolvePrepareUploadDecision(
+            files: List<FileItem>,
+            saveTextAsFile: Boolean
+        ): PrepareUploadDecision {
+            val hasBinaryFiles = files.any { !it.isTextMessage }
+
+            if (!saveTextAsFile && !hasBinaryFiles) {
+                // 场景 1：全为纯文本消息，且未开启保存为文件。
+                // 按照 LocalSend 协议规范 §4.1 直接响应 204 No Content，不分发 token，本地直接标记为已完成
+                files.forEach { item ->
+                    item.status = TransferStatus.Completed
+                    item.bytesTransferred = item.size
+                    item.progress = 1f
+                }
+                return PrepareUploadDecision(
+                    shouldRespondNoContent = true,
+                    tokenMap = emptyMap(),
+                    isSessionCompletedImmediately = true
+                )
+            }
+
+            // 场景 2：混合传输或开启了 saveTextAsFile
+            val tokenMap = mutableMapOf<String, String>()
+            files.forEach { item ->
+                if (item.isTextMessage && !saveTextAsFile) {
+                    // 混合传输中未开启保存的纯文本项：直接标记完成，不分配 token
+                    item.status = TransferStatus.Completed
+                    item.bytesTransferred = item.size
+                    item.progress = 1f
+                } else {
+                    // 普通二进制文件或开启了保存为文件的纯文本项：分配 token 进行正常上传
+                    tokenMap[item.id] = item.token ?: item.id
+                }
+            }
+
+            return PrepareUploadDecision(
+                shouldRespondNoContent = false,
+                tokenMap = tokenMap,
+                isSessionCompletedImmediately = false
+            )
         }
     }
 }

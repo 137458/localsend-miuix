@@ -319,6 +319,95 @@ class LocalSendProtocolTest {
         org.junit.Assert.assertFalse(item.isTextMessage)
         org.junit.Assert.assertNull(item.textContent)
     }
+
+    @Test
+    fun testTextMessageServerResponds204WhenSaveTextAsFileDisabled() {
+        // 纯文本传输场景：全为文本消息，saveTextAsFile 为 false
+        val textItem = FileItem(
+            id = "txt-1",
+            name = "text_123.txt",
+            size = 50,
+            textContent = "这是一条文本消息",
+            mimeType = "text/plain",
+            token = "token-txt-1",
+            isTextMessage = true
+        )
+        val files = listOf(textItem)
+
+        val decision = org.localsend.miuix.network.LocalSendServer.resolvePrepareUploadDecision(
+            files = files,
+            saveTextAsFile = false
+        )
+
+        // 核心断言：纯文本消息在未开启另存为文件时，必须响应 204 No Content，不分发 upload token，立即完成
+        assertTrue("All-text transfer must respond with 204 NoContent", decision.shouldRespondNoContent)
+        assertTrue("No upload token should be issued for text messages", decision.tokenMap.isEmpty())
+        assertTrue("Session should complete immediately without upload stage", decision.isSessionCompletedImmediately)
+        assertEquals(org.localsend.miuix.model.TransferStatus.Completed, textItem.status)
+        assertEquals(50L, textItem.bytesTransferred)
+        assertEquals(1f, textItem.progress, 0.001f)
+    }
+
+    @Test
+    fun testMixedTransferOmitsTextMessageTokens() {
+        // 混合传输场景：包含二进制文件与纯文本消息，saveTextAsFile 为 false
+        val textItem = FileItem(
+            id = "txt-msg",
+            name = "text_note.txt",
+            size = 30,
+            textContent = "附言文本",
+            mimeType = "text/plain",
+            token = "token-txt",
+            isTextMessage = true
+        )
+        val binaryItem = FileItem(
+            id = "bin-file",
+            name = "avatar.png",
+            size = 1024,
+            mimeType = "image/png",
+            token = "token-bin",
+            isTextMessage = false
+        )
+        val files = listOf(textItem, binaryItem)
+
+        val decision = org.localsend.miuix.network.LocalSendServer.resolvePrepareUploadDecision(
+            files = files,
+            saveTextAsFile = false
+        )
+
+        // 核心断言：不能直接回 204（因为有二进制文件需传输），但仅给二进制文件分发 token，文本消息不分发 token
+        org.junit.Assert.assertFalse("Mixed transfer must not respond with 204", decision.shouldRespondNoContent)
+        org.junit.Assert.assertFalse("Session still requires uploading binary files", decision.isSessionCompletedImmediately)
+        assertEquals("Token map must contain exactly 1 token for binary file", 1, decision.tokenMap.size)
+        assertEquals("token-bin", decision.tokenMap["bin-file"])
+        org.junit.Assert.assertFalse("Token map must NOT contain text item", decision.tokenMap.containsKey("txt-msg"))
+        assertEquals(org.localsend.miuix.model.TransferStatus.Completed, textItem.status)
+        org.junit.Assert.assertNotEquals(org.localsend.miuix.model.TransferStatus.Completed, binaryItem.status)
+    }
+
+    @Test
+    fun testTextMessageServerAllocatesTokenWhenSaveTextAsFileEnabled() {
+        // 用户主动在设置中开启“将文本保存为文件”：此时应恢复旧逻辑，分发 token 并落盘
+        val textItem = FileItem(
+            id = "txt-1",
+            name = "text_123.txt",
+            size = 50,
+            textContent = "这是一条文本消息",
+            mimeType = "text/plain",
+            token = "token-txt-1",
+            isTextMessage = true
+        )
+        val files = listOf(textItem)
+
+        val decision = org.localsend.miuix.network.LocalSendServer.resolvePrepareUploadDecision(
+            files = files,
+            saveTextAsFile = true
+        )
+
+        org.junit.Assert.assertFalse("When saveTextAsFile is enabled, must not return 204", decision.shouldRespondNoContent)
+        assertEquals("Token map must contain the text token for upload", "token-txt-1", decision.tokenMap["txt-1"])
+        org.junit.Assert.assertFalse("Session still requires upload", decision.isSessionCompletedImmediately)
+    }
 }
 
 

@@ -27,7 +27,8 @@ data class AppSettings(
     val autoCheckUpdate: Boolean = true,
     val ignoredVersion: String? = null,
     val isOs3Effect: Boolean = true,
-    val wideScreenNavigationRail: Boolean = false
+    val wideScreenNavigationRail: Boolean = false,
+    val saveTextAsFile: Boolean = false // 是否将纯文本消息另存为 .txt 文件，默认关闭仅复制并写入历史
 ) {
     companion object {
         private val ADJECTIVES = listOf(

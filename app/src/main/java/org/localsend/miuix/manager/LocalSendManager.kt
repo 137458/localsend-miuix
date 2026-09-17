@@ -129,7 +129,8 @@ class LocalSendManager(private val context: Context) {
             autoCheckUpdate = prefs.getBoolean(KEY_AUTO_CHECK_UPDATE, true),
             ignoredVersion = prefs.getString(KEY_IGNORED_VERSION, null),
             isOs3Effect = prefs.getBoolean(KEY_IS_OS3_EFFECT, true),
-            wideScreenNavigationRail = prefs.getBoolean(KEY_WIDE_SCREEN_NAVIGATION_RAIL, false)
+            wideScreenNavigationRail = prefs.getBoolean(KEY_WIDE_SCREEN_NAVIGATION_RAIL, false),
+            saveTextAsFile = prefs.getBoolean(KEY_SAVE_TEXT_AS_FILE, false)
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -248,7 +249,8 @@ class LocalSendManager(private val context: Context) {
         },
         onSessionUpdated = { session ->
             handleSessionUpdate(session)
-        }
+        },
+        getSaveTextAsFile = { _settings.value.saveTextAsFile }
     )
 
     fun start() {
@@ -988,6 +990,7 @@ class LocalSendManager(private val context: Context) {
             .putString(KEY_IGNORED_VERSION, s.ignoredVersion)
             .putBoolean(KEY_IS_OS3_EFFECT, s.isOs3Effect)
             .putBoolean(KEY_WIDE_SCREEN_NAVIGATION_RAIL, s.wideScreenNavigationRail)
+            .putBoolean(KEY_SAVE_TEXT_AS_FILE, s.saveTextAsFile)
             .apply()
     }
 
@@ -1025,5 +1028,6 @@ class LocalSendManager(private val context: Context) {
         private const val KEY_IGNORED_VERSION = org.localsend.miuix.core.PreferenceKeys.KEY_IGNORED_VERSION
         private const val KEY_IS_OS3_EFFECT = org.localsend.miuix.core.PreferenceKeys.KEY_IS_OS3_EFFECT
         private const val KEY_WIDE_SCREEN_NAVIGATION_RAIL = org.localsend.miuix.core.PreferenceKeys.KEY_WIDE_SCREEN_NAVIGATION_RAIL
+        private const val KEY_SAVE_TEXT_AS_FILE = org.localsend.miuix.core.PreferenceKeys.KEY_SAVE_TEXT_AS_FILE
     }
 }
