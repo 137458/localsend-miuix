@@ -185,6 +185,14 @@ class LocalSendManager(private val context: Context) {
     private val _requestedTabIndex = MutableStateFlow<Int?>(null)
     val requestedTabIndex: StateFlow<Int?> = _requestedTabIndex.asStateFlow()
 
+    // 传输历史一键重发时关联的目标设备，进入发送页时可置顶高亮并支持一键发起传输
+    private val _targetResendDevice = MutableStateFlow<Device?>(null)
+    val targetResendDevice: StateFlow<Device?> = _targetResendDevice.asStateFlow()
+
+    fun clearTargetResendDevice() {
+        _targetResendDevice.value = null
+    }
+
     // 手动输入 IP 历史记录（最多保留最近 5 个不同 IP）
     private val _recentManualIps = MutableStateFlow<List<String>>(loadRecentManualIps())
     val recentManualIps: StateFlow<List<String>> = _recentManualIps.asStateFlow()
@@ -373,16 +381,21 @@ class LocalSendManager(private val context: Context) {
     }
 
     fun isFavorite(device: Device): Boolean {
-        return _favoriteDevices.value.any { fav ->
-            if (fav.fingerprint.isNotBlank() && device.fingerprint.isNotBlank()) {
-                fav.fingerprint.equals(device.fingerprint, ignoreCase = true)
-            } else {
-                fav.ip == device.ip && fav.port == device.port
-            }
-        }
+        return _favoriteDevices.value.any { it.matches(device) }
     }
 
-    fun resendHistoryItem(item: TransferHistoryItem): Int {
+    suspend fun resendHistoryItem(item: TransferHistoryItem): Int = withContext(Dispatchers.IO) {
+        val target = (_nearbyDevices.value + _favoriteDevices.value.map { it.toDevice() })
+            .firstOrNull { it.ip == item.deviceIp }
+            ?: Device(
+                alias = item.deviceAlias,
+                fingerprint = "",
+                port = org.localsend.miuix.core.NetworkConstants.DEFAULT_PORT,
+                protocol = "https",
+                ip = item.deviceIp
+            )
+        _targetResendDevice.value = target
+
         if (item.isTextMessage && !item.textContent.isNullOrEmpty()) {
             val textBytes = item.textContent.toByteArray(Charsets.UTF_8)
             val fileItem = FileItem(
@@ -393,7 +406,7 @@ class LocalSendManager(private val context: Context) {
             )
             addFiles(listOf(fileItem))
             requestNavigateToTab(1) // 切换到发送 Tab
-            return 1
+            return@withContext 1
         }
 
         val validItems = mutableListOf<FileItem>()
@@ -432,7 +445,7 @@ class LocalSendManager(private val context: Context) {
             addFiles(validItems)
             requestNavigateToTab(1) // 切换到发送 Tab
         }
-        return validItems.size
+        validItems.size
     }
 
     fun setAutoCategorizeMedia(enabled: Boolean) {

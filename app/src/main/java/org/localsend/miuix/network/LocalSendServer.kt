@@ -2,6 +2,7 @@ package org.localsend.miuix.network
 
 import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -148,7 +149,7 @@ class LocalSendServer(
                 Environment.DIRECTORY_DOWNLOADS + "/LocalSend" to MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
             }
             val relativePath = org.localsend.miuix.util.SavePathHelper.buildMediaStoreRelativePath(baseDir, pathInfo.subDirectory)
-            val displayName = uniqueMediaName(pathInfo.fileName, relativePath)
+            val displayName = uniqueMediaName(pathInfo.fileName, relativePath, collection)
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
                 put(MediaStore.MediaColumns.MIME_TYPE, fileItem.mimeType)
@@ -200,12 +201,15 @@ class LocalSendServer(
 
     private val allocatedMediaNames = ConcurrentHashMap.newKeySet<String>()
 
-    /** 基于 MediaStore 指定子目录列表生成不重复的文件名。 */
-    private fun uniqueMediaName(name: String, relativePath: String = Environment.DIRECTORY_DOWNLOADS + "/LocalSend/"): String {
+    /** 基于 MediaStore 指定目标集合与子目录列表生成不重复的文件名。 */
+    private fun uniqueMediaName(
+        name: String,
+        relativePath: String = Environment.DIRECTORY_DOWNLOADS + "/LocalSend/",
+        collection: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) else Uri.EMPTY
+    ): String {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return name
         val existing = HashSet<String>()
         try {
-            val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
             val projection = arrayOf(MediaStore.MediaColumns.DISPLAY_NAME)
             val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} = ?"
             val selectionArgs = arrayOf(relativePath)
@@ -241,15 +245,34 @@ class LocalSendServer(
         return "$base ($counter)$ext"
     }
 
-    /** 删除已写入的文件（用于 sha256 校验失败后的清理）。 */
+    /** 删除已写入的文件（用于传输取消或 sha256 校验失败后的临时文件清理）。 */
     private fun deleteSavedFile(fileItem: FileItem, target: SaveTarget) {
         try {
             val uri = fileItem.mediaStoreUri
             if (uri != null) {
-                context.contentResolver.delete(uri, null, null)
-            } else if (target is SaveTarget.UriTarget) {
-                val parent = DocumentFile.fromTreeUri(context, target.treeUri)
-                parent?.findFile(fileItem.name)?.delete()
+                if (target is SaveTarget.MediaStoreTarget) {
+                    context.contentResolver.delete(uri, null, null)
+                } else if (target is SaveTarget.UriTarget) {
+                    try {
+                        DocumentFile.fromSingleUri(context, uri)?.delete()
+                    } catch (_: Exception) {}
+                }
+            }
+            if (target is SaveTarget.UriTarget) {
+                val root = DocumentFile.fromTreeUri(context, target.treeUri)
+                if (root != null) {
+                    val pathInfo = org.localsend.miuix.util.SavePathHelper.resolve(fileItem.name)
+                    val segments = org.localsend.miuix.util.SavePathHelper.splitSegments(pathInfo.subDirectory)
+                    var currentDir: DocumentFile? = root
+                    for (segment in segments) {
+                        currentDir = currentDir?.findFile(segment)
+                        if (currentDir == null || !currentDir.isDirectory) {
+                            currentDir = null
+                            break
+                        }
+                    }
+                    currentDir?.findFile(pathInfo.fileName)?.delete()
+                }
             }
         } catch (ignored: Exception) {}
     }

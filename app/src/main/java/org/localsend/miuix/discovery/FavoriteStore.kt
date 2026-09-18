@@ -15,10 +15,17 @@ data class FavoriteDevice(
     val port: Int = 53317,
     val protocol: String = "http",
     val deviceModel: String? = null,
-    val deviceType: String = "mobile",
+    val deviceType: DeviceType = DeviceType.mobile,
     val download: Boolean = false,
     val customAlias: String? = null
 ) {
+    fun matches(device: Device): Boolean {
+        if (fingerprint.isNotBlank() && device.fingerprint.isNotBlank()) {
+            return fingerprint.equals(device.fingerprint, ignoreCase = true)
+        }
+        return ip == device.ip && port == device.port
+    }
+
     fun toDevice(): Device = Device(
         alias = customAlias?.takeIf { it.isNotBlank() } ?: alias,
         fingerprint = fingerprint,
@@ -26,7 +33,7 @@ data class FavoriteDevice(
         protocol = protocol,
         ip = ip,
         deviceModel = deviceModel,
-        deviceType = DeviceType.fromString(deviceType),
+        deviceType = deviceType,
         download = download
     )
 
@@ -38,7 +45,7 @@ data class FavoriteDevice(
             port = device.port,
             protocol = device.protocol,
             deviceModel = device.deviceModel,
-            deviceType = device.deviceType.value,
+            deviceType = device.deviceType,
             download = device.download
         )
     }
@@ -99,12 +106,7 @@ class FavoriteStore(
         return updated
     }
 
-    private fun matches(fav: FavoriteDevice, device: Device): Boolean {
-        if (fav.fingerprint.isNotBlank() && device.fingerprint.isNotBlank()) {
-            return fav.fingerprint.equals(device.fingerprint, ignoreCase = true)
-        }
-        return fav.ip == device.ip && fav.port == device.port
-    }
+    private fun matches(fav: FavoriteDevice, device: Device): Boolean = fav.matches(device)
 
     companion object {
         const val DEFAULT_MAX_ITEMS = 20

@@ -80,4 +80,23 @@ class FavoriteStoreTest {
         val loaded = store.load()
         assertEquals(3, loaded.size)
     }
+
+    @Test
+    fun testDeviceTypeEnumAndMatches() {
+        val dev = Device(
+            alias = "ServerNode",
+            fingerprint = "fp-server",
+            port = 53317,
+            protocol = "https",
+            ip = "192.168.1.100",
+            deviceType = DeviceType.server
+        )
+        val fav = FavoriteDevice.fromDevice(dev)
+        assertEquals(DeviceType.server, fav.deviceType)
+        assertTrue(fav.matches(dev))
+
+        val converted = fav.toDevice()
+        assertEquals(DeviceType.server, converted.deviceType)
+        assertEquals("ServerNode", converted.alias)
+    }
 }

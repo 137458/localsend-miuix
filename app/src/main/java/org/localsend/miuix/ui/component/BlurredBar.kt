@@ -1,17 +1,12 @@
 package org.localsend.miuix.ui.component
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurDefaults
@@ -97,71 +92,5 @@ fun BlurredBar(
             )
         }
         content()
-    }
-}
-
-/**
- * 带有 Xiaomi HyperOS / MIUIX 沉浸式毛玻璃模糊质感的大标题顶栏快捷组件。
- */
-@Composable
-fun FrostedTopAppBar(
-    title: String,
-    modifier: Modifier = Modifier,
-    scrollBehavior: ScrollBehavior? = null,
-    navigationIcon: @Composable () -> Unit = {},
-    actions: @Composable RowScope.() -> Unit = {},
-    backdrop: Backdrop? = null,
-) {
-    val colorScheme = MiuixTheme.colorScheme
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else colorScheme.surface
-
-    BlurredBar(
-        backdrop = backdrop,
-        modifier = modifier.fillMaxWidth(),
-        blurEnabled = blurActive,
-        scrollBehavior = scrollBehavior,
-    ) {
-        TopAppBar(
-            title = title,
-            scrollBehavior = scrollBehavior,
-            color = barColor,
-            navigationIcon = navigationIcon,
-            actions = actions,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-/**
- * 带有 Xiaomi HyperOS / MIUIX 沉浸式毛玻璃模糊质感的紧凑型小顶栏快捷组件。
- */
-@Composable
-fun FrostedSmallTopAppBar(
-    title: String,
-    modifier: Modifier = Modifier,
-    scrollBehavior: ScrollBehavior? = null,
-    navigationIcon: @Composable () -> Unit = {},
-    actions: @Composable RowScope.() -> Unit = {},
-    backdrop: Backdrop? = null,
-) {
-    val colorScheme = MiuixTheme.colorScheme
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else colorScheme.surface
-
-    BlurredBar(
-        backdrop = backdrop,
-        modifier = modifier.fillMaxWidth(),
-        blurEnabled = blurActive,
-        scrollBehavior = scrollBehavior,
-    ) {
-        SmallTopAppBar(
-            title = title,
-            scrollBehavior = scrollBehavior,
-            color = barColor,
-            navigationIcon = navigationIcon,
-            actions = actions,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }

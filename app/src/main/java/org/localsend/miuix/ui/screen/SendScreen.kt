@@ -68,6 +68,7 @@ import androidx.compose.ui.graphics.Color
 import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
+import androidx.compose.material.icons.filled.Close
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -76,7 +77,6 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
-import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -119,6 +119,7 @@ fun SendScreen(
         }
     }
     val isScanning by manager.isScanning.collectAsState()
+    val targetResendDevice by manager.targetResendDevice.collectAsState()
     val activeSessions by manager.activeSessions.collectAsState()
     val shares by manager.shares.collectAsState()
     val outgoingSessions = remember(activeSessions) { activeSessions.filter { !it.isIncoming } }
@@ -163,34 +164,33 @@ fun SendScreen(
     val backdrop = rememberBlurBackdrop()
     val colorScheme = MiuixTheme.colorScheme
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            BlurredBar(
-                backdrop = backdrop,
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        BlurredBar(
+            backdrop = backdrop,
+            scrollBehavior = scrollBehavior,
+        ) {
+            TopAppBar(
+                title = stringResource(R.string.send_title),
                 scrollBehavior = scrollBehavior,
-            ) {
-                TopAppBar(
-                    title = stringResource(R.string.send_title),
-                    scrollBehavior = scrollBehavior,
-                    color = if (backdrop != null) Color.Transparent else colorScheme.surface,
-                    actions = {
-                        IconButton(onClick = onManualIp) {
-                            Icon(imageVector = AppIcons.Send, contentDescription = stringResource(R.string.action_input_ip))
-                        }
-                        IconButton(
-                            onClick = {
-                                manager.refreshDevices()
-                                Toast.makeText(context, context.getString(R.string.toast_multicast_sent), Toast.LENGTH_SHORT).show()
-                            }
-                        ) {
-                            Icon(imageVector = AppIcons.Refresh, contentDescription = stringResource(R.string.action_refresh))
-                        }
+                color = if (backdrop != null) Color.Transparent else colorScheme.surface,
+                actions = {
+                    IconButton(onClick = onManualIp) {
+                        Icon(imageVector = AppIcons.Send, contentDescription = stringResource(R.string.action_input_ip))
                     }
-                )
-            }
+                    IconButton(
+                        onClick = {
+                            manager.refreshDevices()
+                            Toast.makeText(context, context.getString(R.string.toast_multicast_sent), Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Icon(imageVector = AppIcons.Refresh, contentDescription = stringResource(R.string.action_refresh))
+                    }
+                }
+            )
         }
-    ) { innerPadding ->
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -209,7 +209,6 @@ fun SendScreen(
                     }
                 },
                 pullToRefreshState = pullToRefreshState,
-                contentPadding = PaddingValues(top = innerPadding.calculateTopPadding()),
                 topAppBarScrollBehavior = scrollBehavior,
                 refreshTexts = listOf(refreshPull, refreshRelease, refreshRefreshing, refreshComplete),
                 modifier = Modifier
@@ -219,7 +218,7 @@ fun SendScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        top = innerPadding.calculateTopPadding() + 8.dp,
+                        top = 8.dp,
                         bottom = contentPadding.calculateBottomPadding() + 16.dp,
                         start = 12.dp,
                         end = 12.dp
@@ -420,6 +419,49 @@ fun SendScreen(
                     }
                 }
 
+                // Section 2.5: Resend Target Device
+                if (targetResendDevice != null) {
+                    val resendDev = targetResendDevice!!
+                    item {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        SmallTitle(text = stringResource(R.string.history_action_resend))
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                ArrowPreference(
+                                    title = resendDev.alias,
+                                    summary = "${resendDev.ip}:${resendDev.port} • " + (resendDev.deviceModel ?: resendDev.deviceType.value),
+                                    startAction = {
+                                        Icon(
+                                            imageVector = AppIcons.getDeviceIcon(resendDev.deviceType),
+                                            contentDescription = null,
+                                            tint = MiuixTheme.colorScheme.primary,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    },
+                                    endActions = {
+                                        IconButton(onClick = { manager.clearTargetResendDevice() }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = stringResource(R.string.btn_cancel),
+                                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        if (selectedFiles.isEmpty()) {
+                                            Toast.makeText(context, context.getString(R.string.toast_empty_selection_warn), Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            manager.sendFilesTo(resendDev)
+                                            Toast.makeText(context, context.getString(R.string.toast_initiating_transfer, resendDev.alias), Toast.LENGTH_SHORT).show()
+                                            manager.clearTargetResendDevice()
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Section 3: Favorite Devices
                 if (favoriteDeviceList.isNotEmpty()) {
                     item {
@@ -432,8 +474,7 @@ fun SendScreen(
                             isFavorite = true,
                             outgoingSessions = outgoingSessions,
                             selectedFiles = selectedFiles,
-                            manager = manager,
-                            context = context
+                            manager = manager
                         )
                     }
                 }
@@ -507,8 +548,7 @@ fun SendScreen(
                             isFavorite = false,
                             outgoingSessions = outgoingSessions,
                             selectedFiles = selectedFiles,
-                            manager = manager,
-                            context = context
+                            manager = manager
                         )
                     }
 
@@ -591,9 +631,9 @@ private fun DeviceItemCard(
     isFavorite: Boolean,
     outgoingSessions: List<TransferSession>,
     selectedFiles: List<FileItem>,
-    manager: LocalSendManager,
-    context: Context
+    manager: LocalSendManager
 ) {
+    val context = LocalContext.current
     val deviceSessions = remember(outgoingSessions, device) {
         outgoingSessions.filter {
             (it.device.fingerprint.isNotEmpty() && it.device.fingerprint == device.fingerprint) || it.device.ip == device.ip

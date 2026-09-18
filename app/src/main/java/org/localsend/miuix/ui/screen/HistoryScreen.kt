@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -167,17 +168,22 @@ fun HistoryScreen(
         }
     }
 
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+
     HistoryDetailDialog(
         item = selectedItem,
         show = selectedItem != null,
         onDismissRequest = { selectedItem = null },
         onDelete = { id -> manager.deleteHistoryItem(id) },
         onResend = { item ->
-            val count = manager.resendHistoryItem(item)
-            if (count > 0) {
-                selectedItem = null
-            } else {
-                Toast.makeText(context, context.getString(R.string.history_resend_empty_hint), Toast.LENGTH_SHORT).show()
+            coroutineScope.launch {
+                val count = manager.resendHistoryItem(item)
+                if (count > 0) {
+                    selectedItem = null
+                    onBack()
+                } else {
+                    Toast.makeText(context, context.getString(R.string.history_resend_empty_hint), Toast.LENGTH_SHORT).show()
+                }
             }
         }
     )

@@ -28,7 +28,6 @@ import org.localsend.miuix.ui.component.CertFingerprintDialog
 import org.localsend.miuix.ui.component.PinDialog
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -94,21 +93,20 @@ fun SettingsScreen(
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            BlurredBar(
-                backdrop = backdrop,
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        BlurredBar(
+            backdrop = backdrop,
+            scrollBehavior = scrollBehavior,
+        ) {
+            TopAppBar(
+                title = stringResource(R.string.settings_title),
                 scrollBehavior = scrollBehavior,
-            ) {
-                TopAppBar(
-                    title = stringResource(R.string.settings_title),
-                    scrollBehavior = scrollBehavior,
-                    color = if (backdrop != null) Color.Transparent else colorScheme.surface,
-                )
-            }
+                color = if (backdrop != null) Color.Transparent else colorScheme.surface,
+            )
         }
-    ) { innerPadding ->
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -120,7 +118,7 @@ fun SettingsScreen(
                     .fillMaxSize()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding = PaddingValues(
-                    top = innerPadding.calculateTopPadding() + 8.dp,
+                    top = 8.dp,
                     bottom = contentPadding.calculateBottomPadding() + 16.dp,
                     start = 12.dp,
                     end = 12.dp
@@ -305,7 +303,7 @@ fun SettingsScreen(
             }
         }
     }
-    }
+}
 
     PinDialog(
         show = showPinDialog,
