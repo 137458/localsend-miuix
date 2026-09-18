@@ -1,5 +1,6 @@
 package org.localsend.miuix.ui.screen
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
@@ -52,7 +53,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
+import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.util.ThumbnailHelper
 import org.localsend.miuix.ui.component.AppIcons
@@ -98,13 +101,31 @@ fun SendScreen(
     val context = LocalContext.current
     val selectedFiles by manager.selectedFiles.collectAsState()
     val nearbyDevices by manager.nearbyDevices.collectAsState()
+    val favoriteDevices by manager.favoriteDevices.collectAsState()
+    val favoriteDeviceList = remember(favoriteDevices, nearbyDevices) {
+        favoriteDevices.map { fav ->
+            nearbyDevices.firstOrNull { nearby ->
+                (fav.fingerprint.isNotBlank() && fav.fingerprint.equals(nearby.fingerprint, ignoreCase = true)) ||
+                (fav.ip == nearby.ip && fav.port == nearby.port)
+            } ?: fav.toDevice()
+        }
+    }
+    val nonFavoriteNearbyDevices = remember(favoriteDevices, nearbyDevices) {
+        nearbyDevices.filterNot { nearby ->
+            favoriteDevices.any { fav ->
+                (fav.fingerprint.isNotBlank() && fav.fingerprint.equals(nearby.fingerprint, ignoreCase = true)) ||
+                (fav.ip == nearby.ip && fav.port == nearby.port)
+            }
+        }
+    }
     val isScanning by manager.isScanning.collectAsState()
     val activeSessions by manager.activeSessions.collectAsState()
     val shares by manager.shares.collectAsState()
     val outgoingSessions = remember(activeSessions) { activeSessions.filter { !it.isIncoming } }
-    val nonNearbySessions = remember(outgoingSessions, nearbyDevices) {
+    val nonNearbySessions = remember(outgoingSessions, nearbyDevices, favoriteDeviceList) {
+        val allKnown = favoriteDeviceList + nearbyDevices
         outgoingSessions.filter { session ->
-            nearbyDevices.none {
+            allKnown.none {
                 (it.fingerprint.isNotEmpty() && it.fingerprint == session.device.fingerprint) || it.ip == session.device.ip
             }
         }
@@ -399,8 +420,26 @@ fun SendScreen(
                     }
                 }
 
-                // Section 3: Nearby Devices
-                val totalDeviceCount = nearbyDevices.size + nonNearbySessions.size
+                // Section 3: Favorite Devices
+                if (favoriteDeviceList.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        SmallTitle(text = stringResource(R.string.send_favorites_title))
+                    }
+                    items(favoriteDeviceList, key = { "fav_" + (if (it.fingerprint.isNotEmpty()) it.fingerprint else "${it.ip}:${it.port}") }) { device ->
+                        DeviceItemCard(
+                            device = device,
+                            isFavorite = true,
+                            outgoingSessions = outgoingSessions,
+                            selectedFiles = selectedFiles,
+                            manager = manager,
+                            context = context
+                        )
+                    }
+                }
+
+                // Section 4: Nearby Devices
+                val totalDeviceCount = nonFavoriteNearbyDevices.size + nonNearbySessions.size
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
                     SmallTitle(text = stringResource(R.string.send_section_nearby_devices, totalDeviceCount))
@@ -431,7 +470,7 @@ fun SendScreen(
                     }
                 }
 
-                if (nearbyDevices.isEmpty() && nonNearbySessions.isEmpty() && !isScanning) {
+                if (nonFavoriteNearbyDevices.isEmpty() && nonNearbySessions.isEmpty() && !isScanning) {
                     item {
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(
@@ -462,48 +501,15 @@ fun SendScreen(
                         }
                     }
                 } else {
-                    items(nearbyDevices, key = { if (it.fingerprint.isNotEmpty()) it.fingerprint else "${it.ip}:${it.port}" }) { device ->
-                        val deviceSessions = outgoingSessions.filter {
-                            (it.device.fingerprint.isNotEmpty() && it.device.fingerprint == device.fingerprint) || it.device.ip == device.ip
-                        }
-                        val networkLabel = if (device.alternateIps.isNotEmpty()) {
-                            stringResource(R.string.send_device_multi_subnet_tag, device.alternateIps.size)
-                        } else {
-                            ""
-                        }
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                ArrowPreference(
-                                    title = device.alias,
-                                    summary = "${device.ip}:${device.port}$networkLabel • ${device.deviceModel ?: device.deviceType.value}",
-                                    startAction = {
-                                        Icon(
-                                            imageVector = AppIcons.getDeviceIcon(device.deviceType),
-                                            contentDescription = null,
-                                            tint = MiuixTheme.colorScheme.primary,
-                                            modifier = Modifier.size(24.dp)
-                                        )
-                                    },
-                                    onClick = {
-                                        if (selectedFiles.isEmpty()) {
-                                            Toast.makeText(context, context.getString(R.string.toast_empty_selection_warn), Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            manager.sendFilesTo(device)
-                                            Toast.makeText(context, context.getString(R.string.toast_initiating_transfer, device.alias), Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                )
-                                if (deviceSessions.isNotEmpty()) {
-                                    deviceSessions.forEach { session ->
-                                        InlineTransferProgress(
-                                            session = session,
-                                            onCancel = { manager.cancelTransfer(session.sessionId) },
-                                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                    items(nonFavoriteNearbyDevices, key = { if (it.fingerprint.isNotEmpty()) it.fingerprint else "${it.ip}:${it.port}" }) { device ->
+                        DeviceItemCard(
+                            device = device,
+                            isFavorite = false,
+                            outgoingSessions = outgoingSessions,
+                            selectedFiles = selectedFiles,
+                            manager = manager,
+                            context = context
+                        )
                     }
 
                     // 针对手动输入 IP 发起、不在扫描列表中的目标设备，同样在同 Card 下内嵌进度
@@ -576,5 +582,70 @@ private fun QuickActionItem(
             style = MiuixTheme.textStyles.footnote1,
             color = MiuixTheme.colorScheme.onSurface
         )
+    }
+}
+
+@Composable
+private fun DeviceItemCard(
+    device: Device,
+    isFavorite: Boolean,
+    outgoingSessions: List<TransferSession>,
+    selectedFiles: List<FileItem>,
+    manager: LocalSendManager,
+    context: Context
+) {
+    val deviceSessions = remember(outgoingSessions, device) {
+        outgoingSessions.filter {
+            (it.device.fingerprint.isNotEmpty() && it.device.fingerprint == device.fingerprint) || it.device.ip == device.ip
+        }
+    }
+    val networkLabel = if (device.alternateIps.isNotEmpty()) {
+        stringResource(R.string.send_device_multi_subnet_tag, device.alternateIps.size)
+    } else {
+        ""
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            ArrowPreference(
+                title = device.alias,
+                summary = "${device.ip}:${device.port}$networkLabel • ${device.deviceModel ?: device.deviceType.value}",
+                startAction = {
+                    Icon(
+                        imageVector = AppIcons.getDeviceIcon(device.deviceType),
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                },
+                endActions = {
+                    IconButton(
+                        onClick = { manager.toggleFavorite(device) }
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) AppIcons.Star else AppIcons.StarBorder,
+                            contentDescription = if (isFavorite) stringResource(R.string.send_action_unfavorite) else stringResource(R.string.send_action_favorite),
+                            tint = if (isFavorite) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+                    }
+                },
+                onClick = {
+                    if (selectedFiles.isEmpty()) {
+                        Toast.makeText(context, context.getString(R.string.toast_empty_selection_warn), Toast.LENGTH_SHORT).show()
+                    } else {
+                        manager.sendFilesTo(device)
+                        Toast.makeText(context, context.getString(R.string.toast_initiating_transfer, device.alias), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+            if (deviceSessions.isNotEmpty()) {
+                for (session in deviceSessions) {
+                    InlineTransferProgress(
+                        session = session,
+                        onCancel = { manager.cancelTransfer(session.sessionId) },
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                    )
+                }
+            }
+        }
     }
 }

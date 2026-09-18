@@ -32,12 +32,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
 import org.localsend.miuix.model.TransferSession
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
@@ -547,11 +549,14 @@ fun CertFingerprintDialog(
 @Composable
 fun IncomingTransferDialog(
     session: TransferSession?,
-    onAccept: () -> Unit,
+    onAccept: (selectedFileIds: Set<String>?) -> Unit,
     onAcceptAndCopy: () -> Unit,
     onDecline: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    var selectedFileIds by remember(session?.sessionId) {
+        mutableStateOf(session?.files?.map { it.id }?.toSet() ?: emptySet())
+    }
 
     WindowDialog(
         show = session != null,
@@ -647,7 +652,7 @@ fun IncomingTransferDialog(
                                     } catch (e: Exception) {
                                         Toast.makeText(context, context.getString(R.string.toast_cannot_open_link), Toast.LENGTH_SHORT).show()
                                     }
-                                    onAccept()
+                                    onAccept(null)
                                 },
                                 colors = ButtonDefaults.buttonColorsPrimary(),
                                 modifier = Modifier.weight(1f)
@@ -657,13 +662,53 @@ fun IncomingTransferDialog(
                         }
                     }
                 } else {
-                    Text(
-                        text = stringResource(R.string.dialog_incoming_files_summary, session.files.size, session.formattedTotalSize),
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
+                    val totalFilesCount = session.files.size
+                    val isAllSelected = selectedFileIds.size == totalFilesCount && totalFilesCount > 0
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (totalFilesCount > 1) {
+                                stringResource(R.string.dialog_incoming_selective_count, selectedFileIds.size, totalFilesCount)
+                            } else {
+                                stringResource(R.string.dialog_incoming_files_summary, session.files.size, session.formattedTotalSize)
+                            },
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+
+                        if (totalFilesCount > 1) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        selectedFileIds = if (isAllSelected) emptySet() else session.files.map { it.id }.toSet()
+                                    }
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            ) {
+                                Checkbox(
+                                    state = androidx.compose.ui.state.ToggleableState(isAllSelected),
+                                    onClick = {
+                                        selectedFileIds = if (isAllSelected) emptySet() else session.files.map { it.id }.toSet()
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = stringResource(R.string.dialog_incoming_select_all),
+                                    style = MiuixTheme.textStyles.footnote1,
+                                    color = MiuixTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Card(modifier = Modifier.fillMaxWidth()) {
                         LazyColumn(
@@ -673,13 +718,35 @@ fun IncomingTransferDialog(
                                 .padding(8.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            items(session.files) { file ->
+                            items(session.files, key = { it.id }) { file ->
+                                val isChecked = selectedFileIds.contains(file.id)
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            selectedFileIds = if (isChecked) {
+                                                selectedFileIds - file.id
+                                            } else {
+                                                selectedFileIds + file.id
+                                            }
+                                        }
+                                        .padding(vertical = 4.dp, horizontal = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    if (totalFilesCount > 1) {
+                                        Checkbox(
+                                            state = androidx.compose.ui.state.ToggleableState(isChecked),
+                                            onClick = {
+                                                selectedFileIds = if (isChecked) {
+                                                    selectedFileIds - file.id
+                                                } else {
+                                                    selectedFileIds + file.id
+                                                }
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
                                     FileThumbnail(
                                         file = file,
                                         size = 28.dp
@@ -689,8 +756,10 @@ fun IncomingTransferDialog(
                                         text = file.name,
                                         style = MiuixTheme.textStyles.body1,
                                         modifier = Modifier.weight(1f),
-                                        maxLines = 1
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = file.formattedSize,
                                         style = MiuixTheme.textStyles.footnote1,
@@ -715,7 +784,8 @@ fun IncomingTransferDialog(
                             Text(stringResource(R.string.btn_decline))
                         }
                         Button(
-                            onClick = onAccept,
+                            onClick = { onAccept(selectedFileIds) },
+                            enabled = selectedFileIds.isNotEmpty(),
                             colors = ButtonDefaults.buttonColorsPrimary(),
                             modifier = Modifier.weight(1f)
                         ) {

@@ -28,7 +28,8 @@ data class AppSettings(
     val ignoredVersion: String? = null,
     val isOs3Effect: Boolean = true,
     val wideScreenNavigationRail: Boolean = false,
-    val saveTextAsFile: Boolean = false // 是否将纯文本消息另存为 .txt 文件，默认关闭仅复制并写入历史
+    val saveTextAsFile: Boolean = false, // 是否将纯文本消息另存为 .txt 文件，默认关闭仅复制并写入历史
+    val autoCategorizeMedia: Boolean = false // 是否按文件类型分类保存（图片进Pictures，视频进Movies等）
 ) {
     companion object {
         private val ADJECTIVES = listOf(

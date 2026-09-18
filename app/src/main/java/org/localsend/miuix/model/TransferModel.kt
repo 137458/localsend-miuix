@@ -142,12 +142,14 @@ data class TransferSession(
     val startTime: Long = System.currentTimeMillis(),
     var endTime: Long? = null,
     var errorMessage: String? = null,
-    val updateSeq: Long = 0L
+    val updateSeq: Long = 0L,
+    var lastActiveTime: Long = System.currentTimeMillis()
 ) {
     fun createSnapshot(seq: Long = System.nanoTime()): TransferSession {
         return copy(
             files = files.map { it.copy() },
-            updateSeq = seq
+            updateSeq = seq,
+            lastActiveTime = lastActiveTime
         )
     }
 

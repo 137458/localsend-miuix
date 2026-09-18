@@ -175,7 +175,7 @@ fun LiquidGlassBottomBar(
         ).also { holder.instance = it }
     }
 
-    LaunchedEffect(selectedIndex) {
+    LaunchedEffect(Unit) {
         snapshotFlow { selectedIndex() }.collectLatest { index ->
             dampedDragAnimation.animateToValue(index.toFloat())
         }

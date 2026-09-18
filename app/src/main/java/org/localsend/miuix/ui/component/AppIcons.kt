@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tablet
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -42,6 +44,8 @@ object AppIcons {
     val Link: ImageVector = Icons.Default.Link
     val Copy: ImageVector = Icons.Default.ContentCopy
     val History: ImageVector = Icons.Default.History
+    val Star: ImageVector = Icons.Default.Star
+    val StarBorder: ImageVector = Icons.Default.StarBorder
 
     fun getDeviceIcon(type: DeviceType): ImageVector {
         return when (type) {

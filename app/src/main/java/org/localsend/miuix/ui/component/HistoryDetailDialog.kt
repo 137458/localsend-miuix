@@ -67,7 +67,8 @@ fun HistoryDetailDialog(
     item: TransferHistoryItem?,
     show: Boolean,
     onDismissRequest: () -> Unit,
-    onDelete: (String) -> Unit
+    onDelete: (String) -> Unit,
+    onResend: ((TransferHistoryItem) -> Unit)? = null
 ) {
     if (item == null) return
     val context = LocalContext.current
@@ -320,8 +321,18 @@ fun HistoryDetailDialog(
             // Action Buttons (Delete / Close)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (onResend != null) {
+                    Button(
+                        onClick = { onResend(item) },
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.history_action_resend))
+                    }
+                }
+
                 Button(
                     onClick = {
                         onDelete(item.id)

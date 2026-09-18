@@ -25,6 +25,7 @@ object PreferenceKeys {
     const val KEY_IS_OS3_EFFECT = "is_os3_effect"
     const val KEY_WIDE_SCREEN_NAVIGATION_RAIL = "wide_screen_navigation_rail"
     const val KEY_SAVE_TEXT_AS_FILE = "save_text_as_file"
+    const val KEY_AUTO_CATEGORIZE_MEDIA = "auto_categorize_media"
 }
 
 object ExternalLinks {

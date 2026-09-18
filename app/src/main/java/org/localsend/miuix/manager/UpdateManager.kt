@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import org.localsend.miuix.R
 import androidx.core.content.FileProvider
@@ -70,6 +71,7 @@ sealed interface UpdateDownloadState {
 class UpdateManager(private val context: Context) {
 
     companion object {
+        private const val TAG = "UpdateManager"
         const val GITHUB_OWNER = "137458"
         const val GITHUB_REPO = "localsend-miuix"
         const val API_LATEST_RELEASE = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
@@ -222,7 +224,10 @@ class UpdateManager(private val context: Context) {
             }
             context.startActivity(intent)
         } catch (e: Exception) {
-            openInBrowser(context, "file://${apkFile.absolutePath}")
+            Log.e(TAG, "installApk: failed to launch package installer: ${e.message}", e)
+            try {
+                android.widget.Toast.makeText(context, context.getString(R.string.update_install_failed), android.widget.Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {}
         }
     }
 

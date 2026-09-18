@@ -136,9 +136,7 @@ object FingerprintTrust {
         override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
             if (chain.isNullOrEmpty()) throw CertificateException("Empty certificate chain")
             val certFp = normalize(sha256(chain[0]))
-            if (isAccepted(certFp)) {
-                trustedSet.add(certFp)
-            } else {
+            if (!isAccepted(certFp)) {
                 throw CertificateException("Untrusted server certificate fingerprint: $certFp")
             }
         }

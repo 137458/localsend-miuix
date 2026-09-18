@@ -63,6 +63,17 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
+data class IncomingDecision(
+    val accepted: Boolean,
+    val selectedFileIds: Set<String>? = null
+) {
+    companion object {
+        val Rejected = IncomingDecision(false)
+        val AcceptAll = IncomingDecision(true)
+        fun accept(selectedIds: Set<String>?) = IncomingDecision(true, selectedIds)
+    }
+}
+
 class LocalSendServer(
     private val context: Context,
     private val scope: CoroutineScope,
@@ -74,9 +85,10 @@ class LocalSendServer(
     private val getUseHttps: () -> Boolean,
     private val getShares: () -> List<ShareSession>,
     private val onDeviceDiscovered: (Device) -> Unit,
-    private val onIncomingRequest: suspend (session: TransferSession) -> Boolean,
+    private val onIncomingRequest: suspend (session: TransferSession) -> IncomingDecision,
     private val onSessionUpdated: (TransferSession) -> Unit,
-    private val getSaveTextAsFile: () -> Boolean = { false }
+    private val getSaveTextAsFile: () -> Boolean = { false },
+    private val getAutoCategorizeMedia: () -> Boolean = { false }
 ) {
     private var engine: ApplicationEngine? = null
     private val json = AppJson.default
@@ -94,7 +106,7 @@ class LocalSendServer(
             val isTerminal = session.status == TransferStatus.Completed ||
                 session.status == TransferStatus.Failed ||
                 session.status == TransferStatus.Canceled
-            val isStale = (now - session.startTime > 120_000L && session.transferredBytes == 0L) ||
+            val isStale = (now - session.lastActiveTime > 30_000L) ||
                 (session.endTime?.let { now - it > 5_000L } ?: false)
             val isSameSenderReconnecting = incomingIp != null && session.device.ip == incomingIp &&
                 (session.status == TransferStatus.WaitingApproval || session.status == TransferStatus.Failed || (session.status != TransferStatus.InProgress && now - session.startTime > 10_000L))
@@ -124,9 +136,18 @@ class LocalSendServer(
                 throw IllegalStateException(context.getString(R.string.msg_mediastore_requires_q))
             }
             val pathInfo = org.localsend.miuix.util.SavePathHelper.resolve(fileItem.name)
-            val baseDir = Environment.DIRECTORY_DOWNLOADS + "/LocalSend"
+            val isCategorized = getAutoCategorizeMedia()
+            val lowerMime = fileItem.mimeType.lowercase()
+            val (baseDir, collection) = if (isCategorized && lowerMime.startsWith("image/")) {
+                Environment.DIRECTORY_PICTURES + "/LocalSend" to MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else if (isCategorized && lowerMime.startsWith("video/")) {
+                Environment.DIRECTORY_MOVIES + "/LocalSend" to MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else if (isCategorized && lowerMime.startsWith("audio/")) {
+                Environment.DIRECTORY_MUSIC + "/LocalSend" to MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                Environment.DIRECTORY_DOWNLOADS + "/LocalSend" to MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            }
             val relativePath = org.localsend.miuix.util.SavePathHelper.buildMediaStoreRelativePath(baseDir, pathInfo.subDirectory)
-            val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
             val displayName = uniqueMediaName(pathInfo.fileName, relativePath)
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
@@ -1336,9 +1357,7 @@ class LocalSendServer(
 
                 val sessionId = UUID.randomUUID().toString()
                 val fileItems = request.files.values.map { dto ->
-                    val isTextMessage = !dto.preview.isNullOrEmpty() &&
-                        (dto.fileType == "text" || dto.fileType == "text/plain") &&
-                        dto.size <= org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE
+                    val isTextMessage = isInlineTextMessage(dto)
                     FileItem(
                         id = dto.id,
                         name = dto.fileName,
@@ -1365,14 +1384,18 @@ class LocalSendServer(
                 activeSessions[sessionId] = session
                 onSessionUpdated(session)
 
-                val accepted = if (isQuickSave()) {
-                    true
+                val approval = if (isQuickSave()) {
+                    IncomingDecision.AcceptAll
                 } else {
                     onIncomingRequest(session)
                 }
 
-                if (accepted) {
-                    val decision = resolvePrepareUploadDecision(fileItems, getSaveTextAsFile())
+                if (approval.accepted) {
+                    val decision = resolvePrepareUploadDecision(
+                        files = fileItems,
+                        saveTextAsFile = getSaveTextAsFile(),
+                        allowedFileIds = approval.selectedFileIds
+                    )
                     if (decision.shouldRespondNoContent) {
                         session.status = TransferStatus.Completed
                         session.transferredBytes = session.totalBytes
@@ -1470,6 +1493,10 @@ class LocalSendServer(
                                 bytesSinceLast += read
 
                                 val now = System.currentTimeMillis()
+                                session.lastActiveTime = now
+                                if (session.status == TransferStatus.Canceled) {
+                                    throw kotlinx.coroutines.CancellationException("Transfer session canceled by receiver")
+                                }
                                 val delta = now - lastTime
                                 if (delta >= 64) {
                                     val instantSpeed = (bytesSinceLast * 1000) / delta
@@ -1578,18 +1605,44 @@ class LocalSendServer(
         )
 
         /**
+         * 判定 FileDto 是否为完全内联于 preview 的纯文本消息。
+         * 只有当 preview 字节数完全等于文件 declared size，且符合文本类型与大小约束时才为 true。
+         */
+        fun isInlineTextMessage(dto: org.localsend.miuix.model.FileDto): Boolean {
+            val preview = dto.preview ?: return false
+            val isTextMime = dto.fileType.equals("text", ignoreCase = true) ||
+                dto.fileType.equals("text/plain", ignoreCase = true)
+            if (!isTextMime) return false
+            val previewBytes = preview.toByteArray(Charsets.UTF_8).size.toLong()
+            return previewBytes == dto.size && dto.size <= org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE
+        }
+
+        /**
          * 依据 LocalSend 协议 §4.1 与配置，决定 prepare-upload 响应及各文件项的 Upload Token 与生命周期。
          */
         fun resolvePrepareUploadDecision(
             files: List<FileItem>,
-            saveTextAsFile: Boolean
+            saveTextAsFile: Boolean,
+            allowedFileIds: Set<String>? = null
         ): PrepareUploadDecision {
-            val hasBinaryFiles = files.any { !it.isTextMessage }
+            val effectiveFiles = if (allowedFileIds != null) {
+                files.filter { allowedFileIds.contains(it.id) }
+            } else {
+                files
+            }
 
-            if (!saveTextAsFile && !hasBinaryFiles) {
+            if (allowedFileIds != null) {
+                files.filterNot { allowedFileIds.contains(it.id) }.forEach {
+                    it.status = TransferStatus.Canceled
+                }
+            }
+
+            val hasBinaryFiles = effectiveFiles.any { !it.isTextMessage }
+
+            if (!saveTextAsFile && !hasBinaryFiles && effectiveFiles.isNotEmpty()) {
                 // 场景 1：全为纯文本消息，且未开启保存为文件。
                 // 按照 LocalSend 协议规范 §4.1 直接响应 204 No Content，不分发 token，本地直接标记为已完成
-                files.forEach { item ->
+                effectiveFiles.forEach { item ->
                     item.status = TransferStatus.Completed
                     item.bytesTransferred = item.size
                     item.progress = 1f
@@ -1603,7 +1656,7 @@ class LocalSendServer(
 
             // 场景 2：混合传输或开启了 saveTextAsFile
             val tokenMap = mutableMapOf<String, String>()
-            files.forEach { item ->
+            effectiveFiles.forEach { item ->
                 if (item.isTextMessage && !saveTextAsFile) {
                     // 混合传输中未开启保存的纯文本项：直接标记完成，不分配 token
                     item.status = TransferStatus.Completed

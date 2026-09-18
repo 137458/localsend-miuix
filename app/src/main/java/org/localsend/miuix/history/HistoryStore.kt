@@ -26,15 +26,19 @@ class HistoryStore(
         }
     }
 
+    private val writeLock = Any()
+
     fun persist(items: List<TransferHistoryItem>) {
-        val capped = items.take(maxItems)
-        val parent = file.parentFile ?: return
-        if (!parent.exists() && !parent.mkdirs()) return
-        val tempFile = File(parent, "${file.name}.tmp")
-        tempFile.writeText(json.encodeToString(capped))
-        if (!tempFile.renameTo(file)) {
-            tempFile.copyTo(file, overwrite = true)
-            tempFile.delete()
+        synchronized(writeLock) {
+            val capped = items.take(maxItems)
+            val parent = file.parentFile ?: return@synchronized
+            if (!parent.exists() && !parent.mkdirs()) return@synchronized
+            val tempFile = File(parent, "${file.name}.tmp")
+            tempFile.writeText(json.encodeToString(capped))
+            if (!tempFile.renameTo(file)) {
+                tempFile.copyTo(file, overwrite = true)
+                tempFile.delete()
+            }
         }
     }
 

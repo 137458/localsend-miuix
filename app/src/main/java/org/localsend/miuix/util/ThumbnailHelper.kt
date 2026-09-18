@@ -202,25 +202,33 @@ object ThumbnailHelper {
                     return context.contentResolver.loadThumbnail(uri, Size(targetSize, targetSize), null)
                 } catch (t: Throwable) {}
             }
+            val retriever = MediaMetadataRetriever()
             try {
-                val retriever = MediaMetadataRetriever()
                 retriever.setDataSource(context, uri)
-                val frame = retriever.frameAtTime
-                retriever.release()
-                if (frame != null) {
-                    return Bitmap.createScaledBitmap(frame, targetSize, targetSize, true)
+                val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    retriever.getScaledFrameAtTime(-1, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetSize, targetSize)
+                } else {
+                    retriever.frameAtTime?.let { Bitmap.createScaledBitmap(it, targetSize, targetSize, true) }
                 }
-            } catch (t: Throwable) {}
+                if (frame != null) return frame
+            } catch (t: Throwable) {
+            } finally {
+                try { retriever.release() } catch (_: Throwable) {}
+            }
         } else if (!path.isNullOrEmpty()) {
+            val retriever = MediaMetadataRetriever()
             try {
-                val retriever = MediaMetadataRetriever()
                 retriever.setDataSource(path)
-                val frame = retriever.frameAtTime
-                retriever.release()
-                if (frame != null) {
-                    return Bitmap.createScaledBitmap(frame, targetSize, targetSize, true)
+                val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    retriever.getScaledFrameAtTime(-1, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetSize, targetSize)
+                } else {
+                    retriever.frameAtTime?.let { Bitmap.createScaledBitmap(it, targetSize, targetSize, true) }
                 }
-            } catch (t: Throwable) {}
+                if (frame != null) return frame
+            } catch (t: Throwable) {
+            } finally {
+                try { retriever.release() } catch (_: Throwable) {}
+            }
         }
         return null
     }

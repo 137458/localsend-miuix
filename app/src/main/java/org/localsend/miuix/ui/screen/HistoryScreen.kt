@@ -71,6 +71,7 @@ fun HistoryScreen(
     manager: LocalSendManager,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val history by manager.transferHistory.collectAsState()
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberBlurBackdrop()
@@ -170,7 +171,15 @@ fun HistoryScreen(
         item = selectedItem,
         show = selectedItem != null,
         onDismissRequest = { selectedItem = null },
-        onDelete = { id -> manager.deleteHistoryItem(id) }
+        onDelete = { id -> manager.deleteHistoryItem(id) },
+        onResend = { item ->
+            val count = manager.resendHistoryItem(item)
+            if (count > 0) {
+                selectedItem = null
+            } else {
+                Toast.makeText(context, context.getString(R.string.history_resend_empty_hint), Toast.LENGTH_SHORT).show()
+            }
+        }
     )
 
     if (showClearConfirmDialog) {

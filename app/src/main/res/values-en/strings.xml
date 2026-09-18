@@ -126,6 +126,15 @@
     <string name="settings_pref_auto_copy_desc">Automatically copy received text messages to clipboard</string>
     <string name="settings_pref_save_text_as_file_title">Save Text as File</string>
     <string name="settings_pref_save_text_as_file_desc">Save received text messages as .txt files in the download folder; default is off</string>
+    <string name="settings_pref_auto_categorize_title">Smart Media Categorization</string>
+    <string name="settings_pref_auto_categorize_desc">Save photos to Pictures, videos to Movies, and others to Downloads</string>
+    <string name="send_favorites_title">Favorite Devices</string>
+    <string name="send_action_favorite">Add to Favorites</string>
+    <string name="send_action_unfavorite">Remove from Favorites</string>
+    <string name="history_action_resend">Resend</string>
+    <string name="history_resend_empty_hint">No valid or accessible files found to resend</string>
+    <string name="dialog_incoming_selective_count">Selected %1$d of %2$d items</string>
+    <string name="dialog_incoming_select_all">Select All</string>
     <string name="settings_pref_save_history_title">Save Transfer History</string>
     <string name="settings_pref_save_history_desc">Keep logs of completed and cancelled transfers</string>
     <string name="settings_pref_download_path_title">Download Directory</string>
@@ -335,6 +344,7 @@
     <string name="update_dialog_btn_browser">Browser Download</string>
     <string name="update_dialog_btn_update_now">Update Now</string>
     <string name="update_dialog_github_release_note">View release notes on GitHub ↗</string>
+    <string name="update_install_failed">Failed to launch package installer, please check permissions</string>
 
     <!-- Notification & Live Updates -->
     <string name="notif_channel_live_name">Live Transfer Updates</string>

@@ -457,8 +457,8 @@ fun App(manager: LocalSendManager) {
         // Global Overlay Dialogs & BottomSheets
         IncomingTransferDialog(
             session = pendingIncomingSession,
-            onAccept = {
-                pendingIncomingSession?.let { manager.acceptIncomingTransfer(it.sessionId) }
+            onAccept = { selectedIds ->
+                pendingIncomingSession?.let { manager.acceptIncomingTransfer(it.sessionId, selectedIds) }
             },
             onAcceptAndCopy = {
                 pendingIncomingSession?.let { session ->

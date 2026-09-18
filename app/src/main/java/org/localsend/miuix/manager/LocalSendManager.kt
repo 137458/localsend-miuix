@@ -30,12 +30,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.decodeFromString
 import org.localsend.miuix.R
 import org.localsend.miuix.core.AppJson
 import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.discovery.DeviceDirectory
+import org.localsend.miuix.discovery.FavoriteDevice
+import org.localsend.miuix.discovery.FavoriteStore
 import org.localsend.miuix.history.HistoryStore
+import org.localsend.miuix.network.IncomingDecision
 import org.localsend.miuix.model.AppSettings
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
@@ -130,10 +134,15 @@ class LocalSendManager(private val context: Context) {
             ignoredVersion = prefs.getString(KEY_IGNORED_VERSION, null),
             isOs3Effect = prefs.getBoolean(KEY_IS_OS3_EFFECT, true),
             wideScreenNavigationRail = prefs.getBoolean(KEY_WIDE_SCREEN_NAVIGATION_RAIL, false),
-            saveTextAsFile = prefs.getBoolean(KEY_SAVE_TEXT_AS_FILE, false)
+            saveTextAsFile = prefs.getBoolean(KEY_SAVE_TEXT_AS_FILE, false),
+            autoCategorizeMedia = prefs.getBoolean(KEY_AUTO_CATEGORIZE_MEDIA, false)
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    private val favoriteStore = FavoriteStore(File(context.filesDir, FavoriteStore.FILENAME))
+    private val _favoriteDevices = MutableStateFlow<List<FavoriteDevice>>(favoriteStore.load())
+    val favoriteDevices: StateFlow<List<FavoriteDevice>> = _favoriteDevices.asStateFlow()
 
     private val _nearbyDevices = MutableStateFlow<List<Device>>(emptyList())
     val nearbyDevices: StateFlow<List<Device>> = _nearbyDevices.asStateFlow()
@@ -203,7 +212,7 @@ class LocalSendManager(private val context: Context) {
         _requestedTabIndex.value = null
     }
 
-    private val incomingApprovalDeferreds = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
+    private val incomingApprovalDeferreds = ConcurrentHashMap<String, CompletableDeferred<IncomingDecision>>()
     private val notifiedIncoming = ConcurrentHashMap.newKeySet<String>()
 
     private val discoveryService = DiscoveryService(
@@ -239,18 +248,21 @@ class LocalSendManager(private val context: Context) {
             upsertDevice(device)
         },
         onIncomingRequest = { session ->
-            val deferred = CompletableDeferred<Boolean>()
+            val deferred = CompletableDeferred<IncomingDecision>()
             incomingApprovalDeferreds[session.sessionId] = deferred
             _pendingIncomingSession.value = session
-            val result = deferred.await()
-            _pendingIncomingSession.value = null
-            incomingApprovalDeferreds.remove(session.sessionId)
-            result
+            try {
+                withTimeoutOrNull(60_000L) { deferred.await() } ?: IncomingDecision.Rejected
+            } finally {
+                _pendingIncomingSession.value = null
+                incomingApprovalDeferreds.remove(session.sessionId)
+            }
         },
         onSessionUpdated = { session ->
             handleSessionUpdate(session)
         },
-        getSaveTextAsFile = { _settings.value.saveTextAsFile }
+        getSaveTextAsFile = { _settings.value.saveTextAsFile },
+        getAutoCategorizeMedia = { _settings.value.autoCategorizeMedia }
     )
 
     fun start() {
@@ -275,14 +287,19 @@ class LocalSendManager(private val context: Context) {
         }
     }
 
+    private var lastForegroundActiveCount = 0
+
     fun stop() {
         if (!started.compareAndSet(true, false)) return
         discoveryService.stop()
         server.stop()
+        lastForegroundActiveCount = 0
         org.localsend.miuix.service.TransferService.stop(context)
     }
 
     private fun syncForegroundServiceState(activeCount: Int) {
+        if (activeCount == lastForegroundActiveCount) return
+        lastForegroundActiveCount = activeCount
         if (activeCount > 0) {
             org.localsend.miuix.service.TransferService.start(context, activeCount)
         } else {
@@ -340,12 +357,87 @@ class LocalSendManager(private val context: Context) {
         }
     }
 
-    fun acceptIncomingTransfer(sessionId: String) {
-        incomingApprovalDeferreds[sessionId]?.complete(true)
+    fun acceptIncomingTransfer(sessionId: String, selectedFileIds: Set<String>? = null) {
+        incomingApprovalDeferreds[sessionId]?.complete(IncomingDecision.accept(selectedFileIds))
     }
 
     fun declineIncomingTransfer(sessionId: String) {
-        incomingApprovalDeferreds[sessionId]?.complete(false)
+        incomingApprovalDeferreds[sessionId]?.complete(IncomingDecision.Rejected)
+    }
+
+    fun toggleFavorite(device: Device) {
+        scope.launch(Dispatchers.IO) {
+            val updated = favoriteStore.toggle(device)
+            _favoriteDevices.value = updated
+        }
+    }
+
+    fun isFavorite(device: Device): Boolean {
+        return _favoriteDevices.value.any { fav ->
+            if (fav.fingerprint.isNotBlank() && device.fingerprint.isNotBlank()) {
+                fav.fingerprint.equals(device.fingerprint, ignoreCase = true)
+            } else {
+                fav.ip == device.ip && fav.port == device.port
+            }
+        }
+    }
+
+    fun resendHistoryItem(item: TransferHistoryItem): Int {
+        if (item.isTextMessage && !item.textContent.isNullOrEmpty()) {
+            val textBytes = item.textContent.toByteArray(Charsets.UTF_8)
+            val fileItem = FileItem(
+                name = context.getString(R.string.notif_plain_text_message),
+                size = textBytes.size.toLong(),
+                mimeType = "text/plain",
+                textContent = item.textContent
+            )
+            addFiles(listOf(fileItem))
+            requestNavigateToTab(1) // 切换到发送 Tab
+            return 1
+        }
+
+        val validItems = mutableListOf<FileItem>()
+        item.fileEntries.forEach { entry ->
+            val uri = entry.uri
+            val path = entry.path
+            if (uri != null) {
+                try {
+                    context.contentResolver.openInputStream(uri)?.use {
+                        validItems.add(
+                            FileItem(
+                                name = entry.name,
+                                size = entry.size,
+                                uri = uri,
+                                mimeType = entry.mimeType
+                            )
+                        )
+                    }
+                } catch (_: Exception) {}
+            } else if (!path.isNullOrEmpty()) {
+                val file = File(path)
+                if (file.exists() && file.canRead()) {
+                    validItems.add(
+                        FileItem(
+                            name = entry.name,
+                            size = file.length(),
+                            path = path,
+                            mimeType = entry.mimeType
+                        )
+                    )
+                }
+            }
+        }
+
+        if (validItems.isNotEmpty()) {
+            addFiles(validItems)
+            requestNavigateToTab(1) // 切换到发送 Tab
+        }
+        return validItems.size
+    }
+
+    fun setAutoCategorizeMedia(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_CATEGORIZE_MEDIA, enabled).apply()
+        _settings.update { it.copy(autoCategorizeMedia = enabled) }
     }
 
     fun sendFilesTo(targetDevice: Device, filesToSend: List<FileItem> = _selectedFiles.value) {
@@ -991,6 +1083,7 @@ class LocalSendManager(private val context: Context) {
             .putBoolean(KEY_IS_OS3_EFFECT, s.isOs3Effect)
             .putBoolean(KEY_WIDE_SCREEN_NAVIGATION_RAIL, s.wideScreenNavigationRail)
             .putBoolean(KEY_SAVE_TEXT_AS_FILE, s.saveTextAsFile)
+            .putBoolean(KEY_AUTO_CATEGORIZE_MEDIA, s.autoCategorizeMedia)
             .apply()
     }
 
@@ -1029,5 +1122,6 @@ class LocalSendManager(private val context: Context) {
         private const val KEY_IS_OS3_EFFECT = org.localsend.miuix.core.PreferenceKeys.KEY_IS_OS3_EFFECT
         private const val KEY_WIDE_SCREEN_NAVIGATION_RAIL = org.localsend.miuix.core.PreferenceKeys.KEY_WIDE_SCREEN_NAVIGATION_RAIL
         private const val KEY_SAVE_TEXT_AS_FILE = org.localsend.miuix.core.PreferenceKeys.KEY_SAVE_TEXT_AS_FILE
+        private const val KEY_AUTO_CATEGORIZE_MEDIA = org.localsend.miuix.core.PreferenceKeys.KEY_AUTO_CATEGORIZE_MEDIA
     }
 }

@@ -118,6 +118,7 @@ class LocalSendClient(
                                     completedImmediately = true
                                 )
                             )
+                        } else {
                             val errorBody = try {
                                 connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
                             } catch (ignored: Exception) { null }
@@ -147,10 +148,10 @@ class LocalSendClient(
     }
 
     private fun prepareErrorText(code: Int, body: String): String = when (code) {
-        HttpURLConnection.HTTP_UNAUTHORIZED -> context.getString(R.string.msg_pin_required)
-        HttpURLConnection.HTTP_CONFLICT -> context.getString(R.string.msg_peer_busy)
-        429 -> context.getString(R.string.msg_too_many_requests)
-        else -> context.getString(R.string.msg_peer_rejected_http, code, body).trim()
+        HttpURLConnection.HTTP_UNAUTHORIZED -> try { context.getString(R.string.msg_pin_required) } catch (_: Throwable) { "PIN required" }
+        HttpURLConnection.HTTP_CONFLICT -> try { context.getString(R.string.msg_peer_busy) } catch (_: Throwable) { "Peer is busy" }
+        429 -> try { context.getString(R.string.msg_too_many_requests) } catch (_: Throwable) { "Too many requests" }
+        else -> try { context.getString(R.string.msg_peer_rejected_http, code, body).trim() } catch (_: Throwable) { "HTTP $code: $body".trim() }
     }
 
     suspend fun uploadFile(
