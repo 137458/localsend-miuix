@@ -55,6 +55,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -85,25 +86,27 @@ fun ReceiveScreen(
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberBlurBackdrop()
     val colorScheme = MiuixTheme.colorScheme
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        BlurredBar(
-            backdrop = backdrop,
-            scrollBehavior = scrollBehavior,
-        ) {
-            TopAppBar(
-                title = stringResource(R.string.receive_title),
-                scrollBehavior = scrollBehavior,
-                color = if (backdrop != null) Color.Transparent else colorScheme.surface,
-                actions = {
-                    IconButton(onClick = onOpenHistory) {
-                        Icon(imageVector = AppIcons.History, contentDescription = stringResource(R.string.action_history))
-                    }
-                }
-            )
-        }
 
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            BlurredBar(
+                backdrop = backdrop,
+                scrollBehavior = scrollBehavior,
+            ) {
+                TopAppBar(
+                    title = stringResource(R.string.receive_title),
+                    scrollBehavior = scrollBehavior,
+                    color = if (backdrop != null) Color.Transparent else colorScheme.surface,
+                    actions = {
+                        IconButton(onClick = onOpenHistory) {
+                            Icon(imageVector = AppIcons.History, contentDescription = stringResource(R.string.action_history))
+                        }
+                    }
+                )
+            }
+        }
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -115,7 +118,7 @@ fun ReceiveScreen(
                     .fillMaxSize()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding = PaddingValues(
-                    top = 8.dp,
+                    top = innerPadding.calculateTopPadding() + 8.dp,
                     bottom = contentPadding.calculateBottomPadding() + 16.dp,
                     start = 12.dp,
                     end = 12.dp

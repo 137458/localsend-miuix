@@ -77,6 +77,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -164,33 +165,34 @@ fun SendScreen(
     val backdrop = rememberBlurBackdrop()
     val colorScheme = MiuixTheme.colorScheme
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        BlurredBar(
-            backdrop = backdrop,
-            scrollBehavior = scrollBehavior,
-        ) {
-            TopAppBar(
-                title = stringResource(R.string.send_title),
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            BlurredBar(
+                backdrop = backdrop,
                 scrollBehavior = scrollBehavior,
-                color = if (backdrop != null) Color.Transparent else colorScheme.surface,
-                actions = {
-                    IconButton(onClick = onManualIp) {
-                        Icon(imageVector = AppIcons.Send, contentDescription = stringResource(R.string.action_input_ip))
-                    }
-                    IconButton(
-                        onClick = {
-                            manager.refreshDevices()
-                            Toast.makeText(context, context.getString(R.string.toast_multicast_sent), Toast.LENGTH_SHORT).show()
+            ) {
+                TopAppBar(
+                    title = stringResource(R.string.send_title),
+                    scrollBehavior = scrollBehavior,
+                    color = if (backdrop != null) Color.Transparent else colorScheme.surface,
+                    actions = {
+                        IconButton(onClick = onManualIp) {
+                            Icon(imageVector = AppIcons.Send, contentDescription = stringResource(R.string.action_input_ip))
                         }
-                    ) {
-                        Icon(imageVector = AppIcons.Refresh, contentDescription = stringResource(R.string.action_refresh))
+                        IconButton(
+                            onClick = {
+                                manager.refreshDevices()
+                                Toast.makeText(context, context.getString(R.string.toast_multicast_sent), Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Icon(imageVector = AppIcons.Refresh, contentDescription = stringResource(R.string.action_refresh))
+                        }
                     }
-                }
-            )
+                )
+            }
         }
-
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -218,7 +220,7 @@ fun SendScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        top = 8.dp,
+                        top = innerPadding.calculateTopPadding() + 8.dp,
                         bottom = contentPadding.calculateBottomPadding() + 16.dp,
                         start = 12.dp,
                         end = 12.dp
