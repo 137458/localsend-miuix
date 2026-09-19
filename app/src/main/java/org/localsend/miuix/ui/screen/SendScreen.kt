@@ -211,11 +211,10 @@ fun SendScreen(
                     }
                 },
                 pullToRefreshState = pullToRefreshState,
+                contentPadding = PaddingValues(top = innerPadding.calculateTopPadding()),
                 topAppBarScrollBehavior = scrollBehavior,
                 refreshTexts = listOf(refreshPull, refreshRelease, refreshRefreshing, refreshComplete),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .nestedScroll(scrollBehavior.nestedScrollConnection)
+                modifier = Modifier.fillMaxSize()
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
