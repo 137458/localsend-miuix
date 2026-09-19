@@ -78,20 +78,22 @@ fun SettingsScreen(
         stringResource(R.string.theme_monet_dark)
     )
 
+    val supportedDeviceTypes = remember {
+        listOf(
+            DeviceType.mobile,
+            DeviceType.tablet,
+            DeviceType.desktop,
+            DeviceType.server
+        )
+    }
     val deviceTypeOptions = listOf(
         stringResource(R.string.device_type_mobile),
         stringResource(R.string.device_type_tablet),
         stringResource(R.string.device_type_desktop),
         stringResource(R.string.device_type_server)
     )
-    val currentDeviceTypeIndex = remember(settings.deviceType) {
-        when (settings.deviceType) {
-            DeviceType.mobile -> 0
-            DeviceType.tablet -> 1
-            DeviceType.desktop -> 2
-            DeviceType.server -> 3
-            else -> 0
-        }
+    val currentDeviceTypeIndex = remember(settings.deviceType, supportedDeviceTypes) {
+        supportedDeviceTypes.indexOf(settings.deviceType).coerceAtLeast(0)
     }
 
     Scaffold(
@@ -141,13 +143,7 @@ fun SettingsScreen(
                         items = deviceTypeOptions,
                         selectedIndex = currentDeviceTypeIndex,
                         onSelectedIndexChange = { index ->
-                            val newType = when (index) {
-                                0 -> DeviceType.mobile
-                                1 -> DeviceType.tablet
-                                2 -> DeviceType.desktop
-                                3 -> DeviceType.server
-                                else -> DeviceType.mobile
-                            }
+                            val newType = supportedDeviceTypes.getOrElse(index) { DeviceType.mobile }
                             manager.updateSettings { it.copy(deviceType = newType) }
                         }
                     )
@@ -226,7 +222,7 @@ fun SettingsScreen(
                         summary = stringResource(R.string.settings_pref_auto_categorize_desc),
                         checked = settings.autoCategorizeMedia,
                         onCheckedChange = { checked ->
-                            manager.setAutoCategorizeMedia(checked)
+                            manager.updateSettings { it.copy(autoCategorizeMedia = checked) }
                         }
                     )
                     SwitchPreference(

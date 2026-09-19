@@ -449,8 +449,7 @@ class LocalSendManager(private val context: Context) {
     }
 
     fun setAutoCategorizeMedia(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_AUTO_CATEGORIZE_MEDIA, enabled).apply()
-        _settings.update { it.copy(autoCategorizeMedia = enabled) }
+        updateSettings { it.copy(autoCategorizeMedia = enabled) }
     }
 
     fun sendFilesTo(targetDevice: Device, filesToSend: List<FileItem> = _selectedFiles.value) {
@@ -736,17 +735,24 @@ class LocalSendManager(private val context: Context) {
                 }
 
                 if (_settings.value.saveToHistory) {
+                    val recordedFiles = if (session.isIncoming) {
+                        val completedFiles = session.files.filter { it.status == TransferStatus.Completed }
+                        if (completedFiles.isNotEmpty()) completedFiles else session.files.filter { it.status != TransferStatus.Canceled }
+                    } else {
+                        session.files
+                    }
+                    val effectiveFiles = if (recordedFiles.isNotEmpty()) recordedFiles else session.files
                     val historyItem = TransferHistoryItem(
                         deviceAlias = session.device.alias,
                         deviceIp = session.device.ip,
                         isIncoming = session.isIncoming,
-                        fileCount = session.files.size,
-                        totalSize = session.totalBytes,
+                        fileCount = effectiveFiles.size,
+                        totalSize = effectiveFiles.sumOf { it.size },
                         status = session.status,
-                        fileNames = session.files.map { it.name },
+                        fileNames = effectiveFiles.map { it.name },
                         textContent = if (session.isTextMessage) session.singleTextMessageContent else null,
                         isTextMessage = session.isTextMessage,
-                        fileEntries = session.files.map {
+                        fileEntries = effectiveFiles.map {
                             HistoryFileEntry(
                                 name = it.name,
                                 size = it.size,

@@ -103,33 +103,29 @@ fun SendScreen(
     val selectedFiles by manager.selectedFiles.collectAsState()
     val nearbyDevices by manager.nearbyDevices.collectAsState()
     val favoriteDevices by manager.favoriteDevices.collectAsState()
-    val favoriteDeviceList = remember(favoriteDevices, nearbyDevices) {
-        favoriteDevices.map { fav ->
-            nearbyDevices.firstOrNull { nearby ->
-                (fav.fingerprint.isNotBlank() && fav.fingerprint.equals(nearby.fingerprint, ignoreCase = true)) ||
-                (fav.ip == nearby.ip && fav.port == nearby.port)
-            } ?: fav.toDevice()
+    val targetResendDevice by manager.targetResendDevice.collectAsState()
+    val favoriteDeviceList = remember(favoriteDevices, nearbyDevices, targetResendDevice) {
+        val list = favoriteDevices.map { fav ->
+            nearbyDevices.firstOrNull { nearby -> fav.matches(nearby) } ?: fav.toDevice()
         }
+        val resend = targetResendDevice
+        if (resend != null) list.filterNot { it.matches(resend) } else list
     }
-    val nonFavoriteNearbyDevices = remember(favoriteDevices, nearbyDevices) {
-        nearbyDevices.filterNot { nearby ->
-            favoriteDevices.any { fav ->
-                (fav.fingerprint.isNotBlank() && fav.fingerprint.equals(nearby.fingerprint, ignoreCase = true)) ||
-                (fav.ip == nearby.ip && fav.port == nearby.port)
-            }
+    val nonFavoriteNearbyDevices = remember(favoriteDevices, nearbyDevices, targetResendDevice) {
+        val list = nearbyDevices.filterNot { nearby ->
+            favoriteDevices.any { fav -> fav.matches(nearby) }
         }
+        val resend = targetResendDevice
+        if (resend != null) list.filterNot { it.matches(resend) } else list
     }
     val isScanning by manager.isScanning.collectAsState()
-    val targetResendDevice by manager.targetResendDevice.collectAsState()
     val activeSessions by manager.activeSessions.collectAsState()
     val shares by manager.shares.collectAsState()
     val outgoingSessions = remember(activeSessions) { activeSessions.filter { !it.isIncoming } }
     val nonNearbySessions = remember(outgoingSessions, nearbyDevices, favoriteDeviceList) {
         val allKnown = favoriteDeviceList + nearbyDevices
         outgoingSessions.filter { session ->
-            allKnown.none {
-                (it.fingerprint.isNotEmpty() && it.fingerprint == session.device.fingerprint) || it.ip == session.device.ip
-            }
+            allKnown.none { it.matches(session.device) }
         }
     }
     val totalSelectedSize = remember(selectedFiles) { selectedFiles.sumOf { it.size } }
@@ -474,8 +470,16 @@ fun SendScreen(
                             device = device,
                             isFavorite = true,
                             outgoingSessions = outgoingSessions,
-                            selectedFiles = selectedFiles,
-                            manager = manager
+                            onToggleFavorite = { manager.toggleFavorite(device) },
+                            onSend = {
+                                if (selectedFiles.isEmpty()) {
+                                    Toast.makeText(context, context.getString(R.string.toast_empty_selection_warn), Toast.LENGTH_SHORT).show()
+                                } else {
+                                    manager.sendFilesTo(device)
+                                    Toast.makeText(context, context.getString(R.string.toast_initiating_transfer, device.alias), Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onCancelTransfer = { sessionId -> manager.cancelTransfer(sessionId) }
                         )
                     }
                 }
@@ -548,8 +552,16 @@ fun SendScreen(
                             device = device,
                             isFavorite = false,
                             outgoingSessions = outgoingSessions,
-                            selectedFiles = selectedFiles,
-                            manager = manager
+                            onToggleFavorite = { manager.toggleFavorite(device) },
+                            onSend = {
+                                if (selectedFiles.isEmpty()) {
+                                    Toast.makeText(context, context.getString(R.string.toast_empty_selection_warn), Toast.LENGTH_SHORT).show()
+                                } else {
+                                    manager.sendFilesTo(device)
+                                    Toast.makeText(context, context.getString(R.string.toast_initiating_transfer, device.alias), Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onCancelTransfer = { sessionId -> manager.cancelTransfer(sessionId) }
                         )
                     }
 
@@ -631,14 +643,12 @@ private fun DeviceItemCard(
     device: Device,
     isFavorite: Boolean,
     outgoingSessions: List<TransferSession>,
-    selectedFiles: List<FileItem>,
-    manager: LocalSendManager
+    onToggleFavorite: () -> Unit,
+    onSend: () -> Unit,
+    onCancelTransfer: (String) -> Unit
 ) {
-    val context = LocalContext.current
     val deviceSessions = remember(outgoingSessions, device) {
-        outgoingSessions.filter {
-            (it.device.fingerprint.isNotEmpty() && it.device.fingerprint == device.fingerprint) || it.device.ip == device.ip
-        }
+        outgoingSessions.filter { it.device.matches(device) }
     }
     val networkLabel = if (device.alternateIps.isNotEmpty()) {
         stringResource(R.string.send_device_multi_subnet_tag, device.alternateIps.size)
@@ -659,9 +669,7 @@ private fun DeviceItemCard(
                     )
                 },
                 endActions = {
-                    IconButton(
-                        onClick = { manager.toggleFavorite(device) }
-                    ) {
+                    IconButton(onClick = onToggleFavorite) {
                         Icon(
                             imageVector = if (isFavorite) AppIcons.Star else AppIcons.StarBorder,
                             contentDescription = if (isFavorite) stringResource(R.string.send_action_unfavorite) else stringResource(R.string.send_action_favorite),
@@ -669,20 +677,13 @@ private fun DeviceItemCard(
                         )
                     }
                 },
-                onClick = {
-                    if (selectedFiles.isEmpty()) {
-                        Toast.makeText(context, context.getString(R.string.toast_empty_selection_warn), Toast.LENGTH_SHORT).show()
-                    } else {
-                        manager.sendFilesTo(device)
-                        Toast.makeText(context, context.getString(R.string.toast_initiating_transfer, device.alias), Toast.LENGTH_SHORT).show()
-                    }
-                }
+                onClick = onSend
             )
             if (deviceSessions.isNotEmpty()) {
                 for (session in deviceSessions) {
                     InlineTransferProgress(
                         session = session,
-                        onCancel = { manager.cancelTransfer(session.sessionId) },
+                        onCancel = { onCancelTransfer(session.sessionId) },
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
                     )
                 }

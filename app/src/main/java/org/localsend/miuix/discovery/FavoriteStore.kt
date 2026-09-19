@@ -84,14 +84,14 @@ class FavoriteStore(
 
     fun isFavorite(device: Device): Boolean {
         val current = load()
-        return current.any { matches(it, device) }
+        return current.any { it.matches(device) }
     }
 
     fun toggle(device: Device): List<FavoriteDevice> {
         val current = load()
-        val index = current.indexOfFirst { matches(it, device) }
+        val index = current.indexOfFirst { it.matches(device) }
         val updated = if (index >= 0) {
-            current.filterNot { matches(it, device) }
+            current.filterNot { it.matches(device) }
         } else {
             (listOf(FavoriteDevice.fromDevice(device)) + current).take(maxItems)
         }
@@ -101,12 +101,10 @@ class FavoriteStore(
 
     fun remove(device: Device): List<FavoriteDevice> {
         val current = load()
-        val updated = current.filterNot { matches(it, device) }
+        val updated = current.filterNot { it.matches(device) }
         persist(updated)
         return updated
     }
-
-    private fun matches(fav: FavoriteDevice, device: Device): Boolean = fav.matches(device)
 
     companion object {
         const val DEFAULT_MAX_ITEMS = 20

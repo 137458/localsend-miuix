@@ -50,11 +50,6 @@ class DeviceDirectory(
     companion object {
         const val DEFAULT_TTL_MS = 90_000L
 
-        fun isSameDevice(a: Device, b: Device): Boolean {
-            if (a.fingerprint.isNotBlank() && b.fingerprint.isNotBlank()) {
-                return a.fingerprint == b.fingerprint
-            }
-            return a.ip == b.ip && a.port == b.port
-        }
+        fun isSameDevice(a: Device, b: Device): Boolean = a.matches(b)
     }
 }

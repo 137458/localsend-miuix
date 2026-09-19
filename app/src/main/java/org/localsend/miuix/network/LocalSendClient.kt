@@ -147,11 +147,17 @@ class LocalSendClient(
         }
     }
 
+    private fun safeGetString(resId: Int, fallback: String, vararg formatArgs: Any): String = try {
+        if (formatArgs.isEmpty()) context.getString(resId) else context.getString(resId, *formatArgs)
+    } catch (_: Throwable) {
+        fallback
+    }
+
     private fun prepareErrorText(code: Int, body: String): String = when (code) {
-        HttpURLConnection.HTTP_UNAUTHORIZED -> try { context.getString(R.string.msg_pin_required) } catch (_: Throwable) { "PIN required" }
-        HttpURLConnection.HTTP_CONFLICT -> try { context.getString(R.string.msg_peer_busy) } catch (_: Throwable) { "Peer is busy" }
-        429 -> try { context.getString(R.string.msg_too_many_requests) } catch (_: Throwable) { "Too many requests" }
-        else -> try { context.getString(R.string.msg_peer_rejected_http, code, body).trim() } catch (_: Throwable) { "HTTP $code: $body".trim() }
+        HttpURLConnection.HTTP_UNAUTHORIZED -> safeGetString(R.string.msg_pin_required, "PIN required")
+        HttpURLConnection.HTTP_CONFLICT -> safeGetString(R.string.msg_peer_busy, "Peer is busy")
+        429 -> safeGetString(R.string.msg_too_many_requests, "Too many requests")
+        else -> safeGetString(R.string.msg_peer_rejected_http, "HTTP $code: $body", code, body).trim()
     }
 
     suspend fun uploadFile(

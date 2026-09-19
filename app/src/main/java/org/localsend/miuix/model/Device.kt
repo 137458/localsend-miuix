@@ -61,6 +61,13 @@ data class Device(
         )
     }
 
+    fun matches(other: Device): Boolean {
+        if (fingerprint.isNotBlank() && other.fingerprint.isNotBlank()) {
+            return fingerprint.equals(other.fingerprint, ignoreCase = true)
+        }
+        return ip == other.ip && port == other.port
+    }
+
     val url: String
         get() = "$protocol://$ip:$port"
 

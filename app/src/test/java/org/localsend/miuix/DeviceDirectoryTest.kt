@@ -86,6 +86,22 @@ class DeviceDirectoryTest {
     }
 
     @Test
+    fun deviceMatchesMethod() {
+        val d1 = device("A", "fp-1", "10.0.0.2", 53317)
+        val d2 = device("A2", "FP-1", "10.0.0.3", 53318)
+        val d3 = device("B", "", "10.0.0.2", 53317)
+        val d4 = device("B2", "", "10.0.0.2", 53317)
+        val d5 = device("B3", "", "10.0.0.2", 53318)
+        val d6 = device("C", "fp-2", "10.0.0.2", 53317)
+
+        assertTrue(d1.matches(d2)) // case-insensitive fingerprint match
+        assertTrue(d3.matches(d4)) // blank fingerprint matches same ip:port
+        assertTrue(d1.matches(d3)) // blank fingerprint fallback to same ip:port
+        assertFalse(d3.matches(d5)) // different port
+        assertFalse(d1.matches(d6)) // different fingerprints
+    }
+
+    @Test
     fun expiredDevicesAreDroppedOnUpsert() {
         var now = 0L
         val directory = DeviceDirectory(

@@ -1419,6 +1419,7 @@ class LocalSendServer(
                         saveTextAsFile = getSaveTextAsFile(),
                         allowedFileIds = approval.selectedFileIds
                     )
+                    session.totalBytes = calculateEffectiveTotalBytes(fileItems, approval.selectedFileIds)
                     if (decision.shouldRespondNoContent) {
                         session.status = TransferStatus.Completed
                         session.transferredBytes = session.totalBytes
@@ -1638,6 +1639,17 @@ class LocalSendServer(
             if (!isTextMime) return false
             val previewBytes = preview.toByteArray(Charsets.UTF_8).size.toLong()
             return previewBytes == dto.size && dto.size <= org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE
+        }
+
+        fun calculateEffectiveTotalBytes(
+            files: List<FileItem>,
+            allowedFileIds: Set<String>? = null
+        ): Long {
+            return if (allowedFileIds != null) {
+                files.filter { allowedFileIds.contains(it.id) }.sumOf { it.size }
+            } else {
+                files.sumOf { it.size }
+            }
         }
 
         /**

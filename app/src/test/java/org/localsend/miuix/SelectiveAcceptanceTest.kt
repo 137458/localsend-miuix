@@ -47,4 +47,18 @@ class SelectiveAcceptanceTest {
         assertTrue(decision.tokenMap.containsKey("f1"))
         assertTrue(decision.tokenMap.containsKey("f2"))
     }
+
+    @Test
+    fun testSelectiveAcceptanceTotalBytesMatchesSelectedOnly() {
+        val files = listOf(
+            FileItem(id = "f1", name = "1.txt", size = 100, mimeType = "text/plain"),
+            FileItem(id = "f2", name = "2.png", size = 200, mimeType = "image/png"),
+            FileItem(id = "f3", name = "3.pdf", size = 300, mimeType = "application/pdf")
+        )
+        val selectedIds = setOf("f1", "f3")
+        val total = LocalSendServer.calculateEffectiveTotalBytes(files, selectedIds)
+        assertEquals(400L, total)
+        val allTotal = LocalSendServer.calculateEffectiveTotalBytes(files, null)
+        assertEquals(600L, allTotal)
+    }
 }

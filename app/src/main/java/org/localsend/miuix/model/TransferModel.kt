@@ -135,7 +135,7 @@ data class TransferSession(
     val device: Device,
     val isIncoming: Boolean,
     val files: List<FileItem>,
-    val totalBytes: Long,
+    var totalBytes: Long,
     var transferredBytes: Long = 0L,
     var speed: Long = 0L,
     var status: TransferStatus = TransferStatus.WaitingApproval,
