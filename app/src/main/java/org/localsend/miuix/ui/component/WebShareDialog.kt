@@ -43,7 +43,7 @@ import top.yukonga.miuix.kmp.window.WindowBottomSheet
 fun WebShareDialog(
     show: Boolean,
     onDismissRequest: () -> Unit,
-    manager: LocalSendManager
+    manager: LocalSendManager,
 ) {
     val shares by manager.shares.collectAsState()
     val settings by manager.settings.collectAsState()
@@ -62,36 +62,38 @@ fun WebShareDialog(
     WindowBottomSheet(
         show = show,
         onDismissRequest = onDismissRequest,
-        title = stringResource(R.string.webshare_dialog_title)
+        title = stringResource(R.string.webshare_dialog_title),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 text = stringResource(R.string.webshare_dialog_hint),
                 style = MiuixTheme.textStyles.body2,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 16.dp),
             )
 
             // QR Code Container with clean white background for scanning
             Box(
-                modifier = Modifier
-                    .size(220.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White)
-                    .padding(12.dp),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(220.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
+                        .padding(12.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 QrCodeImage(
                     content = shareUrl,
                     size = 196.dp,
                     darkColor = Color.Black,
-                    lightColor = Color.White
+                    lightColor = Color.White,
                 )
             }
 
@@ -103,27 +105,29 @@ fun WebShareDialog(
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.error,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
                 )
             }
 
             Card(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.webshare_url_label),
                             style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
@@ -131,7 +135,7 @@ fun WebShareDialog(
                             style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.SemiBold),
                             color = MiuixTheme.colorScheme.primary,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
 
@@ -140,7 +144,7 @@ fun WebShareDialog(
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Web URL", shareUrl))
                         },
-                        colors = ButtonDefaults.buttonColorsPrimary()
+                        colors = ButtonDefaults.buttonColorsPrimary(),
                     ) {
                         Text(stringResource(R.string.btn_copy))
                     }
@@ -152,30 +156,32 @@ fun WebShareDialog(
             if (isSharing) {
                 val currentShare = shares.first()
                 Card(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                     ) {
                         Text(
                             text = stringResource(R.string.webshare_current_shared_count, currentShare.files.size),
-                            style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold)
+                            style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold),
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         currentShare.files.take(5).forEach { file ->
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
                                     imageVector = if (file.isTextMessage) AppIcons.Text else AppIcons.getFileIcon(file.mimeType, file.name),
                                     contentDescription = null,
                                     tint = MiuixTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(16.dp),
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
@@ -184,7 +190,7 @@ fun WebShareDialog(
                                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
                                 )
                             }
                         }
@@ -193,33 +199,35 @@ fun WebShareDialog(
                                 text = stringResource(R.string.webshare_more_items, currentShare.files.size),
                                 style = MiuixTheme.textStyles.footnote1,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                modifier = Modifier.padding(top = 4.dp, start = 24.dp)
+                                modifier = Modifier.padding(top = 4.dp, start = 24.dp),
                             )
                         }
                     }
                 }
             } else {
                 Card(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                     ) {
                         Text(
                             text = stringResource(R.string.webshare_ready_title),
-                            style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold)
+                            style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold),
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (selectedFiles.isNotEmpty()) {
-                                stringResource(R.string.webshare_ready_desc_with_files, selectedFiles.size)
-                            } else {
-                                stringResource(R.string.webshare_ready_desc_empty)
-                            },
+                            text =
+                                if (selectedFiles.isNotEmpty()) {
+                                    stringResource(R.string.webshare_ready_desc_with_files, selectedFiles.size)
+                                } else {
+                                    stringResource(R.string.webshare_ready_desc_empty)
+                                },
                             style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                     }
                 }
@@ -229,12 +237,12 @@ fun WebShareDialog(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Button(
                     onClick = onDismissRequest,
                     colors = ButtonDefaults.buttonColors(),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.btn_close))
                 }
@@ -244,11 +252,12 @@ fun WebShareDialog(
                         onClick = {
                             manager.stopShare()
                         },
-                        colors = ButtonDefaults.buttonColors(
-                            color = MiuixTheme.colorScheme.error,
-                            contentColor = Color.White
-                        ),
-                        modifier = Modifier.weight(1f)
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                color = MiuixTheme.colorScheme.error,
+                                contentColor = Color.White,
+                            ),
+                        modifier = Modifier.weight(1f),
                     ) {
                         Text(stringResource(R.string.webshare_btn_stop_share))
                     }
@@ -258,7 +267,7 @@ fun WebShareDialog(
                             manager.startShare(selectedFiles)
                         },
                         colors = ButtonDefaults.buttonColorsPrimary(),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     ) {
                         Text(stringResource(R.string.webshare_btn_share_selected, selectedFiles.size))
                     }
@@ -267,4 +276,3 @@ fun WebShareDialog(
         }
     }
 }
-

@@ -24,9 +24,8 @@ import org.intellij.lang.annotations.Language
 @SuppressLint("NewApi")
 class InteractiveHighlight(
     val animationScope: CoroutineScope,
-    val position: (size: Size, offset: Offset) -> Offset = { _, offset -> offset }
+    val position: (size: Size, offset: Offset) -> Offset = { _, offset -> offset },
 ) {
-
     private val pressProgressAnimationSpec =
         spring(0.5f, 300f, 0.001f)
     private val positionAnimationSpec =
@@ -41,9 +40,10 @@ class InteractiveHighlight(
     val offset: Offset get() = positionAnimation.value - startPosition
 
     @Language("AGSL")
-    private val shader = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        RuntimeShader(
-            """
+    private val shader =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            RuntimeShader(
+                """
     uniform float2 size;
     layout(color) uniform half4 color;
     uniform float radius;
@@ -53,9 +53,11 @@ class InteractiveHighlight(
         float dist = distance(coord, position);
         float intensity = smoothstep(radius, radius * 0.5, dist);
         return color * intensity;
-    }"""
-        )
-    } else null
+    }""",
+            )
+        } else {
+            null
+        }
 
     val modifier: Modifier =
         Modifier.drawWithContent {
@@ -63,7 +65,7 @@ class InteractiveHighlight(
             if (progress > 0f && size.width > 0f && size.height > 0f) {
                 drawRect(
                     Color.White.copy(0.06f * progress),
-                    blendMode = BlendMode.Plus
+                    blendMode = BlendMode.Plus,
                 )
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && shader != null) {
                     shader.apply {
@@ -74,12 +76,12 @@ class InteractiveHighlight(
                         setFloatUniform(
                             "position",
                             pos.x.fastCoerceIn(0f, size.width.coerceAtLeast(1f)),
-                            pos.y.fastCoerceIn(0f, size.height.coerceAtLeast(1f))
+                            pos.y.fastCoerceIn(0f, size.height.coerceAtLeast(1f)),
                         )
                     }
                     drawRect(
                         ShaderBrush(shader),
-                        blendMode = BlendMode.Plus
+                        blendMode = BlendMode.Plus,
                     )
                 }
             }
@@ -108,7 +110,7 @@ class InteractiveHighlight(
                         launch { pressProgressAnimation.animateTo(0f, pressProgressAnimationSpec) }
                         launch { positionAnimation.animateTo(startPosition, positionAnimationSpec) }
                     }
-                }
+                },
             ) { change, _ ->
                 animationScope.launch { positionAnimation.snapTo(change.position) }
             }

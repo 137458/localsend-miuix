@@ -27,7 +27,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun TransferSessionCard(
     session: TransferSession,
     onCancel: () -> Unit,
-    onAccept: (() -> Unit)? = null
+    onAccept: (() -> Unit)? = null,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
@@ -41,7 +41,7 @@ fun TransferSessionCard(
                     isExpanded = isExpanded,
                     onToggleExpanded = { isExpanded = !isExpanded },
                     onCancel = onCancel,
-                    onAccept = onAccept
+                    onAccept = onAccept,
                 )
             }
         }
@@ -56,21 +56,23 @@ fun InlineTransferProgress(
     session: TransferSession,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
-    onAccept: (() -> Unit)? = null
+    onAccept: (() -> Unit)? = null,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp, bottom = 2.dp)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp, bottom = 2.dp),
     ) {
         // 分割线
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f)),
         )
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -82,7 +84,7 @@ fun InlineTransferProgress(
                 isExpanded = isExpanded,
                 onToggleExpanded = { isExpanded = !isExpanded },
                 onCancel = onCancel,
-                onAccept = onAccept
+                onAccept = onAccept,
             )
         }
     }

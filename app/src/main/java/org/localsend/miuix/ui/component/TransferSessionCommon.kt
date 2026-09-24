@@ -46,14 +46,14 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal fun AcceptIconButton(
     onAccept: () -> Unit,
     modifier: Modifier = Modifier,
-    iconModifier: Modifier = Modifier
+    iconModifier: Modifier = Modifier,
 ) {
     IconButton(onClick = onAccept, modifier = modifier) {
         Icon(
             imageVector = AppIcons.Check,
             contentDescription = stringResource(R.string.btn_accept),
             tint = MiuixTheme.colorScheme.primary,
-            modifier = iconModifier
+            modifier = iconModifier,
         )
     }
 }
@@ -66,14 +66,15 @@ internal fun AcceptIconButton(
 internal fun fileStatusText(
     session: TransferSession,
     inProgressText: String,
-    completedText: String
-): String = when (session.status) {
-    TransferStatus.WaitingApproval -> stringResource(R.string.session_waiting_peer)
-    TransferStatus.InProgress -> inProgressText
-    TransferStatus.Completed -> completedText
-    TransferStatus.Failed -> stringResource(R.string.session_transfer_failed, session.errorMessage ?: stringResource(R.string.session_unknown_error))
-    TransferStatus.Canceled -> stringResource(R.string.session_canceled)
-}
+    completedText: String,
+): String =
+    when (session.status) {
+        TransferStatus.WaitingApproval -> stringResource(R.string.session_waiting_peer)
+        TransferStatus.InProgress -> inProgressText
+        TransferStatus.Completed -> completedText
+        TransferStatus.Failed -> stringResource(R.string.session_transfer_failed, session.errorMessage ?: stringResource(R.string.session_unknown_error))
+        TransferStatus.Canceled -> stringResource(R.string.session_canceled)
+    }
 
 /**
  * 文件传输状态文案颜色：失败与部分失败统一用错误色、等待确认用主色；
@@ -83,18 +84,19 @@ internal fun fileStatusText(
 internal fun fileStatusColor(
     session: TransferSession,
     defaultColor: Color,
-    completedColor: Color = defaultColor
-): Color = when {
-    session.status == TransferStatus.Failed -> MiuixTheme.colorScheme.error
-    session.isPartialFailure -> MiuixTheme.colorScheme.error
-    session.status == TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
-    session.status == TransferStatus.Completed -> completedColor
-    else -> defaultColor
-}
+    completedColor: Color = defaultColor,
+): Color =
+    when {
+        session.status == TransferStatus.Failed -> MiuixTheme.colorScheme.error
+        session.isPartialFailure -> MiuixTheme.colorScheme.error
+        session.status == TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
+        session.status == TransferStatus.Completed -> completedColor
+        else -> defaultColor
+    }
 
 @Composable
-internal fun remainingTimeLabel(session: TransferSession): String {
-    return when (val remaining = session.remainingTime) {
+internal fun remainingTimeLabel(session: TransferSession): String =
+    when (val remaining = session.remainingTime) {
         RemainingTime.Hidden -> ""
         RemainingTime.Calculating -> stringResource(R.string.eta_calculating)
         RemainingTime.AlmostDone -> stringResource(R.string.live_almost_done)
@@ -102,25 +104,25 @@ internal fun remainingTimeLabel(session: TransferSession): String {
         is RemainingTime.Minutes -> stringResource(R.string.eta_minutes, remaining.minutes, remaining.seconds)
         is RemainingTime.Hours -> stringResource(R.string.eta_hours, remaining.hours, remaining.minutes)
     }
-}
 
 @Composable
 internal fun FileDetailItem(
     file: FileItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.35f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.35f))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         FileThumbnail(
             file = file,
-            size = 32.dp
+            size = 32.dp,
         )
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -128,22 +130,22 @@ internal fun FileDetailItem(
                 text = if (file.isTextMessage) stringResource(R.string.send_type_text_message) else file.name,
                 style = MiuixTheme.textStyles.body2,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     text = "${FileItem.formatFileSize(file.bytesTransferred)} / ${file.formattedSize}",
                     style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 if (file.status == TransferStatus.InProgress && file.speed > 0) {
                     Text(
                         text = FileItem.formatSpeed(file.speed),
                         style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.primary
+                        color = MiuixTheme.colorScheme.primary,
                     )
                 }
             }
@@ -152,42 +154,47 @@ internal fun FileDetailItem(
                 val animatedFileProgress by animateFloatAsState(
                     targetValue = file.progress,
                     animationSpec = tween(durationMillis = 80, easing = LinearEasing),
-                    label = "FileProgress"
+                    label = "FileProgress",
                 )
                 LinearProgressIndicator(
                     progress = animatedFileProgress,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
                 )
             }
         }
         Spacer(modifier = Modifier.width(8.dp))
         when (file.status) {
-            TransferStatus.Completed -> Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = stringResource(R.string.status_completed),
-                tint = MiuixTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
-            TransferStatus.InProgress -> Text(
-                text = "${(file.progress * 100).toInt()}%",
-                style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.primary
-            )
-            TransferStatus.Failed -> Icon(
-                imageVector = Icons.Default.Error,
-                contentDescription = stringResource(R.string.status_failed),
-                tint = MiuixTheme.colorScheme.error,
-                modifier = Modifier.size(18.dp)
-            )
-            TransferStatus.WaitingApproval, TransferStatus.Canceled -> Icon(
-                imageVector = Icons.Default.HourglassEmpty,
-                contentDescription = stringResource(R.string.status_waiting),
-                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.size(16.dp)
-            )
+            TransferStatus.Completed ->
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = stringResource(R.string.status_completed),
+                    tint = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+            TransferStatus.InProgress ->
+                Text(
+                    text = "${(file.progress * 100).toInt()}%",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.primary,
+                )
+            TransferStatus.Failed ->
+                Icon(
+                    imageVector = Icons.Default.Error,
+                    contentDescription = stringResource(R.string.status_failed),
+                    tint = MiuixTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp),
+                )
+            TransferStatus.WaitingApproval, TransferStatus.Canceled ->
+                Icon(
+                    imageVector = Icons.Default.HourglassEmpty,
+                    contentDescription = stringResource(R.string.status_waiting),
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.size(16.dp),
+                )
         }
     }
 }

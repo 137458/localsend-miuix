@@ -7,7 +7,6 @@ import org.junit.Test
 import org.localsend.miuix.util.ShareIntentHelper
 
 class ShareIntentHelperTest {
-
     @Test
     fun testIsShareIntent_null() {
         assertFalse(ShareIntentHelper.isShareIntent(null))

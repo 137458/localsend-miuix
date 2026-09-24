@@ -49,7 +49,6 @@ private class InnerShadowElement(
     val shape: Shape,
     val shadow: () -> InnerShadow?,
 ) : ModifierNodeElement<InnerShadowNode>() {
-
     override fun create(): InnerShadowNode = InnerShadowNode(shape, shadow)
 
     override fun update(node: InnerShadowNode) {
@@ -84,7 +83,6 @@ private class InnerShadowNode(
     var shadow: () -> InnerShadow?,
 ) : Modifier.Node(),
     DrawModifierNode {
-
     override val shouldAutoInvalidate: Boolean = false
 
     private var shadowLayer: GraphicsLayer? = null
@@ -140,9 +138,10 @@ private class InnerShadowNode(
     }
 
     override fun onAttach() {
-        shadowLayer = requireGraphicsContext().createGraphicsLayer().apply {
-            compositingStrategy = CompositingStrategy.Offscreen
-        }
+        shadowLayer =
+            requireGraphicsContext().createGraphicsLayer().apply {
+                compositingStrategy = CompositingStrategy.Offscreen
+            }
     }
 
     override fun onDetach() {
@@ -153,6 +152,7 @@ private class InnerShadowNode(
     }
 }
 
-private val ShadowMaskPaint: Paint = Paint().apply {
-    blendMode = BlendMode.Clear
-}
+private val ShadowMaskPaint: Paint =
+    Paint().apply {
+        blendMode = BlendMode.Clear
+    }

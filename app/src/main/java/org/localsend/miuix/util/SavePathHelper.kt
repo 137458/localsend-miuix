@@ -3,7 +3,7 @@ package org.localsend.miuix.util
 object SavePathHelper {
     data class PathComponents(
         val subDirectory: String,
-        val fileName: String
+        val fileName: String,
     )
 
     /**
@@ -25,7 +25,10 @@ object SavePathHelper {
     /**
      * Formats MediaStore RELATIVE_PATH. MediaStore expects a trailing slash (e.g. "Download/LocalSend/sub/").
      */
-    fun buildMediaStoreRelativePath(baseDir: String, subDirectory: String): String {
+    fun buildMediaStoreRelativePath(
+        baseDir: String,
+        subDirectory: String,
+    ): String {
         val cleanBase = baseDir.trim().trimEnd('/')
         return if (subDirectory.isBlank()) {
             "$cleanBase/"
@@ -38,7 +41,5 @@ object SavePathHelper {
     /**
      * Splits subDirectory path into individual directory names for recursive SAF creation.
      */
-    fun splitSegments(subDirectory: String): List<String> {
-        return subDirectory.split('/').filter { it.isNotEmpty() && it != "." && it != ".." }
-    }
+    fun splitSegments(subDirectory: String): List<String> = subDirectory.split('/').filter { it.isNotEmpty() && it != "." && it != ".." }
 }

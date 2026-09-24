@@ -9,16 +9,19 @@ import org.localsend.miuix.webshare.WebShareCopy
  * 纯字符串逻辑，所需数据一律通过函数参数显式传入，不依赖 LocalSendServer 的实例状态。
  */
 internal object WebShareHtmlRenderer {
-
     /** 简单的 HTML 转义，用于根页展示文件名，避免注入。 */
-    private fun escapeHtml(str: String): String = str
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
-        .replace("'", "&#39;")
+    private fun escapeHtml(str: String): String =
+        str
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
 
-    private fun getWebFileSvgIcon(mimeType: String, fileName: String): String {
+    private fun getWebFileSvgIcon(
+        mimeType: String,
+        fileName: String,
+    ): String {
         val lowerName = fileName.lowercase()
         val lowerMime = mimeType.lowercase()
         return when {
@@ -45,7 +48,10 @@ internal object WebShareHtmlRenderer {
         }
     }
 
-    internal fun isSameIp(ip1: String, ip2: String): Boolean {
+    internal fun isSameIp(
+        ip1: String,
+        ip2: String,
+    ): Boolean {
         if (ip1 == ip2) return true
         val clean1 = ip1.removePrefix("::ffff:").removePrefix("/").trim()
         val clean2 = ip2.removePrefix("::ffff:").removePrefix("/").trim()
@@ -55,84 +61,99 @@ internal object WebShareHtmlRenderer {
         return false
     }
 
-    internal fun buildWebShareHtml(alias: String, session: ShareSession?, copy: WebShareCopy): String {
+    internal fun buildWebShareHtml(
+        alias: String,
+        session: ShareSession?,
+        copy: WebShareCopy,
+    ): String {
         val hasSessionFiles = session != null && session.files.isNotEmpty()
         val textItems = session?.files?.filter { it.isTextMessage && !it.textContent.isNullOrEmpty() } ?: emptyList()
         val binaryFiles = session?.files?.filterNot { it.isTextMessage && !it.textContent.isNullOrEmpty() } ?: emptyList()
 
-        val textSectionHtml = if (textItems.isNotEmpty()) {
-            val textCards = textItems.joinToString("") { textItem ->
-                val escapedText = escapeHtml(textItem.textContent ?: "")
+        val textSectionHtml =
+            if (textItems.isNotEmpty()) {
+                val textCards =
+                    textItems.joinToString("") { textItem ->
+                        val escapedText = escapeHtml(textItem.textContent ?: "")
+                        """
+                        <div class="text-card">
+                            <pre class="text-content" id="text-${textItem.id}">$escapedText</pre>
+                            <button class="btn btn-sec" onclick="copyText('text-${textItem.id}')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                ${copy.copyText}
+                            </button>
+                        </div>
+                        """.trimIndent()
+                    }
                 """
-                <div class="text-card">
-                    <pre class="text-content" id="text-${textItem.id}">$escapedText</pre>
-                    <button class="btn btn-sec" onclick="copyText('text-${textItem.id}')">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                        ${copy.copyText}
-                    </button>
+                <div class="section-card">
+                    <div class="section-header">
+                        <span class="section-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                            ${copy.sharedText}
+                        </span>
+                        <span class="section-tag">${copy.textCountLabel(textItems.size)}</span>
+                    </div>
+                    $textCards
                 </div>
                 """.trimIndent()
+            } else {
+                ""
             }
-            """
-            <div class="section-card">
-                <div class="section-header">
-                    <span class="section-title">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                        ${copy.sharedText}
-                    </span>
-                    <span class="section-tag">${copy.textCountLabel(textItems.size)}</span>
-                </div>
-                $textCards
-            </div>
-            """.trimIndent()
-        } else ""
 
-        val fileListHtml = if (binaryFiles.isNotEmpty()) {
-            val rows = binaryFiles.joinToString("") { file ->
-                val downloadUrl = "${LocalSendRoutes.DOWNLOAD}?sessionId=${session?.sessionId}&fileId=${file.id}"
-                val iconSvg = getWebFileSvgIcon(file.mimeType, file.name)
-                """
-                <div class="file-item">
-                    <div style="display:flex; align-items:center; gap:12px; max-width:70%;">
-                        <div style="flex-shrink:0; display:flex; align-items:center;">
-                            $iconSvg
+        val fileListHtml =
+            if (binaryFiles.isNotEmpty()) {
+                val rows =
+                    binaryFiles.joinToString("") { file ->
+                        val downloadUrl = "${LocalSendRoutes.DOWNLOAD}?sessionId=${session?.sessionId}&fileId=${file.id}"
+                        val iconSvg = getWebFileSvgIcon(file.mimeType, file.name)
+                        """
+                        <div class="file-item">
+                            <div style="display:flex; align-items:center; gap:12px; max-width:70%;">
+                                <div style="flex-shrink:0; display:flex; align-items:center;">
+                                    $iconSvg
+                                </div>
+                                <div class="file-details">
+                                    <span class="file-name">${escapeHtml(file.name)}</span>
+                                    <span class="file-meta">${file.formattedSize}</span>
+                                </div>
+                            </div>
+                            <a class="btn btn-primary" href="$downloadUrl" download="${escapeHtml(file.name)}">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                ${copy.download}
+                            </a>
                         </div>
-                        <div class="file-details">
-                            <span class="file-name">${escapeHtml(file.name)}</span>
-                            <span class="file-meta">${file.formattedSize}</span>
+                        """.trimIndent()
+                    }
+                """
+                <div class="section-card">
+                    <div class="section-header">
+                        <span class="section-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                            ${copy.sharedFiles}
+                        </span>
+                        <div style="display:inline-flex;align-items:center;gap:8px;">
+                            ${if (binaryFiles.size > 1 && session != null) """<a href="${LocalSendRoutes.DOWNLOAD_ZIP}?sessionId=${session.sessionId}" class="btn-zip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${copy.zipAll}</a>""" else ""}
+                            <span class="section-tag">${binaryFiles.size} ${copy.fileCountLabel}</span>
                         </div>
                     </div>
-                    <a class="btn btn-primary" href="$downloadUrl" download="${escapeHtml(file.name)}">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        ${copy.download}
-                    </a>
+                    <div class="file-list">$rows</div>
                 </div>
                 """.trimIndent()
+            } else {
+                ""
             }
-            """
-            <div class="section-card">
-                <div class="section-header">
-                    <span class="section-title">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                        ${copy.sharedFiles}
-                    </span>
-                    <div style="display:inline-flex;align-items:center;gap:8px;">
-                        ${if (binaryFiles.size > 1 && session != null) """<a href="${LocalSendRoutes.DOWNLOAD_ZIP}?sessionId=${session.sessionId}" class="btn-zip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${copy.zipAll}</a>""" else ""}
-                        <span class="section-tag">${binaryFiles.size} ${copy.fileCountLabel}</span>
-                    </div>
-                </div>
-                <div class="file-list">$rows</div>
-            </div>
-            """.trimIndent()
-        } else ""
 
-        val noShareHint = if (!hasSessionFiles) {
-            """
-            <div class="empty-hint">
-                <p>${copy.emptyHint}</p>
-            </div>
-            """.trimIndent()
-        } else ""
+        val noShareHint =
+            if (!hasSessionFiles) {
+                """
+                <div class="empty-hint">
+                    <p>${copy.emptyHint}</p>
+                </div>
+                """.trimIndent()
+            } else {
+                ""
+            }
 
         return """
             <!DOCTYPE html>
@@ -717,6 +738,6 @@ internal object WebShareHtmlRenderer {
                 </script>
             </body>
             </html>
-        """.trimIndent()
+            """.trimIndent()
     }
 }

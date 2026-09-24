@@ -15,8 +15,9 @@ import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.notification.TransferNotifier
 
-class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
-
+class MainActivity :
+    ComponentActivity(),
+    NavigationEventDispatcherOwner {
     private val eventDispatcher = NavigationEventDispatcher()
     override val navigationEventDispatcher: NavigationEventDispatcher
         get() = eventDispatcher
@@ -24,11 +25,12 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     private lateinit var manager: LocalSendManager
 
     // 现代 Activity Result API 申请权限（包含 Android 13+ 通知与 Android 17+ 局域网前瞻性权限）
-    private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        TransferNotifier.ensure(applicationContext)
-    }
+    private val permissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) {
+            TransferNotifier.ensure(applicationContext)
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,20 +83,30 @@ class MainActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     }
 
     private fun handleIncomingIntent(intent: android.content.Intent?) {
-        if (intent == null || !org.localsend.miuix.util.ShareIntentHelper.isShareIntent(intent)) return
+        if (intent == null ||
+            !org.localsend.miuix.util.ShareIntentHelper
+                .isShareIntent(intent)
+        ) {
+            return
+        }
         if (intent.getBooleanExtra(EXTRA_INTENT_PROCESSED, false)) return
 
-        val items = org.localsend.miuix.util.ShareIntentHelper.extractShareItems(applicationContext, intent)
+        val items =
+            org.localsend.miuix.util.ShareIntentHelper
+                .extractShareItems(applicationContext, intent)
         if (items.isNotEmpty()) {
             manager.addFiles(items)
             // 自动跳转至主界面的“发送”Tab（索引 1）
             manager.requestNavigateToTab(1)
-            val msg = if (items.size == 1 && items[0].textContent != null) {
-                getString(R.string.toast_external_text_added)
-            } else {
-                getString(R.string.toast_external_files_added, items.size)
-            }
-            android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
+            val msg =
+                if (items.size == 1 && items[0].textContent != null) {
+                    getString(R.string.toast_external_text_added)
+                } else {
+                    getString(R.string.toast_external_files_added, items.size)
+                }
+            android.widget.Toast
+                .makeText(this, msg, android.widget.Toast.LENGTH_SHORT)
+                .show()
         }
         intent.putExtra(EXTRA_INTENT_PROCESSED, true)
     }

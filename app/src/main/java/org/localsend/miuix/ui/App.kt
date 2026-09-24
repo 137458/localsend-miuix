@@ -1,6 +1,5 @@
 package org.localsend.miuix.ui
 
-import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -11,7 +10,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import org.localsend.miuix.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -40,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateCheckResult
 import org.localsend.miuix.manager.UpdateManager
@@ -94,23 +93,25 @@ fun App(manager: LocalSendManager) {
     }
 
     // 1. Theme Configuration
-    val colorSchemeMode = remember(settings.themeModeIndex) {
-        when (settings.themeModeIndex) {
-            1 -> ColorSchemeMode.Light
-            2 -> ColorSchemeMode.Dark
-            3 -> ColorSchemeMode.MonetSystem
-            4 -> ColorSchemeMode.MonetLight
-            5 -> ColorSchemeMode.MonetDark
-            else -> ColorSchemeMode.System
+    val colorSchemeMode =
+        remember(settings.themeModeIndex) {
+            when (settings.themeModeIndex) {
+                1 -> ColorSchemeMode.Light
+                2 -> ColorSchemeMode.Dark
+                3 -> ColorSchemeMode.MonetSystem
+                4 -> ColorSchemeMode.MonetLight
+                5 -> ColorSchemeMode.MonetDark
+                else -> ColorSchemeMode.System
+            }
         }
-    }
     val themeController = remember(colorSchemeMode) { ThemeController(colorSchemeMode) }
 
     // 2. Horizontal Pager State（支持进程重建时恢复离开时的页面）
-    val pagerState = rememberPagerState(
-        initialPage = settings.lastSelectedTabIndex.coerceIn(0, 2),
-        pageCount = { 3 }
-    )
+    val pagerState =
+        rememberPagerState(
+            initialPage = settings.lastSelectedTabIndex.coerceIn(0, 2),
+            pageCount = { 3 },
+        )
     LaunchedEffect(pagerState.currentPage) {
         if (pagerState.currentPage != settings.lastSelectedTabIndex) {
             manager.updateSettings { it.copy(lastSelectedTabIndex = pagerState.currentPage) }
@@ -121,13 +122,14 @@ fun App(manager: LocalSendManager) {
     val tabReceive = context.getString(R.string.nav_tab_receive)
     val tabSend = context.getString(R.string.nav_tab_send)
     val tabSettings = context.getString(R.string.nav_tab_settings)
-    val navigationItems = remember(tabReceive, tabSend, tabSettings) {
-        listOf(
-            NavigationItem(tabReceive, AppIcons.Receive),
-            NavigationItem(tabSend, AppIcons.Send),
-            NavigationItem(tabSettings, AppIcons.Settings)
-        )
-    }
+    val navigationItems =
+        remember(tabReceive, tabSend, tabSettings) {
+            listOf(
+                NavigationItem(tabReceive, AppIcons.Receive),
+                NavigationItem(tabSend, AppIcons.Send),
+                NavigationItem(tabSettings, AppIcons.Settings),
+            )
+        }
 
     // 4. Dialog Visibility States
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -152,9 +154,10 @@ fun App(manager: LocalSendManager) {
             val result = updateManager.checkForUpdate()
             result.onSuccess { info ->
                 // 同一版本只在首次发现时自动弹窗，避免每次冷启动都打断用户；忽略过的版本不再提示
-                val isNewlyPrompted = info.hasUpdate &&
-                    info.latestVersion != settings.ignoredVersion &&
-                    info.latestVersion != settings.promptedUpdateVersion
+                val isNewlyPrompted =
+                    info.hasUpdate &&
+                        info.latestVersion != settings.ignoredVersion &&
+                        info.latestVersion != settings.promptedUpdateVersion
                 if (isNewlyPrompted) {
                     manager.updateSettings { it.copy(promptedUpdateVersion = info.latestVersion) }
                     availableUpdate = info
@@ -165,115 +168,128 @@ fun App(manager: LocalSendManager) {
     }
 
     // 6. Activity Result Launchers
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris: List<Uri>? ->
-        if (!uris.isNullOrEmpty()) {
-            val items = uris.map { uri ->
-                var name = "file_${System.currentTimeMillis()}"
-                var size = 0L
-                try {
+    val filePickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenMultipleDocuments(),
+        ) { uris: List<Uri>? ->
+            if (!uris.isNullOrEmpty()) {
+                val items =
+                    uris.map { uri ->
+                        var name = "file_${System.currentTimeMillis()}"
+                        var size = 0L
+                        try {
+                            try {
+                                context.contentResolver.takePersistableUriPermission(
+                                    uri,
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                )
+                            } catch (ignored: Exception) {
+                            }
+
+                            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                                if (cursor.moveToFirst()) {
+                                    if (nameIndex != -1 && !cursor.isNull(nameIndex)) {
+                                        name = cursor.getString(nameIndex) ?: name
+                                    }
+                                    if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
+                                        size = cursor.getLong(sizeIndex)
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            name = uri.lastPathSegment ?: name
+                        }
+                        val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                        FileItem(name = name, size = size, uri = uri, mimeType = mime)
+                    }
+                manager.addFiles(items)
+                Toast.makeText(context, context.getString(R.string.toast_files_added, items.size), Toast.LENGTH_SHORT).show()
+            }
+        }
+
+    val folderPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocumentTree(),
+        ) { uri: Uri? ->
+            if (uri != null) {
+                scope.launch {
+                    manager.addFolder(uri)
+                }
+            }
+        }
+
+    val mediaPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickMultipleVisualMedia(),
+        ) { uris: List<Uri>? ->
+            if (!uris.isNullOrEmpty()) {
+                val items =
+                    uris.map { uri ->
+                        var name = "media_${System.currentTimeMillis()}.jpg"
+                        var size = 0L
+                        try {
+                            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                                if (cursor.moveToFirst()) {
+                                    if (nameIndex != -1 && !cursor.isNull(nameIndex)) {
+                                        name = cursor.getString(nameIndex) ?: name
+                                    }
+                                    if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
+                                        size = cursor.getLong(sizeIndex)
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            name = uri.lastPathSegment ?: name
+                        }
+                        val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                        FileItem(name = name, size = size, uri = uri, mimeType = mime)
+                    }
+                manager.addFiles(items)
+                Toast.makeText(context, context.getString(R.string.toast_media_added, items.size), Toast.LENGTH_SHORT).show()
+            }
+        }
+
+    val directoryPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocumentTree(),
+        ) { uri: Uri? ->
+            if (uri != null) {
+                val defaultFolder = context.getString(R.string.settings_custom_folder)
+                val display =
                     try {
-                        context.contentResolver.takePersistableUriPermission(
-                            uri,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        )
-                    } catch (ignored: Exception) {}
-
-                    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                        if (cursor.moveToFirst()) {
-                            if (nameIndex != -1 && !cursor.isNull(nameIndex)) {
-                                name = cursor.getString(nameIndex) ?: name
-                            }
-                            if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
-                                size = cursor.getLong(sizeIndex)
-                            }
-                        }
+                        DocumentFile.fromTreeUri(context, uri)?.name
+                            ?: uri.lastPathSegment
+                            ?: defaultFolder
+                    } catch (e: Exception) {
+                        uri.lastPathSegment ?: defaultFolder
                     }
-                } catch (e: Exception) {
-                    name = uri.lastPathSegment ?: name
-                }
-                val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
-                FileItem(name = name, size = size, uri = uri, mimeType = mime)
-            }
-            manager.addFiles(items)
-            Toast.makeText(context, context.getString(R.string.toast_files_added, items.size), Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    val folderPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            scope.launch {
-                manager.addFolder(uri)
+                manager.setDownloadTree(uri, display)
+                Toast.makeText(context, context.getString(R.string.toast_save_path_updated, display), Toast.LENGTH_SHORT).show()
             }
         }
-    }
-
-    val mediaPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia()
-    ) { uris: List<Uri>? ->
-        if (!uris.isNullOrEmpty()) {
-            val items = uris.map { uri ->
-                var name = "media_${System.currentTimeMillis()}.jpg"
-                var size = 0L
-                try {
-                    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                        if (cursor.moveToFirst()) {
-                            if (nameIndex != -1 && !cursor.isNull(nameIndex)) {
-                                name = cursor.getString(nameIndex) ?: name
-                            }
-                            if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
-                                size = cursor.getLong(sizeIndex)
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    name = uri.lastPathSegment ?: name
-                }
-                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
-                FileItem(name = name, size = size, uri = uri, mimeType = mime)
-            }
-            manager.addFiles(items)
-            Toast.makeText(context, context.getString(R.string.toast_media_added, items.size), Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    val directoryPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            val defaultFolder = context.getString(R.string.settings_custom_folder)
-            val display = try {
-                DocumentFile.fromTreeUri(context, uri)?.name
-                    ?: uri.lastPathSegment
-                    ?: defaultFolder
-            } catch (e: Exception) {
-                uri.lastPathSegment ?: defaultFolder
-            }
-            manager.setDownloadTree(uri, display)
-            Toast.makeText(context, context.getString(R.string.toast_save_path_updated, display), Toast.LENGTH_SHORT).show()
-        }
-    }
 
     val pickClipboard = {
         try {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             if (clipboard.hasPrimaryClip()) {
-                val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
+                val clipText =
+                    clipboard.primaryClip
+                        ?.getItemAt(0)
+                        ?.text
+                        ?.toString()
                 if (!clipText.isNullOrEmpty()) {
                     val bytes = clipText.toByteArray(Charsets.UTF_8)
-                    val item = FileItem(
-                        name = "clipboard_${System.currentTimeMillis()}.txt",
-                        size = bytes.size.toLong(),
-                        textContent = clipText,
-                        mimeType = "text/plain"
-                    )
+                    val item =
+                        FileItem(
+                            name = "clipboard_${System.currentTimeMillis()}.txt",
+                            size = bytes.size.toLong(),
+                            textContent = clipText,
+                            mimeType = "text/plain",
+                        )
                     manager.addFiles(listOf(item))
                     Toast.makeText(context, context.getString(R.string.toast_clipboard_extracted), Toast.LENGTH_SHORT).show()
                 } else {
@@ -289,12 +305,17 @@ fun App(manager: LocalSendManager) {
 
     MiuixTheme(controller = themeController) {
         val surfaceColor = MiuixTheme.colorScheme.surface
-        val backdrop = if (org.localsend.miuix.ui.effect.isRuntimeShaderSupported()) {
-            rememberLayerBackdrop {
-                drawRect(surfaceColor)
-                drawContent()
+        val backdrop =
+            if (org.localsend.miuix.ui.effect
+                    .isRuntimeShaderSupported()
+            ) {
+                rememberLayerBackdrop {
+                    drawRect(surfaceColor)
+                    drawContent()
+                }
+            } else {
+                null
             }
-        } else null
 
         val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
@@ -321,7 +342,7 @@ fun App(manager: LocalSendManager) {
         NavDisplay(
             backStack = backStack,
             onBack = { backStack.removeLastOrNull() },
-            transition = NavTransitions.MiuixDefault
+            transition = NavTransitions.MiuixDefault,
         ) {
             entry<AppRoute.Main> {
                 val configuration = LocalConfiguration.current
@@ -332,10 +353,11 @@ fun App(manager: LocalSendManager) {
                     bottomBar = {
                         if (!useNavigationRail) {
                             Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 12.dp + navBarBottomPadding),
-                                contentAlignment = Alignment.BottomCenter
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 12.dp + navBarBottomPadding),
+                                contentAlignment = Alignment.BottomCenter,
                             ) {
                                 LiquidGlassBottomBar(
                                     items = navigationItems,
@@ -353,22 +375,25 @@ fun App(manager: LocalSendManager) {
                                     badge = { index ->
                                         if (index == 0 && pendingIncomingSession != null) {
                                             { Badge { Text("1") } }
-                                        } else null
-                                    }
+                                        } else {
+                                            null
+                                        }
+                                    },
                                 )
                             }
                         }
-                    }
+                    },
                 ) { innerPadding ->
                     Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
                     ) {
                         if (useNavigationRail) {
                             NavigationRail(
                                 modifier = Modifier.fillMaxHeight(),
-                                defaultWindowInsetsPadding = true
+                                defaultWindowInsetsPadding = true,
                             ) {
                                 navigationItems.forEachIndexed { index, item ->
                                     NavigationRailItem(
@@ -383,57 +408,62 @@ fun App(manager: LocalSendManager) {
                                             }
                                         },
                                         icon = item.icon,
-                                        label = item.label
+                                        label = item.label,
                                     )
                                 }
                             }
                         }
                         Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
                         ) {
                             HorizontalPager(
                                 state = pagerState,
                                 beyondViewportPageCount = 2,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
                             ) { page ->
-                                val pagePadding = PaddingValues(
-                                    top = innerPadding.calculateTopPadding(),
-                                    bottom = innerPadding.calculateBottomPadding()
-                                )
+                                val pagePadding =
+                                    PaddingValues(
+                                        top = innerPadding.calculateTopPadding(),
+                                        bottom = innerPadding.calculateBottomPadding(),
+                                    )
                                 when (page) {
-                                    0 -> ReceiveScreen(
-                                        manager = manager,
-                                        contentPadding = pagePadding,
-                                        onOpenRenameDialog = { showRenameDialog = true },
-                                        onOpenHistory = { backStack.add(AppRoute.History) }
-                                    )
-                                    1 -> SendScreen(
-                                        manager = manager,
-                                        contentPadding = pagePadding,
-                                        onOpenAddSheet = { showAddContentSheet = true },
-                                        onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
-                                        onPickFolder = { folderPickerLauncher.launch(null) },
-                                        onPickMedia = {
-                                            mediaPickerLauncher.launch(
-                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                                            )
-                                        },
-                                        onPickApps = { showAppPickerSheet = true },
-                                        onSendText = { showSendTextDialog = true },
-                                        onPasteClipboard = pickClipboard,
-                                        onOpenWebShare = { showWebShareDialog = true },
-                                        onManualIp = { showManualIpDialog = true }
-                                    )
-                                    2 -> SettingsScreen(
-                                        manager = manager,
-                                        contentPadding = pagePadding,
-                                        onOpenRenameDialog = { showRenameDialog = true },
-                                        onOpenPortDialog = { showPortDialog = true },
-                                        onPickDirectory = { directoryPickerLauncher.launch(null) },
-                                        onNavigateToUpdate = { backStack.add(AppRoute.Update) }
-                                    )
+                                    0 ->
+                                        ReceiveScreen(
+                                            manager = manager,
+                                            contentPadding = pagePadding,
+                                            onOpenRenameDialog = { showRenameDialog = true },
+                                            onOpenHistory = { backStack.add(AppRoute.History) },
+                                        )
+                                    1 ->
+                                        SendScreen(
+                                            manager = manager,
+                                            contentPadding = pagePadding,
+                                            onOpenAddSheet = { showAddContentSheet = true },
+                                            onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
+                                            onPickFolder = { folderPickerLauncher.launch(null) },
+                                            onPickMedia = {
+                                                mediaPickerLauncher.launch(
+                                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                                                )
+                                            },
+                                            onPickApps = { showAppPickerSheet = true },
+                                            onSendText = { showSendTextDialog = true },
+                                            onPasteClipboard = pickClipboard,
+                                            onOpenWebShare = { showWebShareDialog = true },
+                                            onManualIp = { showManualIpDialog = true },
+                                        )
+                                    2 ->
+                                        SettingsScreen(
+                                            manager = manager,
+                                            contentPadding = pagePadding,
+                                            onOpenRenameDialog = { showRenameDialog = true },
+                                            onOpenPortDialog = { showPortDialog = true },
+                                            onPickDirectory = { directoryPickerLauncher.launch(null) },
+                                            onNavigateToUpdate = { backStack.add(AppRoute.Update) },
+                                        )
                                 }
                             }
                         }
@@ -443,21 +473,21 @@ fun App(manager: LocalSendManager) {
 
             // 独立传输历史页（通过 miuix-nav 连续深度推进展示，支持左滑边缘返回手势）
             entry<AppRoute.History>(
-                swipeDismiss = NavSwipeDirection.LeftToRight
+                swipeDismiss = NavSwipeDirection.LeftToRight,
             ) {
                 HistoryScreen(
                     manager = manager,
-                    onBack = { backStack.removeLastOrNull() }
+                    onBack = { backStack.removeLastOrNull() },
                 )
             }
 
             // 独立软件更新页（通过 miuix-nav 连续深度推进展示，支持左滑边缘返回手势）
             entry<AppRoute.Update>(
-                swipeDismiss = NavSwipeDirection.LeftToRight
+                swipeDismiss = NavSwipeDirection.LeftToRight,
             ) {
                 UpdateScreen(
                     manager = manager,
-                    onBack = { backStack.removeLastOrNull() }
+                    onBack = { backStack.removeLastOrNull() },
                 )
             }
         }
@@ -491,7 +521,7 @@ fun App(manager: LocalSendManager) {
             },
             onDismiss = {
                 dismissedIncomingSessionId = pendingIncomingSession?.sessionId
-            }
+            },
         )
 
         RenameDeviceDialog(
@@ -501,7 +531,7 @@ fun App(manager: LocalSendManager) {
             onConfirm = { newAlias ->
                 manager.updateSettings { it.copy(alias = newAlias) }
                 Toast.makeText(context, context.getString(R.string.toast_device_renamed, newAlias), Toast.LENGTH_SHORT).show()
-            }
+            },
         )
 
         PortDialog(
@@ -509,7 +539,7 @@ fun App(manager: LocalSendManager) {
             initialPort = settings.port,
             onDismissRequest = { showPortDialog = false },
             // 重启是异步的且端口可能顺延，更新结果由 manager 依据真实监听端口统一提示，避免这里先报出未生效的请求端口
-            onConfirm = { newPort -> manager.applyPortChange(newPort) }
+            onConfirm = { newPort -> manager.applyPortChange(newPort) },
         )
 
         SendTextDialog(
@@ -517,15 +547,16 @@ fun App(manager: LocalSendManager) {
             onDismissRequest = { showSendTextDialog = false },
             onConfirm = { text ->
                 val bytes = text.toByteArray(Charsets.UTF_8)
-                val item = FileItem(
-                    name = "text_${System.currentTimeMillis()}.txt",
-                    size = bytes.size.toLong(),
-                    textContent = text,
-                    mimeType = "text/plain"
-                )
+                val item =
+                    FileItem(
+                        name = "text_${System.currentTimeMillis()}.txt",
+                        size = bytes.size.toLong(),
+                        textContent = text,
+                        mimeType = "text/plain",
+                    )
                 manager.addFiles(listOf(item))
                 Toast.makeText(context, context.getString(R.string.toast_text_added), Toast.LENGTH_SHORT).show()
-            }
+            },
         )
 
         AddContentBottomSheet(
@@ -535,24 +566,24 @@ fun App(manager: LocalSendManager) {
             onPickFolder = { folderPickerLauncher.launch(null) },
             onPickMedia = {
                 mediaPickerLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                 )
             },
             onPickApps = { showAppPickerSheet = true },
             onSendText = { showSendTextDialog = true },
-            onPasteClipboard = pickClipboard
+            onPasteClipboard = pickClipboard,
         )
 
         AppPickerBottomSheet(
             show = showAppPickerSheet,
             onDismissRequest = { showAppPickerSheet = false },
-            manager = manager
+            manager = manager,
         )
 
         org.localsend.miuix.ui.component.WebShareDialog(
             show = showWebShareDialog,
             onDismissRequest = { showWebShareDialog = false },
-            manager = manager
+            manager = manager,
         )
 
         org.localsend.miuix.ui.component.ManualIpDialog(
@@ -562,7 +593,7 @@ fun App(manager: LocalSendManager) {
             onSend = { ip, port ->
                 manager.sendToIp(ip, port)
                 Toast.makeText(context, context.getString(R.string.toast_connecting_ip, ip, port), Toast.LENGTH_SHORT).show()
-            }
+            },
         )
 
         if (pendingTargetPinPrompt != null) {
@@ -570,7 +601,7 @@ fun App(manager: LocalSendManager) {
                 show = true,
                 targetAlias = pendingTargetPinPrompt?.device?.alias ?: "",
                 onDismissRequest = { pendingTargetPinPrompt?.onDismiss?.invoke() },
-                onConfirm = { pin -> pendingTargetPinPrompt?.onPinEntered?.invoke(pin) }
+                onConfirm = { pin -> pendingTargetPinPrompt?.onPinEntered?.invoke(pin) },
             )
         }
 
@@ -585,7 +616,7 @@ fun App(manager: LocalSendManager) {
                 onIgnore = { ver ->
                     manager.updateSettings { it.copy(ignoredVersion = ver) }
                     showUpdateDialog = false
-                }
+                },
             )
         }
     }

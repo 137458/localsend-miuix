@@ -1,7 +1,6 @@
 package org.localsend.miuix.ui.component
 
 import android.graphics.Bitmap
-import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -16,6 +15,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import android.graphics.Color as AndroidColor
 
 /**
  * 基于 ZXing 高性能核心算法的 QR 码生成与 Compose 渲染组件。
@@ -23,19 +23,19 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
  * 确保微信、系统相机、iOS 及各类扫码工具均可在各类光照与缩放条件下秒级识别。
  */
 object QrCodeGenerator {
-
     fun generateQrBitmap(
         content: String,
         sizePx: Int = 512,
         darkColor: Int = AndroidColor.BLACK,
-        lightColor: Int = AndroidColor.WHITE
-    ): Bitmap {
-        return try {
-            val hints = mapOf(
-                EncodeHintType.CHARACTER_SET to "UTF-8",
-                EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
-                EncodeHintType.MARGIN to 1 // 1 module quiet zone (plus UI card padding)
-            )
+        lightColor: Int = AndroidColor.WHITE,
+    ): Bitmap =
+        try {
+            val hints =
+                mapOf(
+                    EncodeHintType.CHARACTER_SET to "UTF-8",
+                    EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
+                    EncodeHintType.MARGIN to 1, // 1 module quiet zone (plus UI card padding)
+                )
             val bitMatrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, sizePx, sizePx, hints)
             val width = bitMatrix.width
             val height = bitMatrix.height
@@ -55,7 +55,6 @@ object QrCodeGenerator {
                 eraseColor(lightColor)
             }
         }
-    }
 }
 
 @Composable
@@ -64,22 +63,23 @@ fun QrCodeImage(
     size: Dp = 200.dp,
     darkColor: Color = Color.Black,
     lightColor: Color = Color.White,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val darkArgb = darkColor.toArgb()
     val lightArgb = lightColor.toArgb()
-    val bitmap = remember(content, darkArgb, lightArgb) {
-        QrCodeGenerator.generateQrBitmap(
-            content = content,
-            sizePx = 512,
-            darkColor = darkArgb,
-            lightColor = lightArgb
-        )
-    }
+    val bitmap =
+        remember(content, darkArgb, lightArgb) {
+            QrCodeGenerator.generateQrBitmap(
+                content = content,
+                sizePx = 512,
+                darkColor = darkArgb,
+                lightColor = lightArgb,
+            )
+        }
 
     Image(
         bitmap = bitmap.asImageBitmap(),
         contentDescription = "QR Code",
-        modifier = modifier.size(size)
+        modifier = modifier.size(size),
     )
 }

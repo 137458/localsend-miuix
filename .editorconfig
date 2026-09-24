@@ -14,6 +14,8 @@ indent_size = 4
 # 现有代码超长行较多（> 100 字符约 680 行、> 120 字符约 294 行、> 160 字符约 67 行），
 # 故不强制换行，避免 ktlint 大面积报错；如后续确需收紧，可改为具体数值（如 120）。
 max_line_length = off
+# Compose 官方约定：@Composable 函数使用 PascalCase 命名，不应按普通函数规则报错
+ktlint_function_naming_ignore_when_annotated_with = Composable
 
 [*.{json,yml,yaml}]
 indent_size = 2

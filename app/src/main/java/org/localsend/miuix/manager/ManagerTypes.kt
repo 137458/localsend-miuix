@@ -8,12 +8,12 @@ data class AppInfoItem(
     val versionName: String,
     val sourceDir: String,
     val apkSize: Long,
-    val isSystemApp: Boolean
+    val isSystemApp: Boolean,
 )
 
 data class PinPromptRequest(
     val sessionId: String,
     val device: Device,
     val onPinEntered: (String) -> Unit,
-    val onDismiss: () -> Unit
+    val onDismiss: () -> Unit,
 )

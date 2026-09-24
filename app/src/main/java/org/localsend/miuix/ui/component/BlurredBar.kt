@@ -40,8 +40,7 @@ fun rememberBlurBackdrop(enableBlur: Boolean = true): LayerBackdrop? {
  * 安全挂载 layerBackdrop 采样源的扩展 Modifier。
  * 当 backdrop 为非 null 时注册为 Backdrop 图层采样源，为 null 时保持原样。
  */
-fun Modifier.blurBackdropSource(backdrop: LayerBackdrop?): Modifier =
-    if (backdrop != null) this.layerBackdrop(backdrop) else this
+fun Modifier.blurBackdropSource(backdrop: LayerBackdrop?): Modifier = if (backdrop != null) this.layerBackdrop(backdrop) else this
 
 /**
  * Xiaomi HyperOS / MIUIX 官方规范沉浸式顶部毛玻璃包装器。
@@ -69,26 +68,29 @@ fun BlurredBar(
     Box(modifier = modifier) {
         if (backdrop != null && blurEnabled) {
             Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .graphicsLayer {
-                        // 停靠顶部时透明度为 0；在 48dp 滑动区间内平滑淡入
-                        alpha = scrollBehavior?.state
-                            ?.let { (-it.contentOffset / 48.dp.toPx()).coerceIn(0f, 1f) }
-                            ?: 1f
-                    }
-                    .progressiveTextureBlur(
-                        backdrop = backdrop,
-                        shape = RectangleShape,
-                        // 顶部状态栏满额模糊向底部平滑渐隐至 0，curve = 2.2f 柔和过渡，绝无硬切割边缘
-                        gradient = ProgressiveBlur.Top.copy(curve = 2.2f),
-                        blurRadius = 10f,
-                        colors = BlurDefaults.blurColors(
-                            blendColors = listOf(
-                                BlendColorEntry(color = MiuixTheme.colorScheme.surface.copy(alpha = 0.3f)),
-                            ),
+                modifier =
+                    Modifier
+                        .matchParentSize()
+                        .graphicsLayer {
+                            // 停靠顶部时透明度为 0；在 48dp 滑动区间内平滑淡入
+                            alpha = scrollBehavior
+                                ?.state
+                                ?.let { (-it.contentOffset / 48.dp.toPx()).coerceIn(0f, 1f) }
+                                ?: 1f
+                        }.progressiveTextureBlur(
+                            backdrop = backdrop,
+                            shape = RectangleShape,
+                            // 顶部状态栏满额模糊向底部平滑渐隐至 0，curve = 2.2f 柔和过渡，绝无硬切割边缘
+                            gradient = ProgressiveBlur.Top.copy(curve = 2.2f),
+                            blurRadius = 10f,
+                            colors =
+                                BlurDefaults.blurColors(
+                                    blendColors =
+                                        listOf(
+                                            BlendColorEntry(color = MiuixTheme.colorScheme.surface.copy(alpha = 0.3f)),
+                                        ),
+                                ),
                         ),
-                    ),
             )
         }
         content()

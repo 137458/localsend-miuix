@@ -28,7 +28,6 @@ class DampedDragAnimation(
     val onDragStopped: DampedDragAnimation.() -> Unit,
     val onDrag: DampedDragAnimation.(size: IntSize, dragAmount: Offset) -> Unit,
 ) {
-
     private val valueAnimationSpec =
         spring(1f, 1000f, visibilityThreshold)
     private val velocityAnimationSpec =
@@ -62,32 +61,33 @@ class DampedDragAnimation(
     val scaleY: Float get() = scaleYAnimation.value
     val velocity: Float get() = velocityAnimation.value
 
-    val modifier: Modifier = Modifier.pointerInput(Unit) {
-        inspectDragGestures(
-            onDragStart = { down ->
-                onDragStarted(down.position)
-                press()
-            },
-            onDragEnd = {
-                onDragStopped()
-                release()
-            },
-            onDragCancel = {
-                onDragStopped()
-                release()
-            }
-        ) { change, dragAmount ->
-            val position = change.position
-            val previousPosition = change.previousPosition
+    val modifier: Modifier =
+        Modifier.pointerInput(Unit) {
+            inspectDragGestures(
+                onDragStart = { down ->
+                    onDragStarted(down.position)
+                    press()
+                },
+                onDragEnd = {
+                    onDragStopped()
+                    release()
+                },
+                onDragCancel = {
+                    onDragStopped()
+                    release()
+                },
+            ) { change, dragAmount ->
+                val position = change.position
+                val previousPosition = change.previousPosition
 
-            val isInside = canDrag(position)
-            val wasInside = canDrag(previousPosition)
+                val isInside = canDrag(position)
+                val wasInside = canDrag(previousPosition)
 
-            if (isInside && wasInside) {
-                onDrag(size, dragAmount)
+                if (isInside && wasInside) {
+                    onDrag(size, dragAmount)
+                }
             }
         }
-    }
 
     fun press() {
         velocityTracker.resetTracking()
@@ -137,12 +137,15 @@ class DampedDragAnimation(
     private fun updateVelocity() {
         velocityTracker.addPosition(
             System.currentTimeMillis(),
-            Offset(value, 0f)
+            Offset(value, 0f),
         )
         val rangeDelta = valueRange.endInclusive - valueRange.start
-        val targetVelocity = if (rangeDelta > 0f) {
-            velocityTracker.calculateVelocity().x / rangeDelta
-        } else 0f
+        val targetVelocity =
+            if (rangeDelta > 0f) {
+                velocityTracker.calculateVelocity().x / rangeDelta
+            } else {
+                0f
+            }
         animationScope.launch {
             velocityAnimation.animateTo(targetVelocity, velocityAnimationSpec)
         }

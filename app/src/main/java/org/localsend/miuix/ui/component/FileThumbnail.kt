@@ -7,6 +7,8 @@ import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,18 +20,25 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,16 +55,6 @@ import kotlinx.coroutines.withContext
 import org.localsend.miuix.R
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.util.ThumbnailHelper
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.setValue
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -68,51 +67,56 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 fun FileThumbnail(
     file: FileItem,
     modifier: Modifier = Modifier,
-    size: Dp = 42.dp
+    size: Dp = 42.dp,
 ) {
     val context = LocalContext.current
-    val isImageOrVideoOrApk = ThumbnailHelper.isImage(file) ||
+    val isImageOrVideoOrApk =
+        ThumbnailHelper.isImage(file) ||
             ThumbnailHelper.isVideo(file) ||
             ThumbnailHelper.isApk(file)
 
     val thumbnailBitmap by produceState<Bitmap?>(initialValue = null, file.id) {
         if (isImageOrVideoOrApk) {
-            value = withContext(Dispatchers.IO) {
-                ThumbnailHelper.loadThumbnail(context, file, targetSize = (size.value * 2.5f).toInt().coerceAtLeast(96))
-            }
+            value =
+                withContext(Dispatchers.IO) {
+                    ThumbnailHelper.loadThumbnail(context, file, targetSize = (size.value * 2.5f).toInt().coerceAtLeast(96))
+                }
         }
     }
 
     Box(
-        modifier = modifier
-            .size(size)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .size(size)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)),
+        contentAlignment = Alignment.Center,
     ) {
         if (thumbnailBitmap != null) {
             Image(
                 bitmap = thumbnailBitmap!!.asImageBitmap(),
                 contentDescription = file.name,
-                modifier = Modifier
-                    .size(size)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
+                modifier =
+                    Modifier
+                        .size(size)
+                        .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop,
             )
             // 视频类型额外显示半透明播放图标标记
             if (ThumbnailHelper.isVideo(file)) {
                 Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.55f)),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.55f)),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = stringResource(R.string.preview_video_tag),
                         tint = Color.White,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(14.dp),
                     )
                 }
             }
@@ -122,7 +126,7 @@ fun FileThumbnail(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MiuixTheme.colorScheme.primary,
-                modifier = Modifier.size(size * 0.55f)
+                modifier = Modifier.size(size * 0.55f),
             )
         }
     }
@@ -133,7 +137,7 @@ fun FilePreviewDialog(
     files: List<FileItem>,
     initialIndex: Int = 0,
     onRemoveFile: ((FileItem) -> Unit)? = null,
-    onDismissRequest: () -> Unit
+    onDismissRequest: () -> Unit,
 ) {
     if (files.isEmpty()) return
     val context = LocalContext.current
@@ -146,49 +150,51 @@ fun FilePreviewDialog(
     WindowDialog(
         show = true,
         title = if (file.isTextMessage) stringResource(R.string.preview_text_title) else file.name,
-        onDismissRequest = onDismissRequest
+        onDismissRequest = onDismissRequest,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
         ) {
             // 1. 多文件顶部导航指示条（仅多文件时显示）
             if (files.size > 1) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         IconButton(
                             onClick = { if (safeIndex > 0) currentIndex = safeIndex - 1 },
-                            enabled = safeIndex > 0
+                            enabled = safeIndex > 0,
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(R.string.preview_action_prev),
-                                tint = if (safeIndex > 0) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.35f)
+                                tint = if (safeIndex > 0) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.35f),
                             )
                         }
                         Text(
                             text = "${safeIndex + 1} / ${files.size}",
                             style = MiuixTheme.textStyles.body2,
-                            color = MiuixTheme.colorScheme.onSurface
+                            color = MiuixTheme.colorScheme.onSurface,
                         )
                         IconButton(
                             onClick = { if (safeIndex < files.size - 1) currentIndex = safeIndex + 1 },
-                            enabled = safeIndex < files.size - 1
+                            enabled = safeIndex < files.size - 1,
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = stringResource(R.string.preview_action_next),
-                                tint = if (safeIndex < files.size - 1) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.35f)
+                                tint = if (safeIndex < files.size - 1) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.35f),
                             )
                         }
                     }
@@ -196,7 +202,7 @@ fun FilePreviewDialog(
                     Text(
                         text = file.formattedSize,
                         style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
             }
@@ -208,19 +214,20 @@ fun FilePreviewDialog(
             if (file.isTextMessage) {
                 val text = file.textContent ?: ""
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 260.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
-                        .padding(12.dp)
-                        .verticalScroll(rememberScrollState())
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 260.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
+                            .padding(12.dp)
+                            .verticalScroll(rememberScrollState()),
                 ) {
                     SelectionContainer {
                         Text(
                             text = text.ifEmpty { stringResource(R.string.preview_empty_text) },
                             style = MiuixTheme.textStyles.body2,
-                            color = MiuixTheme.colorScheme.onSurface
+                            color = MiuixTheme.colorScheme.onSurface,
                         )
                     }
                 }
@@ -228,32 +235,35 @@ fun FilePreviewDialog(
                 Text(
                     text = stringResource(R.string.preview_text_stats, text.length, file.formattedSize),
                     style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             } else if (isImage || isVideo) {
                 val previewBitmap by produceState<Bitmap?>(initialValue = null, file.id) {
-                    value = withContext(Dispatchers.IO) {
-                        ThumbnailHelper.loadPreviewImage(context, file, maxDimension = 900)
-                    }
+                    value =
+                        withContext(Dispatchers.IO) {
+                            ThumbnailHelper.loadPreviewImage(context, file, maxDimension = 900)
+                        }
                 }
 
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 120.dp, max = 280.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.35f)),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp, max = 280.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.35f)),
+                    contentAlignment = Alignment.Center,
                 ) {
                     if (previewBitmap != null) {
                         Image(
                             bitmap = previewBitmap!!.asImageBitmap(),
                             contentDescription = file.name,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 280.dp)
-                                .clip(RoundedCornerShape(10.dp)),
-                            contentScale = ContentScale.Fit
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 280.dp)
+                                    .clip(RoundedCornerShape(10.dp)),
+                            contentScale = ContentScale.Fit,
                         )
                     } else {
                         FileThumbnail(file = file, size = 64.dp)
@@ -261,17 +271,18 @@ fun FilePreviewDialog(
 
                     if (isVideo) {
                         Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.55f)),
-                            contentAlignment = Alignment.Center
+                            modifier =
+                                Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.55f)),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
                                 contentDescription = stringResource(R.string.preview_video_content_desc),
                                 tint = Color.White,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(28.dp),
                             )
                         }
                     }
@@ -279,24 +290,25 @@ fun FilePreviewDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = stringResource(R.string.preview_file_stats, file.formattedSize, file.mimeType),
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             } else {
                 // 通用文件详情
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
-                        .padding(12.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
+                            .padding(12.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         FileThumbnail(file = file, size = 48.dp)
@@ -306,13 +318,13 @@ fun FilePreviewDialog(
                                 text = file.name,
                                 style = MiuixTheme.textStyles.body1,
                                 maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = file.formattedSize,
                                 style = MiuixTheme.textStyles.footnote1,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
                         }
                     }
@@ -320,7 +332,7 @@ fun FilePreviewDialog(
                     Text(
                         text = stringResource(R.string.preview_mime_type, file.mimeType),
                         style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                     if (file.path != null) {
                         Spacer(modifier = Modifier.height(4.dp))
@@ -329,7 +341,7 @@ fun FilePreviewDialog(
                             style = MiuixTheme.textStyles.footnote1,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -344,28 +356,29 @@ fun FilePreviewDialog(
                 }
                 LazyRow(
                     state = listState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.35f))
-                        .padding(horizontal = 6.dp, vertical = 6.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.35f))
+                            .padding(horizontal = 6.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     itemsIndexed(files, key = { _, item -> item.id }) { index, item ->
                         val isSelected = index == safeIndex
                         Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .then(
-                                    if (isSelected) {
-                                        Modifier.border(2.dp, MiuixTheme.colorScheme.primary, RoundedCornerShape(8.dp))
-                                    } else {
-                                        Modifier.border(1.dp, Color.Transparent, RoundedCornerShape(8.dp))
-                                    }
-                                )
-                                .clickable { currentIndex = index }
-                                .padding(2.dp)
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .then(
+                                        if (isSelected) {
+                                            Modifier.border(2.dp, MiuixTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                                        } else {
+                                            Modifier.border(1.dp, Color.Transparent, RoundedCornerShape(8.dp))
+                                        },
+                                    ).clickable { currentIndex = index }
+                                    .padding(2.dp),
                         ) {
                             FileThumbnail(file = item, size = 40.dp)
                         }
@@ -378,7 +391,7 @@ fun FilePreviewDialog(
             // 4. 底部操作按钮
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (file.isTextMessage && !file.textContent.isNullOrEmpty()) {
                     TextButton(
@@ -389,7 +402,7 @@ fun FilePreviewDialog(
                             Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                         },
                         colors = ButtonDefaults.textButtonColorsPrimary(),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     )
                 }
                 if (onRemoveFile != null) {
@@ -404,21 +417,23 @@ fun FilePreviewDialog(
                             }
                             onRemoveFile(fileToRemove)
                         },
-                        colors = ButtonDefaults.textButtonColors(
-                            textColor = MiuixTheme.colorScheme.error
-                        ),
-                        modifier = Modifier.weight(1f)
+                        colors =
+                            ButtonDefaults.textButtonColors(
+                                textColor = MiuixTheme.colorScheme.error,
+                            ),
+                        modifier = Modifier.weight(1f),
                     )
                 }
                 TextButton(
                     text = stringResource(R.string.btn_close),
                     onClick = onDismissRequest,
-                    colors = if (file.isTextMessage && !file.textContent.isNullOrEmpty() && onRemoveFile == null) {
-                        ButtonDefaults.textButtonColors()
-                    } else {
-                        ButtonDefaults.textButtonColorsPrimary()
-                    },
-                    modifier = Modifier.weight(1f)
+                    colors =
+                        if (file.isTextMessage && !file.textContent.isNullOrEmpty() && onRemoveFile == null) {
+                            ButtonDefaults.textButtonColors()
+                        } else {
+                            ButtonDefaults.textButtonColorsPrimary()
+                        },
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -428,13 +443,13 @@ fun FilePreviewDialog(
 @Composable
 fun FilePreviewDialog(
     file: FileItem?,
-    onDismissRequest: () -> Unit
+    onDismissRequest: () -> Unit,
 ) {
     if (file == null) return
     FilePreviewDialog(
         files = listOf(file),
         initialIndex = 0,
         onRemoveFile = null,
-        onDismissRequest = onDismissRequest
+        onDismissRequest = onDismissRequest,
     )
 }

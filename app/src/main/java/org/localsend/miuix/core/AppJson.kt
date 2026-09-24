@@ -7,9 +7,10 @@ import kotlinx.serialization.json.Json
  * ignoreUnknownKeys keeps us compatible with official LocalSend fields we do not model yet.
  */
 object AppJson {
-    val default: Json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        encodeDefaults = true
-    }
+    val default: Json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            encodeDefaults = true
+        }
 }

@@ -3,8 +3,8 @@ package org.localsend.miuix.network
 import android.content.Context
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.BasicConstraints
-import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage
+import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.GeneralName
 import org.bouncycastle.asn1.x509.GeneralNames
 import org.bouncycastle.asn1.x509.KeyPurposeId
@@ -30,7 +30,6 @@ import javax.net.ssl.X509ExtendedKeyManager
  * 协议 §2 规定 HTTPS 模式下 fingerprint = 证书的 SHA-256 哈希。
  */
 object TlsStore {
-
     const val KEYSTORE_FILENAME = "localsend_keystore.p12"
     const val KEY_ALIAS = "localsend_selfsigned"
     const val STORE_PASSWORD = "localsend"
@@ -53,10 +52,9 @@ object TlsStore {
         }
     }
 
-    private fun resolveContext(context: Context?): Context {
-        return context?.applicationContext ?: appContext
+    private fun resolveContext(context: Context?): Context =
+        context?.applicationContext ?: appContext
             ?: throw IllegalStateException("TlsStore context not initialized. Call TlsStore.init(context) first.")
-    }
 
     private fun keystoreFile(context: Context): File = File(context.filesDir, KEYSTORE_FILENAME)
 
@@ -95,7 +93,8 @@ object TlsStore {
             if (file.exists()) {
                 file.delete()
             }
-        } catch (ignored: Exception) {}
+        } catch (ignored: Exception) {
+        }
         cachedFingerprint = null
         cachedKeyStore = null
         cachedKeyManagers = null
@@ -117,12 +116,13 @@ object TlsStore {
         val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
         kmf.init(ks, STORE_PASSWORD.toCharArray())
         val standardKm = kmf.keyManagers.filterIsInstance<X509ExtendedKeyManager>().firstOrNull()
-        val customKm = LocalSendKeyManager(
-            standardKeyManager = standardKm,
-            keyStore = ks,
-            alias = KEY_ALIAS,
-            password = STORE_PASSWORD.toCharArray()
-        )
+        val customKm =
+            LocalSendKeyManager(
+                standardKeyManager = standardKm,
+                keyStore = ks,
+                alias = KEY_ALIAS,
+                password = STORE_PASSWORD.toCharArray(),
+            )
         val managers: Array<KeyManager> = arrayOf(customKm)
         cachedKeyManagers = managers
         return managers
@@ -135,34 +135,39 @@ object TlsStore {
         val dn = X500Name("CN=LocalSend")
         val now = Date()
         val notAfter = Date(now.time + 10L * 365 * 24 * 60 * 60 * 1000)
-        val builder = JcaX509v3CertificateBuilder(
-            /* issuer = */ dn,
-            /* serial = */ BigInteger.valueOf(System.currentTimeMillis()),
-            now,
-            notAfter,
-            /* subject = */ dn,
-            keyPair.public
-        )
+        val builder =
+            JcaX509v3CertificateBuilder(
+                // issuer =
+                dn,
+                // serial =
+                BigInteger.valueOf(System.currentTimeMillis()),
+                now,
+                notAfter,
+                // subject =
+                dn,
+                keyPair.public,
+            )
         builder.addExtension(Extension.basicConstraints, true, BasicConstraints(true))
         builder.addExtension(
             Extension.keyUsage,
             true,
-            KeyUsage(KeyUsage.digitalSignature or KeyUsage.keyEncipherment or KeyUsage.dataEncipherment)
+            KeyUsage(KeyUsage.digitalSignature or KeyUsage.keyEncipherment or KeyUsage.dataEncipherment),
         )
         // 增加 clientAuth 与 serverAuth，全面支持服务端与客户端 TLS 双向认证
         builder.addExtension(
             Extension.extendedKeyUsage,
             false,
-            ExtendedKeyUsage(arrayOf(KeyPurposeId.id_kp_serverAuth, KeyPurposeId.id_kp_clientAuth))
+            ExtendedKeyUsage(arrayOf(KeyPurposeId.id_kp_serverAuth, KeyPurposeId.id_kp_clientAuth)),
         )
         // 补充 SAN（Subject Alternative Name），避免 Android/Netty 严格 TLS 模式下握手失败
-        val sans = GeneralNames(
-            arrayOf(
-                GeneralName(GeneralName.dNSName, "localhost"),
-                GeneralName(GeneralName.iPAddress, "127.0.0.1"),
-                GeneralName(GeneralName.iPAddress, "0.0.0.0")
+        val sans =
+            GeneralNames(
+                arrayOf(
+                    GeneralName(GeneralName.dNSName, "localhost"),
+                    GeneralName(GeneralName.iPAddress, "127.0.0.1"),
+                    GeneralName(GeneralName.iPAddress, "0.0.0.0"),
+                ),
             )
-        )
         builder.addExtension(Extension.subjectAlternativeName, false, sans)
 
         val signer = JcaContentSignerBuilder("SHA256withRSA").build(keyPair.private)
@@ -180,8 +185,9 @@ object TlsStore {
         cachedFingerprint?.let { return it }
         val cert = loadKeyStore(context).getCertificate(KEY_ALIAS)
         val digest = MessageDigest.getInstance("SHA-256").digest(cert.encoded)
-        return FingerprintTrust.normalize(
-            digest.joinToString("") { "%02x".format(it) }
-        ).also { cachedFingerprint = it }
+        return FingerprintTrust
+            .normalize(
+                digest.joinToString("") { "%02x".format(it) },
+            ).also { cachedFingerprint = it }
     }
 }

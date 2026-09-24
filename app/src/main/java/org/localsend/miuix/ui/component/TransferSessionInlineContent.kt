@@ -53,43 +53,45 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 internal fun InlineTextMessageProgress(
     session: TransferSession,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
     val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: stringResource(R.string.send_type_text_message)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Chat,
                 contentDescription = null,
                 tint = MiuixTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(18.dp),
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = when (session.status) {
-                    TransferStatus.WaitingApproval -> stringResource(R.string.session_waiting_peer_confirm)
-                    TransferStatus.InProgress -> stringResource(R.string.session_syncing_text)
-                    TransferStatus.Completed -> stringResource(R.string.session_text_delivered)
-                    TransferStatus.Failed -> stringResource(R.string.session_send_failed, session.errorMessage ?: stringResource(R.string.session_peer_declined))
-                    TransferStatus.Canceled -> stringResource(R.string.session_canceled)
-                },
+                text =
+                    when (session.status) {
+                        TransferStatus.WaitingApproval -> stringResource(R.string.session_waiting_peer_confirm)
+                        TransferStatus.InProgress -> stringResource(R.string.session_syncing_text)
+                        TransferStatus.Completed -> stringResource(R.string.session_text_delivered)
+                        TransferStatus.Failed -> stringResource(R.string.session_send_failed, session.errorMessage ?: stringResource(R.string.session_peer_declined))
+                        TransferStatus.Canceled -> stringResource(R.string.session_canceled)
+                    },
                 style = MiuixTheme.textStyles.footnote1,
-                color = when (session.status) {
-                    TransferStatus.Failed -> MiuixTheme.colorScheme.error
-                    TransferStatus.Completed -> MiuixTheme.colorScheme.primary
-                    TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
-                    else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
-                },
+                color =
+                    when (session.status) {
+                        TransferStatus.Failed -> MiuixTheme.colorScheme.error
+                        TransferStatus.Completed -> MiuixTheme.colorScheme.primary
+                        TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
+                        else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    },
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
         }
 
@@ -99,7 +101,7 @@ internal fun InlineTextMessageProgress(
                     imageVector = Icons.Default.Close,
                     contentDescription = stringResource(R.string.action_cancel_transfer),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }
@@ -108,28 +110,30 @@ internal fun InlineTextMessageProgress(
     if (session.status == TransferStatus.InProgress || session.status == TransferStatus.WaitingApproval) {
         Spacer(modifier = Modifier.height(6.dp))
         LinearProgressIndicator(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp)),
         )
     }
 
     Spacer(modifier = Modifier.height(8.dp))
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
-            .padding(horizontal = 10.dp, vertical = 8.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
+                .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Text(
             text = previewText,
             style = MiuixTheme.textStyles.footnote1,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
-            color = MiuixTheme.colorScheme.onSurface
+            color = MiuixTheme.colorScheme.onSurface,
         )
     }
 }
@@ -140,7 +144,7 @@ internal fun InlineFileTransferProgress(
     isExpanded: Boolean,
     onToggleExpanded: () -> Unit,
     onCancel: () -> Unit,
-    onAccept: (() -> Unit)?
+    onAccept: (() -> Unit)?,
 ) {
     var previewInitialIndex by remember { mutableIntStateOf(-1) }
 
@@ -148,68 +152,77 @@ internal fun InlineFileTransferProgress(
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         ) {
             when (session.status) {
-                TransferStatus.Completed -> Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = MiuixTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                TransferStatus.Failed -> Icon(
-                    imageVector = Icons.Default.Error,
-                    contentDescription = null,
-                    tint = MiuixTheme.colorScheme.error,
-                    modifier = Modifier.size(16.dp)
-                )
-                TransferStatus.WaitingApproval -> Icon(
-                    imageVector = Icons.Default.HourglassEmpty,
-                    contentDescription = null,
-                    tint = MiuixTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                TransferStatus.InProgress -> Icon(
-                    imageVector = Icons.Default.Upload,
-                    contentDescription = null,
-                    tint = MiuixTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                TransferStatus.Canceled -> Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = null,
-                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.size(16.dp)
-                )
+                TransferStatus.Completed ->
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                TransferStatus.Failed ->
+                    Icon(
+                        imageVector = Icons.Default.Error,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp),
+                    )
+                TransferStatus.WaitingApproval ->
+                    Icon(
+                        imageVector = Icons.Default.HourglassEmpty,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                TransferStatus.InProgress ->
+                    Icon(
+                        imageVector = Icons.Default.Upload,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                TransferStatus.Canceled ->
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.size(16.dp),
+                    )
             }
             Spacer(modifier = Modifier.width(6.dp))
             val currentFile = session.currentFile
-            val inProgressText = when {
-                currentFile != null && session.files.size > 1 -> stringResource(R.string.session_transferring_indexed, session.currentFileIndex + 1, session.files.size, currentFile.name)
-                currentFile != null -> stringResource(R.string.session_transferring_single, currentFile.name)
-                else -> stringResource(R.string.session_preparing_transfer)
-            }
+            val inProgressText =
+                when {
+                    currentFile != null && session.files.size > 1 -> stringResource(R.string.session_transferring_indexed, session.currentFileIndex + 1, session.files.size, currentFile.name)
+                    currentFile != null -> stringResource(R.string.session_transferring_single, currentFile.name)
+                    else -> stringResource(R.string.session_preparing_transfer)
+                }
             Text(
-                text = fileStatusText(
-                    session = session,
-                    inProgressText = inProgressText,
-                    // 部分文件失败时会话仍判完成，用聚合说明替换"传输完成"，避免用户以为文件已送达
-                    completedText = session.errorMessage?.takeIf { it.isNotBlank() }
-                        ?: stringResource(R.string.session_transfer_complete_check, session.files.size, session.formattedTotalSize)
-                ),
+                text =
+                    fileStatusText(
+                        session = session,
+                        inProgressText = inProgressText,
+                        // 部分文件失败时会话仍判完成，用聚合说明替换"传输完成"，避免用户以为文件已送达
+                        completedText =
+                            session.errorMessage?.takeIf { it.isNotBlank() }
+                                ?: stringResource(R.string.session_transfer_complete_check, session.files.size, session.formattedTotalSize),
+                    ),
                 style = MiuixTheme.textStyles.footnote1,
-                color = fileStatusColor(
-                    session,
-                    defaultColor = MiuixTheme.colorScheme.onSurface,
-                    completedColor = MiuixTheme.colorScheme.primary
-                ),
+                color =
+                    fileStatusColor(
+                        session,
+                        defaultColor = MiuixTheme.colorScheme.onSurface,
+                        completedColor = MiuixTheme.colorScheme.primary,
+                    ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
         }
 
@@ -220,7 +233,7 @@ internal fun InlineFileTransferProgress(
                     AcceptIconButton(
                         onAccept = onAccept,
                         modifier = Modifier.size(30.dp),
-                        iconModifier = Modifier.size(16.dp)
+                        iconModifier = Modifier.size(16.dp),
                     )
                 }
                 IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
@@ -228,7 +241,7 @@ internal fun InlineFileTransferProgress(
                         imageVector = Icons.Default.Close,
                         contentDescription = stringResource(R.string.action_cancel_transfer),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
@@ -239,24 +252,26 @@ internal fun InlineFileTransferProgress(
     val animatedSessionProgress by animateFloatAsState(
         targetValue = if (session.status == TransferStatus.Completed) 1f else session.progress,
         animationSpec = tween(durationMillis = 80, easing = LinearEasing),
-        label = "InlineSessionProgress"
+        label = "InlineSessionProgress",
     )
 
     Spacer(modifier = Modifier.height(8.dp))
     if (session.status == TransferStatus.WaitingApproval) {
         LinearProgressIndicator(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(5.dp)
-                .clip(RoundedCornerShape(2.5.dp))
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(2.5.dp)),
         )
     } else {
         LinearProgressIndicator(
             progress = animatedSessionProgress,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(5.dp)
-                .clip(RoundedCornerShape(2.5.dp))
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(2.5.dp)),
         )
     }
 
@@ -265,26 +280,26 @@ internal fun InlineFileTransferProgress(
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = "${session.formattedTransferredSize} / ${session.formattedTotalSize} (${session.progressPercent}%)",
             style = MiuixTheme.textStyles.footnote1,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
         if (session.status == TransferStatus.InProgress) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = session.formattedSpeed,
                     style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.primary
+                    color = MiuixTheme.colorScheme.primary,
                 )
                 val remainingLabel = remainingTimeLabel(session)
                 if (remainingLabel.isNotEmpty()) {
                     Text(
                         text = " • $remainingLabel",
                         style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
             }
@@ -295,43 +310,45 @@ internal fun InlineFileTransferProgress(
     if (session.files.isNotEmpty()) {
         Spacer(modifier = Modifier.height(6.dp))
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(6.dp))
-                .clickable { onToggleExpanded() }
-                .padding(vertical = 4.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { onToggleExpanded() }
+                    .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = stringResource(R.string.session_file_list_title, session.files.count { it.status == TransferStatus.Completed }, session.files.size),
                 style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             Icon(
                 imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                 contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                 tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(16.dp),
             )
         }
 
         AnimatedVisibility(
             visible = isExpanded,
             enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
+            exit = shrinkVertically() + fadeOut(),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 session.files.forEachIndexed { index, file ->
                     androidx.compose.runtime.key(file.id) {
                         FileDetailItem(
                             file = file,
-                            onClick = { previewInitialIndex = index }
+                            onClick = { previewInitialIndex = index },
                         )
                     }
                 }
@@ -343,7 +360,7 @@ internal fun InlineFileTransferProgress(
         FilePreviewDialog(
             files = session.files,
             initialIndex = previewInitialIndex,
-            onDismissRequest = { previewInitialIndex = -1 }
+            onDismissRequest = { previewInitialIndex = -1 },
         )
     }
 }

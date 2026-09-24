@@ -17,7 +17,7 @@ data class FavoriteDevice(
     val deviceModel: String? = null,
     val deviceType: DeviceType = DeviceType.mobile,
     val download: Boolean = false,
-    val customAlias: String? = null
+    val customAlias: String? = null,
 ) {
     fun matches(device: Device): Boolean {
         if (fingerprint.isNotBlank() && device.fingerprint.isNotBlank()) {
@@ -26,35 +26,42 @@ data class FavoriteDevice(
         return ip == device.ip && port == device.port
     }
 
-    fun toDevice(): Device = Device(
-        alias = customAlias?.takeIf { it.isNotBlank() } ?: alias,
-        fingerprint = fingerprint,
-        port = port,
-        protocol = protocol,
-        ip = ip,
-        deviceModel = deviceModel,
-        deviceType = deviceType,
-        download = download
-    )
+    fun toDevice(): Device =
+        Device(
+            alias = customAlias?.takeIf { it.isNotBlank() } ?: alias,
+            fingerprint = fingerprint,
+            port = port,
+            protocol = protocol,
+            ip = ip,
+            deviceModel = deviceModel,
+            deviceType = deviceType,
+            download = download,
+        )
 
     companion object {
-        fun fromDevice(device: Device): FavoriteDevice = FavoriteDevice(
-            alias = device.alias,
-            fingerprint = device.fingerprint,
-            ip = device.ip,
-            port = device.port,
-            protocol = device.protocol,
-            deviceModel = device.deviceModel,
-            deviceType = device.deviceType,
-            download = device.download
-        )
+        fun fromDevice(device: Device): FavoriteDevice =
+            FavoriteDevice(
+                alias = device.alias,
+                fingerprint = device.fingerprint,
+                ip = device.ip,
+                port = device.port,
+                protocol = device.protocol,
+                deviceModel = device.deviceModel,
+                deviceType = device.deviceType,
+                download = device.download,
+            )
     }
 }
 
 class FavoriteStore(
     private val file: File,
     private val maxItems: Int = DEFAULT_MAX_ITEMS,
-    private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
+    private val json: Json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            encodeDefaults = true
+        },
 ) {
     private val writeLock = Any()
 
@@ -90,11 +97,12 @@ class FavoriteStore(
     fun toggle(device: Device): List<FavoriteDevice> {
         val current = load()
         val index = current.indexOfFirst { it.matches(device) }
-        val updated = if (index >= 0) {
-            current.filterNot { it.matches(device) }
-        } else {
-            (listOf(FavoriteDevice.fromDevice(device)) + current).take(maxItems)
-        }
+        val updated =
+            if (index >= 0) {
+                current.filterNot { it.matches(device) }
+            } else {
+                (listOf(FavoriteDevice.fromDevice(device)) + current).take(maxItems)
+            }
         persist(updated)
         return updated
     }

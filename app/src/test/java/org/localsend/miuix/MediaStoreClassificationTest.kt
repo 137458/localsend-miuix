@@ -5,13 +5,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MediaStoreClassificationTest {
-
     data class MediaStoreDestination(
         val baseDir: String,
-        val mediaType: String
+        val mediaType: String,
     )
 
-    private fun resolveDestination(mimeType: String, isCategorized: Boolean): MediaStoreDestination {
+    private fun resolveDestination(
+        mimeType: String,
+        isCategorized: Boolean,
+    ): MediaStoreDestination {
         if (!isCategorized) {
             return MediaStoreDestination(Environment.DIRECTORY_DOWNLOADS + "/LocalSend", "downloads")
         }

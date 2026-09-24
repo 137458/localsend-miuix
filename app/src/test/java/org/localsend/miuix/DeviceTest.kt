@@ -10,7 +10,6 @@ import org.localsend.miuix.model.DeviceDto
 import org.localsend.miuix.model.DeviceType
 
 class DeviceTest {
-
     @Test
     fun deviceTypeFromStringIsCaseInsensitive() {
         assertEquals(DeviceType.mobile, DeviceType.fromString("MOBILE"))
@@ -46,12 +45,13 @@ class DeviceTest {
 
     @Test
     fun allIpsIncludesAlternatesWithoutDuplicates() {
-        val device = Device(
-            alias = "Multi",
-            fingerprint = "fp",
-            ip = "192.168.43.1",
-            alternateIps = listOf("192.168.1.10", "192.168.43.1")
-        )
+        val device =
+            Device(
+                alias = "Multi",
+                fingerprint = "fp",
+                ip = "192.168.43.1",
+                alternateIps = listOf("192.168.1.10", "192.168.43.1"),
+            )
         assertEquals(listOf("192.168.43.1", "192.168.1.10"), device.allIps)
 
         assertEquals(listOf("10.0.0.1"), Device(alias = "Single", fingerprint = "fp", ip = "10.0.0.1").allIps)
@@ -86,7 +86,7 @@ class DeviceTest {
         assertEquals("http://192.168.1.5:53317", Device(alias = "a", fingerprint = "f", ip = "192.168.1.5").url)
         assertEquals(
             "https://10.0.0.9:8443",
-            Device(alias = "a", fingerprint = "f", ip = "10.0.0.9", port = 8443, protocol = "https").url
+            Device(alias = "a", fingerprint = "f", ip = "10.0.0.9", port = 8443, protocol = "https").url,
         )
     }
 }

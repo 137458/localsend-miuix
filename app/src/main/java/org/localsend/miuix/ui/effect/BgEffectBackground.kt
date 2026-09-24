@@ -41,9 +41,10 @@ fun BgEffectBackground(
         val isDarkTheme = isSystemInDarkTheme()
         val painter = remember(isOs3Effect) { BgEffectPainter(isOs3Effect) }
 
-        val preset = remember(deviceType, isDarkTheme, isOs3Effect) {
-            BgEffectConfig.get(deviceType, isDarkTheme, isOs3Effect)
-        }
+        val preset =
+            remember(deviceType, isDarkTheme, isOs3Effect) {
+                BgEffectConfig.get(deviceType, isDarkTheme, isOs3Effect)
+            }
 
         val colorStage = remember { Animatable(0f) }
 
@@ -64,21 +65,22 @@ fun BgEffectBackground(
         }
 
         Spacer(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(bgModifier)
-                .bgEffectDraw(
-                    painter = painter,
-                    preset = preset,
-                    deviceType = deviceType,
-                    isDarkTheme = isDarkTheme,
-                    surface = surface,
-                    effectBackground = effectBackground,
-                    isFullSize = isFullSize,
-                    playing = dynamicBackground,
-                    colorStage = { colorStage.value },
-                    alpha = alpha,
-                ),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .then(bgModifier)
+                    .bgEffectDraw(
+                        painter = painter,
+                        preset = preset,
+                        deviceType = deviceType,
+                        isDarkTheme = isDarkTheme,
+                        surface = surface,
+                        effectBackground = effectBackground,
+                        isFullSize = isFullSize,
+                        playing = dynamicBackground,
+                        colorStage = { colorStage.value },
+                        alpha = alpha,
+                    ),
         )
         content()
     }

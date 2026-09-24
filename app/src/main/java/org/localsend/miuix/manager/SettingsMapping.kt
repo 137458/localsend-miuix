@@ -14,7 +14,11 @@ internal fun resolveInitialAlias(prefs: SharedPreferences): String =
     }
 
 /** 将持久化配置映射为 [AppSettings]。 */
-internal fun loadSettings(prefs: SharedPreferences, alias: String, defaultDownloadPath: String): AppSettings =
+internal fun loadSettings(
+    prefs: SharedPreferences,
+    alias: String,
+    defaultDownloadPath: String,
+): AppSettings =
     AppSettings(
         alias = alias,
         port = prefs.getInt(PreferenceKeys.KEY_PORT, 53317),
@@ -37,12 +41,16 @@ internal fun loadSettings(prefs: SharedPreferences, alias: String, defaultDownlo
         isOs3Effect = prefs.getBoolean(PreferenceKeys.KEY_IS_OS3_EFFECT, true),
         wideScreenNavigationRail = prefs.getBoolean(PreferenceKeys.KEY_WIDE_SCREEN_NAVIGATION_RAIL, false),
         saveTextAsFile = prefs.getBoolean(PreferenceKeys.KEY_SAVE_TEXT_AS_FILE, false),
-        autoCategorizeMedia = prefs.getBoolean(PreferenceKeys.KEY_AUTO_CATEGORIZE_MEDIA, false)
+        autoCategorizeMedia = prefs.getBoolean(PreferenceKeys.KEY_AUTO_CATEGORIZE_MEDIA, false),
     )
 
 /** 将 [AppSettings] 写回持久化配置。 */
-internal fun persistSettingsTo(prefs: SharedPreferences, s: AppSettings) {
-    prefs.edit()
+internal fun persistSettingsTo(
+    prefs: SharedPreferences,
+    s: AppSettings,
+) {
+    prefs
+        .edit()
         .putString(PreferenceKeys.KEY_ALIAS, s.alias)
         .putInt(PreferenceKeys.KEY_PORT, s.port)
         .putString(PreferenceKeys.KEY_TREE_URI, s.downloadTreeUri)

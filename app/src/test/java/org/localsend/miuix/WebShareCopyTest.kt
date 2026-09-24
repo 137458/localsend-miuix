@@ -7,7 +7,6 @@ import org.junit.Test
 import org.localsend.miuix.webshare.WebShareCopy
 
 class WebShareCopyTest {
-
     @Test
     fun englishBrowserGetsEnglishPageCopy() {
         val copy = WebShareCopy.fromAcceptLanguage("en-US,en;q=0.9,zh;q=0.8")
@@ -37,11 +36,11 @@ class WebShareCopyTest {
     fun browserModelUsesCopyLanguage() {
         assertEquals(
             "Mac 浏览器",
-            WebShareCopy.browserModel("Mozilla/5.0 (Macintosh; Intel Mac OS X)", WebShareCopy.Chinese)
+            WebShareCopy.browserModel("Mozilla/5.0 (Macintosh; Intel Mac OS X)", WebShareCopy.Chinese),
         )
         assertEquals(
             "Mac browser",
-            WebShareCopy.browserModel("Mozilla/5.0 (Macintosh; Intel Mac OS X)", WebShareCopy.English)
+            WebShareCopy.browserModel("Mozilla/5.0 (Macintosh; Intel Mac OS X)", WebShareCopy.English),
         )
     }
 
@@ -110,11 +109,12 @@ class WebShareCopyTest {
 
     @Test
     fun toJsObjectEscapesQuotesBackslashesAndNewlines() {
-        val copy = WebShareCopy.Chinese.copy(
-            copied = "line1\nline2",
-            copyFailed = "quote\"here",
-            waitingConfirm = "back\\slash"
-        )
+        val copy =
+            WebShareCopy.Chinese.copy(
+                copied = "line1\nline2",
+                copyFailed = "quote\"here",
+                waitingConfirm = "back\\slash",
+            )
         val js = copy.toJsObject()
         assertTrue(js.startsWith("{"))
         assertTrue(js.endsWith("}"))

@@ -5,7 +5,6 @@ import org.junit.Test
 import org.localsend.miuix.util.SavePathHelper
 
 class SavePathHelperTest {
-
     @Test
     fun resolveRootFileName() {
         val res = SavePathHelper.resolve("document.pdf")
@@ -90,11 +89,11 @@ class SavePathHelperTest {
     fun buildMediaStoreRelativePathCleansBaseAndSub() {
         assertEquals(
             "Download/LocalSend/",
-            SavePathHelper.buildMediaStoreRelativePath("Download/LocalSend///", "   ")
+            SavePathHelper.buildMediaStoreRelativePath("Download/LocalSend///", "   "),
         )
         assertEquals(
             "Download/LocalSend/sub/dir/",
-            SavePathHelper.buildMediaStoreRelativePath("Download/LocalSend", " sub/dir/ ")
+            SavePathHelper.buildMediaStoreRelativePath("Download/LocalSend", " sub/dir/ "),
         )
     }
 

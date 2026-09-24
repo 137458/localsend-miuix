@@ -60,8 +60,13 @@ import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 private object AppIconCache {
     private val cache = object : LruCache<String, ImageBitmap>(512) {}
+
     fun get(packageName: String): ImageBitmap? = cache.get(packageName)
-    fun put(packageName: String, bitmap: ImageBitmap) {
+
+    fun put(
+        packageName: String,
+        bitmap: ImageBitmap,
+    ) {
         cache.put(packageName, bitmap)
     }
 }
@@ -69,7 +74,7 @@ private object AppIconCache {
 @Composable
 private fun AppIconImage(
     packageName: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var iconBitmap by remember(packageName) { mutableStateOf(AppIconCache.get(packageName)) }
@@ -80,16 +85,17 @@ private fun AppIconImage(
             if (cached != null) {
                 iconBitmap = cached
             } else {
-                val bitmap = withContext(Dispatchers.IO) {
-                    try {
-                        val pm = context.packageManager
-                        val drawable = pm.getApplicationIcon(packageName)
-                        val bmp = drawable.toBitmap(width = 96, height = 96, config = Bitmap.Config.ARGB_8888)
-                        bmp.asImageBitmap().also { AppIconCache.put(packageName, it) }
-                    } catch (e: Exception) {
-                        null
+                val bitmap =
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val pm = context.packageManager
+                            val drawable = pm.getApplicationIcon(packageName)
+                            val bmp = drawable.toBitmap(width = 96, height = 96, config = Bitmap.Config.ARGB_8888)
+                            bmp.asImageBitmap().also { AppIconCache.put(packageName, it) }
+                        } catch (e: Exception) {
+                            null
+                        }
                     }
-                }
                 iconBitmap = bitmap
             }
         }
@@ -99,20 +105,21 @@ private fun AppIconImage(
         Image(
             bitmap = iconBitmap!!,
             contentDescription = null,
-            modifier = modifier.clip(RoundedCornerShape(8.dp))
+            modifier = modifier.clip(RoundedCornerShape(8.dp)),
         )
     } else {
         Box(
-            modifier = modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
+            modifier =
+                modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Default.Android,
                 contentDescription = null,
                 tint = MiuixTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(20.dp),
             )
         }
     }
@@ -122,7 +129,7 @@ private fun AppIconImage(
 fun AppPickerBottomSheet(
     show: Boolean,
     onDismissRequest: () -> Unit,
-    manager: LocalSendManager
+    manager: LocalSendManager,
 ) {
     val coroutineScope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
@@ -143,26 +150,30 @@ fun AppPickerBottomSheet(
         }
     }
 
-    val filteredApps = remember(allApps, searchQuery, showSystemApps) {
-        allApps.filter { app ->
-            (showSystemApps || !app.isSystemApp) &&
-                (searchQuery.isEmpty() ||
-                    app.label.contains(searchQuery, ignoreCase = true) ||
-                    app.packageName.contains(searchQuery, ignoreCase = true))
+    val filteredApps =
+        remember(allApps, searchQuery, showSystemApps) {
+            allApps.filter { app ->
+                (showSystemApps || !app.isSystemApp) &&
+                    (
+                        searchQuery.isEmpty() ||
+                            app.label.contains(searchQuery, ignoreCase = true) ||
+                            app.packageName.contains(searchQuery, ignoreCase = true)
+                    )
+            }
         }
-    }
 
     val isAllFilteredSelected = filteredApps.isNotEmpty() && filteredApps.all { selectedPackages.contains(it.packageName) }
 
     WindowBottomSheet(
         show = show,
         onDismissRequest = onDismissRequest,
-        title = stringResource(R.string.app_picker_title)
+        title = stringResource(R.string.app_picker_title),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             TextField(
                 value = searchQuery,
@@ -170,7 +181,7 @@ fun AppPickerBottomSheet(
                 label = stringResource(R.string.app_picker_search_label),
                 useLabelAsPlaceholder = true,
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -178,21 +189,23 @@ fun AppPickerBottomSheet(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { showSystemApps = !showSystemApps }
+                    modifier = Modifier.clickable { showSystemApps = !showSystemApps },
                 ) {
                     Checkbox(
-                        state = androidx.compose.ui.state.ToggleableState(showSystemApps),
-                        onClick = { showSystemApps = !showSystemApps }
+                        state =
+                            androidx.compose.ui.state
+                                .ToggleableState(showSystemApps),
+                        onClick = { showSystemApps = !showSystemApps },
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = stringResource(R.string.app_picker_show_system_apps),
                         style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
 
@@ -200,22 +213,22 @@ fun AppPickerBottomSheet(
                     Text(
                         text = stringResource(R.string.app_picker_selected_count, selectedPackages.size, filteredApps.size),
                         style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (isRefreshing) stringResource(R.string.app_picker_refreshing) else stringResource(R.string.btn_refresh),
                         style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
                         color = if (isRefreshing) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .clickable(enabled = !isRefreshing) {
-                                coroutineScope.launch {
-                                    isRefreshing = true
-                                    allApps = manager.getInstalledApps(forceRefresh = true)
-                                    isRefreshing = false
-                                }
-                            }
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                        modifier =
+                            Modifier
+                                .clickable(enabled = !isRefreshing) {
+                                    coroutineScope.launch {
+                                        isRefreshing = true
+                                        allApps = manager.getInstalledApps(forceRefresh = true)
+                                        isRefreshing = false
+                                    }
+                                }.padding(horizontal = 4.dp, vertical = 2.dp),
                     )
                 }
             }
@@ -227,27 +240,29 @@ fun AppPickerBottomSheet(
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.End,
                 ) {
-                    val selectAllLabel = when {
-                        searchQuery.isNotBlank() && isAllFilteredSelected -> stringResource(R.string.app_picker_deselect_all_filtered, filteredApps.size)
-                        searchQuery.isNotBlank() && !isAllFilteredSelected -> stringResource(R.string.app_picker_select_all_filtered, filteredApps.size)
-                        isAllFilteredSelected -> stringResource(R.string.app_picker_deselect_all)
-                        else -> stringResource(R.string.app_picker_select_all)
-                    }
+                    val selectAllLabel =
+                        when {
+                            searchQuery.isNotBlank() && isAllFilteredSelected -> stringResource(R.string.app_picker_deselect_all_filtered, filteredApps.size)
+                            searchQuery.isNotBlank() && !isAllFilteredSelected -> stringResource(R.string.app_picker_select_all_filtered, filteredApps.size)
+                            isAllFilteredSelected -> stringResource(R.string.app_picker_deselect_all)
+                            else -> stringResource(R.string.app_picker_select_all)
+                        }
                     Text(
                         text = selectAllLabel,
                         style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
                         color = MiuixTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .clickable {
-                                selectedPackages = if (isAllFilteredSelected) {
-                                    selectedPackages - filteredApps.map { it.packageName }.toSet()
-                                } else {
-                                    selectedPackages + filteredApps.map { it.packageName }
-                                }
-                            }
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                        modifier =
+                            Modifier
+                                .clickable {
+                                    selectedPackages =
+                                        if (isAllFilteredSelected) {
+                                            selectedPackages - filteredApps.map { it.packageName }.toSet()
+                                        } else {
+                                            selectedPackages + filteredApps.map { it.packageName }
+                                        }
+                                }.padding(horizontal = 4.dp, vertical = 2.dp),
                     )
                 }
             }
@@ -256,72 +271,81 @@ fun AppPickerBottomSheet(
 
             if (isLoading || isRefreshing) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height((maxListHeight * 0.7f).coerceIn(180.dp, 260.dp)),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height((maxListHeight * 0.7f).coerceIn(180.dp, 260.dp)),
+                    contentAlignment = Alignment.Center,
                 ) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp))
                 }
             } else if (filteredApps.isEmpty()) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = stringResource(R.string.app_picker_empty),
                         style = MiuixTheme.textStyles.body2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = maxListHeight),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = maxListHeight),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     items(
                         items = filteredApps,
                         key = { it.packageName },
-                        contentType = { "app_info_card" }
+                        contentType = { "app_info_card" },
                     ) { app ->
                         val isSelected = selectedPackages.contains(app.packageName)
                         Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedPackages = if (isSelected) {
-                                        selectedPackages - app.packageName
-                                    } else {
-                                        selectedPackages + app.packageName
-                                    }
-                                }
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedPackages =
+                                            if (isSelected) {
+                                                selectedPackages - app.packageName
+                                            } else {
+                                                selectedPackages + app.packageName
+                                            }
+                                    },
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Checkbox(
-                                    state = androidx.compose.ui.state.ToggleableState(isSelected),
+                                    state =
+                                        androidx.compose.ui.state
+                                            .ToggleableState(isSelected),
                                     onClick = {
-                                        selectedPackages = if (isSelected) {
-                                            selectedPackages - app.packageName
-                                        } else {
-                                            selectedPackages + app.packageName
-                                        }
-                                    }
+                                        selectedPackages =
+                                            if (isSelected) {
+                                                selectedPackages - app.packageName
+                                            } else {
+                                                selectedPackages + app.packageName
+                                            }
+                                    },
                                 )
 
                                 Spacer(modifier = Modifier.width(10.dp))
 
                                 AppIconImage(
                                     packageName = app.packageName,
-                                    modifier = Modifier.size(38.dp)
+                                    modifier = Modifier.size(38.dp),
                                 )
 
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -333,14 +357,14 @@ fun AppPickerBottomSheet(
                                             style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.SemiBold),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f, fill = false)
+                                            modifier = Modifier.weight(1f, fill = false),
                                         )
                                         if (app.isSystemApp) {
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
                                                 text = stringResource(R.string.app_picker_system_tag),
                                                 style = MiuixTheme.textStyles.footnote1,
-                                                color = MiuixTheme.colorScheme.primary
+                                                color = MiuixTheme.colorScheme.primary,
                                             )
                                         }
                                     }
@@ -350,7 +374,7 @@ fun AppPickerBottomSheet(
                                         style = MiuixTheme.textStyles.footnote1,
                                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                             }
@@ -363,11 +387,11 @@ fun AppPickerBottomSheet(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.End,
             ) {
                 Button(
                     onClick = onDismissRequest,
-                    colors = ButtonDefaults.buttonColors()
+                    colors = ButtonDefaults.buttonColors(),
                 ) {
                     Text(stringResource(R.string.btn_cancel))
                 }
@@ -381,7 +405,7 @@ fun AppPickerBottomSheet(
                         onDismissRequest()
                     },
                     enabled = selectedPackages.isNotEmpty(),
-                    colors = ButtonDefaults.buttonColorsPrimary()
+                    colors = ButtonDefaults.buttonColorsPrimary(),
                 ) {
                     Text(stringResource(R.string.app_picker_btn_add_selected, selectedPackages.size))
                 }
@@ -389,4 +413,3 @@ fun AppPickerBottomSheet(
         }
     }
 }
-

@@ -6,8 +6,8 @@ plugins {
 }
 
 ktlint {
-    // 仅用于手动执行 ./gradlew ktlintCheck，不因样式问题导致 build/check 失败
-    ignoreFailures.set(true)
+    // 样式违规会导致构建失败，可执行 ./gradlew ktlintFormat 自动修复
+    ignoreFailures.set(false)
 }
 
 android {
@@ -31,7 +31,7 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
         debug {
@@ -63,22 +63,23 @@ android {
 
     packaging {
         resources {
-            excludes += setOf(
-                "META-INF/INDEX.LIST",
-                "META-INF/io.netty.versions.properties",
-                "META-INF/DEPENDENCIES",
-                "META-INF/LICENSE",
-                "META-INF/LICENSE.txt",
-                "META-INF/license.txt",
-                "META-INF/NOTICE",
-                "META-INF/NOTICE.txt",
-                "META-INF/notice.txt",
-                "META-INF/*.version",
-                "META-INF/native-image/**",
-                "META-INF/services/reactor.blockhound.integration.BlockHoundIntegration",
-                "org/fusesource/jansi/**",
-                "org/bouncycastle/pqc/**"
-            )
+            excludes +=
+                setOf(
+                    "META-INF/INDEX.LIST",
+                    "META-INF/io.netty.versions.properties",
+                    "META-INF/DEPENDENCIES",
+                    "META-INF/LICENSE",
+                    "META-INF/LICENSE.txt",
+                    "META-INF/license.txt",
+                    "META-INF/NOTICE",
+                    "META-INF/NOTICE.txt",
+                    "META-INF/notice.txt",
+                    "META-INF/*.version",
+                    "META-INF/native-image/**",
+                    "META-INF/services/reactor.blockhound.integration.BlockHoundIntegration",
+                    "org/fusesource/jansi/**",
+                    "org/bouncycastle/pqc/**",
+                )
         }
     }
 }

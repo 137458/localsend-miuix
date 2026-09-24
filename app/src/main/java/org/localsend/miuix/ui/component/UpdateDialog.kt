@@ -96,44 +96,46 @@ fun UpdateDialog(
         lastSpeedUpdateTime = System.currentTimeMillis()
         lastSpeedBytes = 0L
 
-        downloadJob = coroutineScope.launch {
-            val result = updateManager.downloadApk(
-                downloadUrl = downloadUrl,
-                onProgress = { progress, downloaded, total ->
-                    downloadProgress = progress
-                    downloadedBytes = downloaded
-                    totalBytes = total
+        downloadJob =
+            coroutineScope.launch {
+                val result =
+                    updateManager.downloadApk(
+                        downloadUrl = downloadUrl,
+                        onProgress = { progress, downloaded, total ->
+                            downloadProgress = progress
+                            downloadedBytes = downloaded
+                            totalBytes = total
 
-                    val now = System.currentTimeMillis()
-                    val dt = now - lastSpeedUpdateTime
-                    if (dt >= 400L) {
-                        val dBytes = downloaded - lastSpeedBytes
-                        if (dBytes > 0L) {
-                            val instantSpeed = (dBytes * 1000L) / dt
-                            downloadSpeed = if (downloadSpeed == 0L) {
-                                instantSpeed
-                            } else {
-                                (downloadSpeed * 7 + instantSpeed * 3) / 10
+                            val now = System.currentTimeMillis()
+                            val dt = now - lastSpeedUpdateTime
+                            if (dt >= 400L) {
+                                val dBytes = downloaded - lastSpeedBytes
+                                if (dBytes > 0L) {
+                                    val instantSpeed = (dBytes * 1000L) / dt
+                                    downloadSpeed =
+                                        if (downloadSpeed == 0L) {
+                                            instantSpeed
+                                        } else {
+                                            (downloadSpeed * 7 + instantSpeed * 3) / 10
+                                        }
+                                }
+                                lastSpeedUpdateTime = now
+                                lastSpeedBytes = downloaded
                             }
+                        },
+                    )
+                isDownloading = false
+                downloadJob = null
+                result
+                    .onSuccess { file ->
+                        downloadedFile = file
+                        updateManager.installApk(context, file)
+                    }.onFailure { error ->
+                        if (error !is CancellationException) {
+                            downloadError = error.localizedMessage ?: context.getString(R.string.toast_download_apk_failed, "")
                         }
-                        lastSpeedUpdateTime = now
-                        lastSpeedBytes = downloaded
                     }
-                },
-            )
-            isDownloading = false
-            downloadJob = null
-            result
-                .onSuccess { file ->
-                    downloadedFile = file
-                    updateManager.installApk(context, file)
-                }
-                .onFailure { error ->
-                    if (error !is CancellationException) {
-                        downloadError = error.localizedMessage ?: context.getString(R.string.toast_download_apk_failed, "")
-                    }
-                }
-        }
+            }
     }
 
     WindowDialog(
@@ -151,36 +153,39 @@ fun UpdateDialog(
         ) {
             // 版本与发布元信息横栏
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f))
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f))
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
                     ) {
                         Text(
                             text = releaseInfo.latestVersion,
-                            style = MiuixTheme.textStyles.body2.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            ),
-                            color = MiuixTheme.colorScheme.primary
+                            style =
+                                MiuixTheme.textStyles.body2.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                ),
+                            color = MiuixTheme.colorScheme.primary,
                         )
                     }
                     if (releaseInfo.apkSize > 0L) {
                         Text(
                             text = FileItem.formatFileSize(releaseInfo.apkSize),
                             style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                     }
                 }
@@ -188,20 +193,21 @@ fun UpdateDialog(
                     Text(
                         text = releaseInfo.publishedAt,
                         style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
             }
 
             // 更新日志容器卡片
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 72.dp, max = 220.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                    .verticalScroll(rememberScrollState()),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 72.dp, max = 220.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                        .verticalScroll(rememberScrollState()),
             ) {
                 if (releaseInfo.changelog.isNotBlank()) {
                     MarkdownText(
@@ -222,16 +228,17 @@ fun UpdateDialog(
             if (isDownloading) {
                 Spacer(modifier = Modifier.height(14.dp))
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
-                        .padding(12.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                            .padding(12.dp),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val speedText = if (downloadSpeed > 0L) " · ${FileItem.formatSpeed(downloadSpeed)}" else ""
                         Text(
@@ -240,11 +247,12 @@ fun UpdateDialog(
                             color = MiuixTheme.colorScheme.primary,
                         )
                         val percent = if (downloadProgress >= 0f) "${(downloadProgress * 100).toInt()}%" else ""
-                        val sizeText = if (totalBytes > 0L) {
-                            "${FileItem.formatFileSize(downloadedBytes)} / ${FileItem.formatFileSize(totalBytes)}"
-                        } else {
-                            FileItem.formatFileSize(downloadedBytes)
-                        }
+                        val sizeText =
+                            if (totalBytes > 0L) {
+                                "${FileItem.formatFileSize(downloadedBytes)} / ${FileItem.formatFileSize(totalBytes)}"
+                            } else {
+                                FileItem.formatFileSize(downloadedBytes)
+                            }
                         Text(
                             text = if (percent.isNotEmpty()) "$sizeText ($percent)" else sizeText,
                             style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
@@ -260,12 +268,13 @@ fun UpdateDialog(
             } else if (downloadedFile != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.08f))
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.08f))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = stringResource(R.string.update_dialog_ready_install),
@@ -276,11 +285,12 @@ fun UpdateDialog(
             } else if (downloadError != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MiuixTheme.colorScheme.error.copy(alpha = 0.08f))
-                        .padding(12.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MiuixTheme.colorScheme.error.copy(alpha = 0.08f))
+                            .padding(12.dp),
                 ) {
                     Text(
                         text = stringResource(R.string.update_dialog_download_failed, downloadError ?: ""),
@@ -393,13 +403,13 @@ fun UpdateDialog(
                 style = MiuixTheme.textStyles.body2.copy(fontSize = 11.sp),
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable {
-                        updateManager.openInBrowser(context, releaseInfo.releaseUrl)
-                    }
-                    .padding(vertical = 4.dp)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            updateManager.openInBrowser(context, releaseInfo.releaseUrl)
+                        }.padding(vertical = 4.dp),
             )
         }
     }

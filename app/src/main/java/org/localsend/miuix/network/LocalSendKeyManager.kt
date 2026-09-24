@@ -1,10 +1,10 @@
 package org.localsend.miuix.network
 
 import java.net.Socket
+import java.security.KeyStore
 import java.security.Principal
 import java.security.PrivateKey
 import java.security.cert.X509Certificate
-import java.security.KeyStore
 import javax.net.ssl.SSLEngine
 import javax.net.ssl.X509ExtendedKeyManager
 
@@ -20,39 +20,46 @@ class LocalSendKeyManager(
     private val standardKeyManager: X509ExtendedKeyManager?,
     private val keyStore: KeyStore,
     private val alias: String,
-    private val password: CharArray
+    private val password: CharArray,
 ) : X509ExtendedKeyManager() {
+    override fun getClientAliases(
+        keyType: String?,
+        issuers: Array<out Principal>?,
+    ): Array<String> = arrayOf(alias)
 
-    override fun getClientAliases(keyType: String?, issuers: Array<out Principal>?): Array<String> {
-        return arrayOf(alias)
-    }
+    override fun chooseClientAlias(
+        keyType: Array<out String>?,
+        issuers: Array<out Principal>?,
+        socket: Socket?,
+    ): String = alias
 
-    override fun chooseClientAlias(keyType: Array<out String>?, issuers: Array<out Principal>?, socket: Socket?): String {
-        return alias
-    }
+    override fun chooseEngineClientAlias(
+        keyType: Array<out String>?,
+        issuers: Array<out Principal>?,
+        engine: SSLEngine?,
+    ): String = alias
 
-    override fun chooseEngineClientAlias(keyType: Array<out String>?, issuers: Array<out Principal>?, engine: SSLEngine?): String {
-        return alias
-    }
+    override fun getServerAliases(
+        keyType: String?,
+        issuers: Array<out Principal>?,
+    ): Array<String>? = standardKeyManager?.getServerAliases(keyType, issuers) ?: arrayOf(alias)
 
-    override fun getServerAliases(keyType: String?, issuers: Array<out Principal>?): Array<String>? {
-        return standardKeyManager?.getServerAliases(keyType, issuers) ?: arrayOf(alias)
-    }
+    override fun chooseServerAlias(
+        keyType: String?,
+        issuers: Array<out Principal>?,
+        socket: Socket?,
+    ): String? = standardKeyManager?.chooseServerAlias(keyType, issuers, socket) ?: alias
 
-    override fun chooseServerAlias(keyType: String?, issuers: Array<out Principal>?, socket: Socket?): String? {
-        return standardKeyManager?.chooseServerAlias(keyType, issuers, socket) ?: alias
-    }
-
-    override fun chooseEngineServerAlias(keyType: String?, issuers: Array<out Principal>?, engine: SSLEngine?): String? {
-        return standardKeyManager?.chooseEngineServerAlias(keyType, issuers, engine) ?: alias
-    }
+    override fun chooseEngineServerAlias(
+        keyType: String?,
+        issuers: Array<out Principal>?,
+        engine: SSLEngine?,
+    ): String? = standardKeyManager?.chooseEngineServerAlias(keyType, issuers, engine) ?: alias
 
     override fun getCertificateChain(alias: String?): Array<X509Certificate>? {
         val chain = keyStore.getCertificateChain(alias ?: this.alias)
         return chain?.mapNotNull { it as? X509Certificate }?.toTypedArray()
     }
 
-    override fun getPrivateKey(alias: String?): PrivateKey? {
-        return keyStore.getKey(alias ?: this.alias, password) as? PrivateKey
-    }
+    override fun getPrivateKey(alias: String?): PrivateKey? = keyStore.getKey(alias ?: this.alias, password) as? PrivateKey
 }

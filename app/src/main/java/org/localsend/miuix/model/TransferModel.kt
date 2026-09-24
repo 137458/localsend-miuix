@@ -12,19 +12,19 @@ data class FileDto(
     val size: Long,
     val fileType: String = "application/octet-stream",
     val sha256: String? = null,
-    val preview: String? = null
+    val preview: String? = null,
 )
 
 @Serializable
 data class PrepareUploadRequestDto(
     val info: DeviceDto,
-    val files: Map<String, FileDto>
+    val files: Map<String, FileDto>,
 )
 
 @Serializable
 data class PrepareUploadResponseDto(
     val sessionId: String,
-    val files: Map<String, String> // fileId to token
+    val files: Map<String, String>, // fileId to token
 )
 
 /** 协议 §5.2：Download(Web Share) 元数据响应的 info 部分（对齐 /info 与 /prepare-download 需包含的字段）。 */
@@ -32,7 +32,7 @@ data class PrepareUploadResponseDto(
 data class PrepareDownloadResponseDto(
     val info: DeviceDto,
     val sessionId: String,
-    val files: Map<String, FileDto>
+    val files: Map<String, FileDto>,
 )
 
 /**
@@ -44,10 +44,14 @@ data class PrepareDownloadResponseDto(
 data class ShareSession(
     val sessionId: String = UUID.randomUUID().toString(),
     val createdAt: Long = System.currentTimeMillis(),
-    val files: List<FileItem>
+    val files: List<FileItem>,
 ) {
     /** 接收方浏览器访问的入口地址（协议 §5.1）。根据服务协议动态决定 http/https，端口取端口号。 */
-    fun downloadLink(protocol: String = "http", ip: String, port: Int): String = "$protocol://$ip:$port"
+    fun downloadLink(
+        protocol: String = "http",
+        ip: String,
+        port: Int,
+    ): String = "$protocol://$ip:$port"
 }
 
 @Serializable
@@ -56,7 +60,7 @@ enum class TransferStatus {
     InProgress,
     Completed,
     Canceled,
-    Failed
+    Failed,
 }
 
 /**
@@ -83,18 +87,17 @@ data class FileItem(
     var error: String? = null,
     // 通过 MediaStore 写入公共目录时，记录插入出的 Uri，用于完成后清除 IS_PENDING 标记
     var mediaStoreUri: Uri? = null,
-    val isTextMessage: Boolean = textContent != null
+    val isTextMessage: Boolean = textContent != null,
 ) {
-    fun toDto(): FileDto {
-        return FileDto(
+    fun toDto(): FileDto =
+        FileDto(
             id = id,
             fileName = name,
             size = size,
             fileType = if (isTextMessage) "text" else mimeType,
             sha256 = expectedSha256,
-            preview = if (isTextMessage) textContent?.take(2000) else null
+            preview = if (isTextMessage) textContent?.take(2000) else null,
         )
-    }
 
     val formattedSize: String
         get() = formatFileSize(size)
@@ -107,11 +110,14 @@ data class FileItem(
                 java.util.Locale.US,
                 "%.1f %sB",
                 bytes.toDouble() / (1L shl (z * 10)),
-                " KMGTPE"[z]
+                " KMGTPE"[z],
             )
         }
 
-        fun formatSpeed(bytesPerSec: Long, compact: Boolean = false): String {
+        fun formatSpeed(
+            bytesPerSec: Long,
+            compact: Boolean = false,
+        ): String {
             if (bytesPerSec < 1024) return "$bytesPerSec B/s"
             return if (compact) {
                 val mb = bytesPerSec.toDouble() / (1024.0 * 1024.0)
@@ -143,15 +149,14 @@ data class TransferSession(
     var endTime: Long? = null,
     var errorMessage: String? = null,
     val updateSeq: Long = 0L,
-    var lastActiveTime: Long = System.currentTimeMillis()
+    var lastActiveTime: Long = System.currentTimeMillis(),
 ) {
-    fun createSnapshot(seq: Long = System.nanoTime()): TransferSession {
-        return copy(
+    fun createSnapshot(seq: Long = System.nanoTime()): TransferSession =
+        copy(
             files = files.map { it.copy() },
             updateSeq = seq,
-            lastActiveTime = lastActiveTime
+            lastActiveTime = lastActiveTime,
         )
-    }
 
     val isTextMessage: Boolean
         get() = files.size == 1 && files.first().isTextMessage
@@ -202,7 +207,7 @@ data class HistoryFileEntry(
     val size: Long,
     val uriString: String? = null,
     val path: String? = null,
-    val mimeType: String = "application/octet-stream"
+    val mimeType: String = "application/octet-stream",
 ) {
     val uri: Uri?
         get() = uriString?.let { Uri.parse(it) }
@@ -212,13 +217,13 @@ data class HistoryFileEntry(
         size: Long,
         uri: Uri?,
         path: String?,
-        mimeType: String = "application/octet-stream"
+        mimeType: String = "application/octet-stream",
     ) : this(
         name = name,
         size = size,
         uriString = uri?.toString(),
         path = path,
-        mimeType = mimeType
+        mimeType = mimeType,
     )
 }
 
@@ -235,7 +240,7 @@ data class TransferHistoryItem(
     val fileNames: List<String>,
     val textContent: String? = null,
     val isTextMessage: Boolean = false,
-    val fileEntries: List<HistoryFileEntry> = emptyList()
+    val fileEntries: List<HistoryFileEntry> = emptyList(),
 ) {
     val formattedSize: String
         get() = FileItem.formatFileSize(totalSize)

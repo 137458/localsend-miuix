@@ -5,7 +5,6 @@ import org.junit.Test
 import org.localsend.miuix.model.FileItem
 
 class TransferSpeedFormatTest {
-
     @Test
     fun testFormatSpeed_full() {
         assertEquals("0 B/s", FileItem.formatSpeed(0L, compact = false))

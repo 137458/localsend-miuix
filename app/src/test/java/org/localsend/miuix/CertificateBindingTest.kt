@@ -7,7 +7,6 @@ import org.localsend.miuix.network.CertificateBinding
 import org.localsend.miuix.network.FingerprintTrust
 
 class CertificateBindingTest {
-
     @Test
     fun officialHttpsFingerprintMustMatchObservedCert() {
         val declared = "AA:BB:CC:DD:EE:FF:11:22"

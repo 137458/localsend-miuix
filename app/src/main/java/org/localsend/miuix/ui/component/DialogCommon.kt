@@ -20,23 +20,23 @@ internal fun DialogButtonRow(
     primaryText: String,
     onPrimary: () -> Unit,
     primaryColors: ButtonColors = ButtonDefaults.buttonColors(),
-    spacing: Dp = 12.dp
+    spacing: Dp = 12.dp,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(spacing)
+        horizontalArrangement = Arrangement.spacedBy(spacing),
     ) {
         Button(
             onClick = onSecondary,
             colors = ButtonDefaults.buttonColors(),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         ) {
             Text(secondaryText)
         }
         Button(
             onClick = onPrimary,
             colors = primaryColors,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         ) {
             Text(primaryText)
         }

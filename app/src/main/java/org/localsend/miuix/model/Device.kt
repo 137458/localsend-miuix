@@ -2,19 +2,22 @@ package org.localsend.miuix.model
 
 import kotlinx.serialization.Serializable
 
+// 枚举项须与 LocalSend 协议中的设备类型字面量一致，且 kotlinx.serialization 按枚举项名序列化，故保持小写
 @Serializable
-enum class DeviceType(val value: String) {
+@Suppress("ktlint:standard:enum-entry-name-case")
+enum class DeviceType(
+    val value: String,
+) {
     mobile("mobile"),
     tablet("tablet"),
     desktop("desktop"),
     web("web"),
     headless("headless"),
-    server("server");
+    server("server"),
+    ;
 
     companion object {
-        fun fromString(str: String?): DeviceType {
-            return entries.firstOrNull { it.value.equals(str, ignoreCase = true) } ?: mobile
-        }
+        fun fromString(str: String?): DeviceType = entries.firstOrNull { it.value.equals(str, ignoreCase = true) } ?: mobile
     }
 }
 
@@ -28,7 +31,7 @@ data class DeviceDto(
     val port: Int = 53317,
     val protocol: String = "http",
     val download: Boolean = false,
-    val announce: Boolean? = null
+    val announce: Boolean? = null,
 )
 
 data class Device(
@@ -42,13 +45,13 @@ data class Device(
     val download: Boolean = false,
     val ip: String,
     val alternateIps: List<String> = emptyList(),
-    val lastSeen: Long = System.currentTimeMillis()
+    val lastSeen: Long = System.currentTimeMillis(),
 ) {
     val allIps: List<String>
         get() = (listOf(ip) + alternateIps).distinct()
 
-    fun toDto(announce: Boolean? = null): DeviceDto {
-        return DeviceDto(
+    fun toDto(announce: Boolean? = null): DeviceDto =
+        DeviceDto(
             alias = alias,
             version = version,
             deviceModel = deviceModel,
@@ -57,9 +60,8 @@ data class Device(
             port = port,
             protocol = protocol,
             download = download,
-            announce = announce
+            announce = announce,
         )
-    }
 
     fun matches(other: Device): Boolean {
         if (fingerprint.isNotBlank() && other.fingerprint.isNotBlank()) {
@@ -72,8 +74,11 @@ data class Device(
         get() = "$protocol://$ip:$port"
 
     companion object {
-        fun fromDto(dto: DeviceDto, ip: String): Device {
-            return Device(
+        fun fromDto(
+            dto: DeviceDto,
+            ip: String,
+        ): Device =
+            Device(
                 alias = dto.alias,
                 version = dto.version,
                 deviceModel = dto.deviceModel,
@@ -83,8 +88,7 @@ data class Device(
                 protocol = dto.protocol,
                 download = dto.download,
                 ip = ip,
-                lastSeen = System.currentTimeMillis()
+                lastSeen = System.currentTimeMillis(),
             )
-        }
     }
 }

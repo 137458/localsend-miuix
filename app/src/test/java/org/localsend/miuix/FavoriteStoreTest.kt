@@ -14,21 +14,24 @@ import org.localsend.miuix.model.DeviceType
 import java.io.File
 
 class FavoriteStoreTest {
-
     @get:Rule
     val tempFolder = TemporaryFolder()
 
     private lateinit var storeFile: File
     private lateinit var favoriteStore: FavoriteStore
 
-    private fun testDevice(alias: String, ip: String, fingerprint: String = "fp-$ip") = Device(
+    private fun testDevice(
+        alias: String,
+        ip: String,
+        fingerprint: String = "fp-$ip",
+    ) = Device(
         alias = alias,
         fingerprint = fingerprint,
         port = 53317,
         protocol = "http",
         download = false,
         ip = ip,
-        deviceType = DeviceType.mobile
+        deviceType = DeviceType.mobile,
     )
 
     @Before
@@ -83,14 +86,15 @@ class FavoriteStoreTest {
 
     @Test
     fun testDeviceTypeEnumAndMatches() {
-        val dev = Device(
-            alias = "ServerNode",
-            fingerprint = "fp-server",
-            port = 53317,
-            protocol = "https",
-            ip = "192.168.1.100",
-            deviceType = DeviceType.server
-        )
+        val dev =
+            Device(
+                alias = "ServerNode",
+                fingerprint = "fp-server",
+                port = 53317,
+                protocol = "https",
+                ip = "192.168.1.100",
+                deviceType = DeviceType.server,
+            )
         val fav = FavoriteDevice.fromDevice(dev)
         assertEquals(DeviceType.server, fav.deviceType)
         assertTrue(fav.matches(dev))
@@ -118,9 +122,9 @@ class FavoriteStoreTest {
                     port = 53318,
                     protocol = "https",
                     deviceType = DeviceType.tablet,
-                    customAlias = "Renamed Beta"
-                )
-            )
+                    customAlias = "Renamed Beta",
+                ),
+            ),
         )
         val reloaded = FavoriteStore(storeFile, maxItems = 5).load()
         assertEquals(2, reloaded.size)
@@ -146,8 +150,8 @@ class FavoriteStoreTest {
         assertTrue(favoriteStore.isFavorite(testDevice("Peer", "10.0.0.7", fingerprint = "real-fp")))
         assertFalse(
             favoriteStore.isFavorite(
-                testDevice("Peer", "10.0.0.7", fingerprint = "real-fp").copy(port = 53318)
-            )
+                testDevice("Peer", "10.0.0.7", fingerprint = "real-fp").copy(port = 53318),
+            ),
         )
     }
 
@@ -185,16 +189,17 @@ class FavoriteStoreTest {
 
     @Test
     fun testFromDeviceCopiesCoreFields() {
-        val original = Device(
-            alias = "X",
-            fingerprint = "fp-x",
-            ip = "10.0.0.4",
-            port = 1234,
-            protocol = "https",
-            deviceModel = "Model",
-            deviceType = DeviceType.desktop,
-            download = true
-        )
+        val original =
+            Device(
+                alias = "X",
+                fingerprint = "fp-x",
+                ip = "10.0.0.4",
+                port = 1234,
+                protocol = "https",
+                deviceModel = "Model",
+                deviceType = DeviceType.desktop,
+                download = true,
+            )
         val favorite = FavoriteDevice.fromDevice(original)
         assertEquals("fp-x", favorite.fingerprint)
         assertEquals("10.0.0.4", favorite.ip)

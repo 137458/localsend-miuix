@@ -12,36 +12,52 @@ import org.localsend.miuix.model.FileItem
 import java.io.File
 
 object ThumbnailHelper {
-
     // 内存缓存以 KB 为单位，限制最大使用可用堆内存的 1/8（通常在 16MB ~ 64MB 之间），防止 OOM
     private val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024).toInt()
     private val cacheSizeKb = (maxMemoryKb / 8).coerceIn(16 * 1024, 64 * 1024)
-    private val memoryCache = object : LruCache<String, Bitmap>(cacheSizeKb) {
-        override fun sizeOf(key: String, bitmap: Bitmap): Int {
-            return (bitmap.byteCount / 1024).coerceAtLeast(1)
+    private val memoryCache =
+        object : LruCache<String, Bitmap>(cacheSizeKb) {
+            override fun sizeOf(
+                key: String,
+                bitmap: Bitmap,
+            ): Int = (bitmap.byteCount / 1024).coerceAtLeast(1)
         }
-    }
 
-    fun isImage(name: String, mimeType: String): Boolean {
+    fun isImage(
+        name: String,
+        mimeType: String,
+    ): Boolean {
         val mime = mimeType.lowercase()
         val n = name.lowercase()
         return mime.startsWith("image/") ||
-                n.endsWith(".jpg") || n.endsWith(".jpeg") ||
-                n.endsWith(".png") || n.endsWith(".webp") ||
-                n.endsWith(".gif") || n.endsWith(".heic") ||
-                n.endsWith(".bmp")
+            n.endsWith(".jpg") ||
+            n.endsWith(".jpeg") ||
+            n.endsWith(".png") ||
+            n.endsWith(".webp") ||
+            n.endsWith(".gif") ||
+            n.endsWith(".heic") ||
+            n.endsWith(".bmp")
     }
 
-    fun isVideo(name: String, mimeType: String): Boolean {
+    fun isVideo(
+        name: String,
+        mimeType: String,
+    ): Boolean {
         val mime = mimeType.lowercase()
         val n = name.lowercase()
         return mime.startsWith("video/") ||
-                n.endsWith(".mp4") || n.endsWith(".mkv") ||
-                n.endsWith(".mov") || n.endsWith(".3gp") ||
-                n.endsWith(".webm") || n.endsWith(".avi")
+            n.endsWith(".mp4") ||
+            n.endsWith(".mkv") ||
+            n.endsWith(".mov") ||
+            n.endsWith(".3gp") ||
+            n.endsWith(".webm") ||
+            n.endsWith(".avi")
     }
 
-    fun isApk(name: String, mimeType: String): Boolean {
+    fun isApk(
+        name: String,
+        mimeType: String,
+    ): Boolean {
         val mime = mimeType.lowercase()
         val n = name.lowercase()
         return mime == "application/vnd.android.package-archive" || n.endsWith(".apk")
@@ -56,20 +72,25 @@ object ThumbnailHelper {
     /**
      * 加载用于列表展示的紧凑缩略图 (约 128x128 像素)。
      */
-    fun loadThumbnail(context: Context, file: FileItem, targetSize: Int = 128): Bitmap? {
+    fun loadThumbnail(
+        context: Context,
+        file: FileItem,
+        targetSize: Int = 128,
+    ): Bitmap? {
         val cacheKey = "thumb_${file.id}_${file.uri?.toString() ?: file.path ?: file.name}_$targetSize"
         memoryCache.get(cacheKey)?.let { return it }
 
-        val bitmap: Bitmap? = try {
-            when {
-                isImage(file) -> loadImageThumbnail(context, file, targetSize)
-                isVideo(file) -> loadVideoThumbnail(context, file, targetSize)
-                isApk(file) -> loadApkIcon(context, file, targetSize)
-                else -> null
+        val bitmap: Bitmap? =
+            try {
+                when {
+                    isImage(file) -> loadImageThumbnail(context, file, targetSize)
+                    isVideo(file) -> loadVideoThumbnail(context, file, targetSize)
+                    isApk(file) -> loadApkIcon(context, file, targetSize)
+                    else -> null
+                }
+            } catch (t: Throwable) {
+                null
             }
-        } catch (t: Throwable) {
-            null
-        }
 
         if (bitmap != null) {
             memoryCache.put(cacheKey, bitmap)
@@ -83,36 +104,42 @@ object ThumbnailHelper {
         mimeType: String,
         uri: android.net.Uri?,
         path: String?,
-        targetSize: Int = 128
+        targetSize: Int = 128,
     ): Bitmap? {
-        val dummy = FileItem(
-            name = name,
-            size = 0L,
-            mimeType = mimeType,
-            uri = uri,
-            path = path
-        )
+        val dummy =
+            FileItem(
+                name = name,
+                size = 0L,
+                mimeType = mimeType,
+                uri = uri,
+                path = path,
+            )
         return loadThumbnail(context, dummy, targetSize)
     }
 
     /**
      * 加载用于弹窗预览的较高清晰度位图 (约 800x800 像素以控制内存)。
      */
-    fun loadPreviewImage(context: Context, file: FileItem, maxDimension: Int = 800): Bitmap? {
+    fun loadPreviewImage(
+        context: Context,
+        file: FileItem,
+        maxDimension: Int = 800,
+    ): Bitmap? {
         val cacheKey = "preview_${file.id}_${file.uri?.toString() ?: file.path ?: file.name}"
         memoryCache.get(cacheKey)?.let { return it }
 
-        val bitmap = try {
-            if (isImage(file)) {
-                loadImageThumbnail(context, file, maxDimension)
-            } else if (isVideo(file)) {
-                loadVideoThumbnail(context, file, maxDimension)
-            } else {
+        val bitmap =
+            try {
+                if (isImage(file)) {
+                    loadImageThumbnail(context, file, maxDimension)
+                } else if (isVideo(file)) {
+                    loadVideoThumbnail(context, file, maxDimension)
+                } else {
+                    null
+                }
+            } catch (t: Throwable) {
                 null
             }
-        } catch (t: Throwable) {
-            null
-        }
 
         if (bitmap != null) {
             memoryCache.put(cacheKey, bitmap)
@@ -120,7 +147,11 @@ object ThumbnailHelper {
         return bitmap
     }
 
-    private fun loadImageThumbnail(context: Context, file: FileItem, targetSize: Int): Bitmap? {
+    private fun loadImageThumbnail(
+        context: Context,
+        file: FileItem,
+        targetSize: Int,
+    ): Bitmap? {
         val uri = file.uri ?: file.mediaStoreUri
         val path = file.path
 
@@ -139,18 +170,21 @@ object ThumbnailHelper {
                         }
                         try {
                             android.system.Os.lseek(fd, 0, android.system.OsConstants.SEEK_SET)
-                        } catch (ignored: Throwable) {}
+                        } catch (ignored: Throwable) {
+                        }
                         val bitmap = BitmapFactory.decodeFileDescriptor(fd, null, options)
                         if (bitmap != null) return bitmap
                     }
                 }
-            } catch (t: Throwable) {}
+            } catch (t: Throwable) {
+            }
 
             // 2. Android 10+ (API 29+) 原生 loadThumbnail 高速硬件解码降级
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && uri.scheme == "content") {
                 try {
                     return context.contentResolver.loadThumbnail(uri, Size(targetSize, targetSize), null)
-                } catch (t: Throwable) {}
+                } catch (t: Throwable) {
+                }
             }
 
             // 3. 本地 file:// 路径降级
@@ -185,14 +219,19 @@ object ThumbnailHelper {
                         }
                     }
                 }
-            } catch (t: Throwable) {}
+            } catch (t: Throwable) {
+            }
         } else if (!path.isNullOrEmpty()) {
             return decodeSampledBitmapFromFile(path, targetSize, targetSize)
         }
         return null
     }
 
-    private fun loadVideoThumbnail(context: Context, file: FileItem, targetSize: Int): Bitmap? {
+    private fun loadVideoThumbnail(
+        context: Context,
+        file: FileItem,
+        targetSize: Int,
+    ): Bitmap? {
         val uri = file.uri ?: file.mediaStoreUri
         val path = file.path
 
@@ -200,40 +239,53 @@ object ThumbnailHelper {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && uri.scheme == "content") {
                 try {
                     return context.contentResolver.loadThumbnail(uri, Size(targetSize, targetSize), null)
-                } catch (t: Throwable) {}
+                } catch (t: Throwable) {
+                }
             }
             val retriever = MediaMetadataRetriever()
             try {
                 retriever.setDataSource(context, uri)
-                val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                    retriever.getScaledFrameAtTime(-1, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetSize, targetSize)
-                } else {
-                    retriever.frameAtTime?.let { Bitmap.createScaledBitmap(it, targetSize, targetSize, true) }
-                }
+                val frame =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                        retriever.getScaledFrameAtTime(-1, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetSize, targetSize)
+                    } else {
+                        retriever.frameAtTime?.let { Bitmap.createScaledBitmap(it, targetSize, targetSize, true) }
+                    }
                 if (frame != null) return frame
             } catch (t: Throwable) {
             } finally {
-                try { retriever.release() } catch (_: Throwable) {}
+                try {
+                    retriever.release()
+                } catch (_: Throwable) {
+                }
             }
         } else if (!path.isNullOrEmpty()) {
             val retriever = MediaMetadataRetriever()
             try {
                 retriever.setDataSource(path)
-                val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                    retriever.getScaledFrameAtTime(-1, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetSize, targetSize)
-                } else {
-                    retriever.frameAtTime?.let { Bitmap.createScaledBitmap(it, targetSize, targetSize, true) }
-                }
+                val frame =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                        retriever.getScaledFrameAtTime(-1, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetSize, targetSize)
+                    } else {
+                        retriever.frameAtTime?.let { Bitmap.createScaledBitmap(it, targetSize, targetSize, true) }
+                    }
                 if (frame != null) return frame
             } catch (t: Throwable) {
             } finally {
-                try { retriever.release() } catch (_: Throwable) {}
+                try {
+                    retriever.release()
+                } catch (_: Throwable) {
+                }
             }
         }
         return null
     }
 
-    private fun loadApkIcon(context: Context, file: FileItem, targetSize: Int): Bitmap? {
+    private fun loadApkIcon(
+        context: Context,
+        file: FileItem,
+        targetSize: Int,
+    ): Bitmap? {
         val path = file.path ?: file.uri?.path ?: return null
         return try {
             val pm = context.packageManager
@@ -248,7 +300,11 @@ object ThumbnailHelper {
         }
     }
 
-    private fun decodeSampledBitmapFromFile(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
+    private fun decodeSampledBitmapFromFile(
+        path: String,
+        reqWidth: Int,
+        reqHeight: Int,
+    ): Bitmap? {
         val file = File(path)
         if (!file.exists()) return null
         return try {
@@ -266,7 +322,11 @@ object ThumbnailHelper {
         }
     }
 
-    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+    private fun calculateInSampleSize(
+        options: BitmapFactory.Options,
+        reqWidth: Int,
+        reqHeight: Int,
+    ): Int {
         val height = options.outHeight
         val width = options.outWidth
         if (height <= 0 || width <= 0) return 1

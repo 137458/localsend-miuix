@@ -35,19 +35,20 @@ fun RenameDeviceDialog(
     show: Boolean,
     initialName: String,
     onDismissRequest: () -> Unit,
-    onConfirm: (String) -> Unit
+    onConfirm: (String) -> Unit,
 ) {
     var name by remember(show, initialName) { mutableStateOf(initialName) }
 
     WindowDialog(
         show = show,
         title = stringResource(R.string.dialog_rename_title),
-        onDismissRequest = onDismissRequest
+        onDismissRequest = onDismissRequest,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
         ) {
             TextField(
                 value = name,
@@ -55,19 +56,19 @@ fun RenameDeviceDialog(
                 label = stringResource(R.string.dialog_rename_label),
                 useLabelAsPlaceholder = true,
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Button(
                     onClick = onDismissRequest,
                     colors = ButtonDefaults.buttonColors(),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.btn_cancel))
                 }
@@ -80,7 +81,7 @@ fun RenameDeviceDialog(
                         }
                     },
                     colors = ButtonDefaults.buttonColorsPrimary(),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.btn_confirm))
                 }
@@ -94,19 +95,20 @@ fun PortDialog(
     show: Boolean,
     initialPort: Int,
     onDismissRequest: () -> Unit,
-    onConfirm: (Int) -> Unit
+    onConfirm: (Int) -> Unit,
 ) {
     var port by remember(show, initialPort) { mutableStateOf(initialPort.toString()) }
 
     WindowDialog(
         show = show,
         title = stringResource(R.string.dialog_port_title),
-        onDismissRequest = onDismissRequest
+        onDismissRequest = onDismissRequest,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
         ) {
             TextField(
                 value = port,
@@ -115,19 +117,19 @@ fun PortDialog(
                 useLabelAsPlaceholder = true,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Button(
                     onClick = onDismissRequest,
                     colors = ButtonDefaults.buttonColors(),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.btn_cancel))
                 }
@@ -140,7 +142,7 @@ fun PortDialog(
                         }
                     },
                     colors = ButtonDefaults.buttonColorsPrimary(),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.btn_confirm))
                 }
@@ -154,7 +156,7 @@ fun ManualIpDialog(
     show: Boolean,
     recentIps: List<String> = emptyList(),
     onDismissRequest: () -> Unit,
-    onSend: (ip: String, port: Int) -> Unit
+    onSend: (ip: String, port: Int) -> Unit,
 ) {
     var ip by remember(show) { mutableStateOf(recentIps.firstOrNull().orEmpty()) }
     var port by remember(show) { mutableStateOf("53317") }
@@ -162,12 +164,13 @@ fun ManualIpDialog(
     WindowDialog(
         show = show,
         title = stringResource(R.string.dialog_manual_ip_title),
-        onDismissRequest = onDismissRequest
+        onDismissRequest = onDismissRequest,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
         ) {
             TextField(
                 value = ip,
@@ -176,7 +179,7 @@ fun ManualIpDialog(
                 useLabelAsPlaceholder = true,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
 
             if (recentIps.isNotEmpty()) {
@@ -184,29 +187,32 @@ fun ManualIpDialog(
                 Text(
                     text = stringResource(R.string.dialog_manual_ip_recent_history),
                     style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     recentIps.take(4).forEach { histIp ->
                         val isSelected = ip == histIp
                         Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(
-                                    if (isSelected) MiuixTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                    else MiuixTheme.colorScheme.surfaceContainer
-                                )
-                                .clickable { ip = histIp }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(
+                                        if (isSelected) {
+                                            MiuixTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                        } else {
+                                            MiuixTheme.colorScheme.surfaceContainer
+                                        },
+                                    ).clickable { ip = histIp }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {
                             Text(
                                 text = histIp,
                                 style = MiuixTheme.textStyles.footnote1,
-                                color = if (isSelected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface
+                                color = if (isSelected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
                             )
                         }
                     }
@@ -222,19 +228,19 @@ fun ManualIpDialog(
                 useLabelAsPlaceholder = true,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Button(
                     onClick = onDismissRequest,
                     colors = ButtonDefaults.buttonColors(),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.btn_cancel))
                 }
@@ -248,7 +254,7 @@ fun ManualIpDialog(
                         }
                     },
                     colors = ButtonDefaults.buttonColorsPrimary(),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.dialog_manual_ip_btn_send))
                 }

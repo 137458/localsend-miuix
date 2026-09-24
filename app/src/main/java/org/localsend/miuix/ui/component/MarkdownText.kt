@@ -48,44 +48,51 @@ fun MarkdownText(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = buildAnnotatedContent(block.text),
-                        style = when (block.level) {
-                            1 -> MiuixTheme.textStyles.title3.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = (baseFontSize + 4).sp,
-                            )
-                            2 -> MiuixTheme.textStyles.title4.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = (baseFontSize + 2).sp,
-                            )
-                            else -> MiuixTheme.textStyles.body1.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = (baseFontSize + 1).sp,
-                            )
-                        },
+                        style =
+                            when (block.level) {
+                                1 ->
+                                    MiuixTheme.textStyles.title3.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = (baseFontSize + 4).sp,
+                                    )
+                                2 ->
+                                    MiuixTheme.textStyles.title4.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = (baseFontSize + 2).sp,
+                                    )
+                                else ->
+                                    MiuixTheme.textStyles.body1.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = (baseFontSize + 1).sp,
+                                    )
+                            },
                         color = MiuixTheme.colorScheme.primary,
                     )
                 }
 
                 is MarkdownBlock.BulletItem -> {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 1.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 1.dp),
                         verticalAlignment = Alignment.Top,
                     ) {
                         Box(
-                            modifier = Modifier
-                                .padding(top = 6.dp, end = 8.dp)
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(MiuixTheme.colorScheme.primary),
+                            modifier =
+                                Modifier
+                                    .padding(top = 6.dp, end = 8.dp)
+                                    .size(4.dp)
+                                    .clip(CircleShape)
+                                    .background(MiuixTheme.colorScheme.primary),
                         )
                         Text(
                             text = buildAnnotatedContent(block.text),
-                            style = MiuixTheme.textStyles.body2.copy(
-                                fontSize = baseFontSize.sp,
-                                lineHeight = (baseFontSize + 6).sp,
-                            ),
+                            style =
+                                MiuixTheme.textStyles.body2.copy(
+                                    fontSize = baseFontSize.sp,
+                                    lineHeight = (baseFontSize + 6).sp,
+                                ),
                             color = MiuixTheme.colorScheme.onSurface,
                         )
                     }
@@ -93,26 +100,29 @@ fun MarkdownText(
 
                 is MarkdownBlock.NumberedItem -> {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 1.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 1.dp),
                         verticalAlignment = Alignment.Top,
                     ) {
                         Text(
                             text = "${block.number}. ",
-                            style = MiuixTheme.textStyles.body2.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = baseFontSize.sp,
-                                lineHeight = (baseFontSize + 6).sp,
-                            ),
+                            style =
+                                MiuixTheme.textStyles.body2.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = baseFontSize.sp,
+                                    lineHeight = (baseFontSize + 6).sp,
+                                ),
                             color = MiuixTheme.colorScheme.primary,
                         )
                         Text(
                             text = buildAnnotatedContent(block.text),
-                            style = MiuixTheme.textStyles.body2.copy(
-                                fontSize = baseFontSize.sp,
-                                lineHeight = (baseFontSize + 6).sp,
-                            ),
+                            style =
+                                MiuixTheme.textStyles.body2.copy(
+                                    fontSize = baseFontSize.sp,
+                                    lineHeight = (baseFontSize + 6).sp,
+                                ),
                             color = MiuixTheme.colorScheme.onSurface,
                         )
                     }
@@ -121,21 +131,23 @@ fun MarkdownText(
                 is MarkdownBlock.Paragraph -> {
                     Text(
                         text = buildAnnotatedContent(block.text),
-                        style = MiuixTheme.textStyles.body2.copy(
-                            fontSize = baseFontSize.sp,
-                            lineHeight = (baseFontSize + 6).sp,
-                        ),
+                        style =
+                            MiuixTheme.textStyles.body2.copy(
+                                fontSize = baseFontSize.sp,
+                                lineHeight = (baseFontSize + 6).sp,
+                            ),
                         color = MiuixTheme.colorScheme.onSurface,
                     )
                 }
 
                 is MarkdownBlock.Divider -> {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .height(0.5.dp)
-                            .background(MiuixTheme.colorScheme.dividerLine.copy(alpha = 0.2f)),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .height(0.5.dp)
+                                .background(MiuixTheme.colorScheme.dividerLine.copy(alpha = 0.2f)),
                     )
                 }
             }
@@ -144,10 +156,24 @@ fun MarkdownText(
 }
 
 private sealed interface MarkdownBlock {
-    data class Heading(val level: Int, val text: String) : MarkdownBlock
-    data class BulletItem(val text: String) : MarkdownBlock
-    data class NumberedItem(val number: String, val text: String) : MarkdownBlock
-    data class Paragraph(val text: String) : MarkdownBlock
+    data class Heading(
+        val level: Int,
+        val text: String,
+    ) : MarkdownBlock
+
+    data class BulletItem(
+        val text: String,
+    ) : MarkdownBlock
+
+    data class NumberedItem(
+        val number: String,
+        val text: String,
+    ) : MarkdownBlock
+
+    data class Paragraph(
+        val text: String,
+    ) : MarkdownBlock
+
     object Divider : MarkdownBlock
 }
 
@@ -192,8 +218,8 @@ private fun parseMarkdownBlocks(markdown: String): List<MarkdownBlock> {
     return blocks
 }
 
-private fun buildAnnotatedContent(rawText: String): AnnotatedString {
-    return buildAnnotatedString {
+private fun buildAnnotatedContent(rawText: String): AnnotatedString =
+    buildAnnotatedString {
         var i = 0
         val len = rawText.length
 
@@ -218,7 +244,7 @@ private fun buildAnnotatedContent(rawText: String): AnnotatedString {
                         SpanStyle(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Medium,
-                        )
+                        ),
                     ) {
                         append(rawText.substring(i + 1, end))
                     }
@@ -231,4 +257,3 @@ private fun buildAnnotatedContent(rawText: String): AnnotatedString {
             i++
         }
     }
-}

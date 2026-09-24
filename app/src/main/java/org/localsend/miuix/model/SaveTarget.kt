@@ -10,5 +10,7 @@ import android.net.Uri
 sealed class SaveTarget {
     data object MediaStoreTarget : SaveTarget()
 
-    data class UriTarget(val treeUri: Uri) : SaveTarget()
+    data class UriTarget(
+        val treeUri: Uri,
+    ) : SaveTarget()
 }

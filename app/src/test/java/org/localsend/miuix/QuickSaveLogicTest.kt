@@ -5,10 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QuickSaveLogicTest {
-
-    private fun shouldAutoAccept(isQuickSave: Boolean): Boolean {
-        return isQuickSave
-    }
+    private fun shouldAutoAccept(isQuickSave: Boolean): Boolean = isQuickSave
 
     @Test
     fun testQuickSaveAcceptsFiles() {

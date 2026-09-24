@@ -13,7 +13,7 @@ class DeviceDirectory(
     private val ttlMs: Long = DEFAULT_TTL_MS,
     private val clock: () -> Long = { System.currentTimeMillis() },
     private val primaryIp: () -> String? = { NetworkUtils.getPrimaryIp() },
-    private val sameSubnet: (String, String) -> Boolean = NetworkUtils::isSameSubnet
+    private val sameSubnet: (String, String) -> Boolean = NetworkUtils::isSameSubnet,
 ) {
     @Volatile
     private var devices: List<Device> = emptyList()
@@ -28,25 +28,28 @@ class DeviceDirectory(
         val now = clock()
         val alive = aliveDevices(now)
         val index = alive.indexOfFirst { isSameDevice(it, device) }
-        devices = if (index < 0) {
-            alive + device
-        } else {
-            val known = alive[index]
-            val allConfirmedIps = (known.allIps + device.allIps).distinct()
-            val primaryLocalIp = primaryIp()
-            val bestIp = if (primaryLocalIp != null && allConfirmedIps.any { sameSubnet(it, primaryLocalIp) }) {
-                allConfirmedIps.first { sameSubnet(it, primaryLocalIp) }
+        devices =
+            if (index < 0) {
+                alive + device
             } else {
-                device.ip
+                val known = alive[index]
+                val allConfirmedIps = (known.allIps + device.allIps).distinct()
+                val primaryLocalIp = primaryIp()
+                val bestIp =
+                    if (primaryLocalIp != null && allConfirmedIps.any { sameSubnet(it, primaryLocalIp) }) {
+                        allConfirmedIps.first { sameSubnet(it, primaryLocalIp) }
+                    } else {
+                        device.ip
+                    }
+                val merged =
+                    device.copy(
+                        ip = bestIp,
+                        alternateIps = allConfirmedIps.filter { it != bestIp },
+                        deviceModel = device.deviceModel ?: known.deviceModel,
+                        lastSeen = maxOf(known.lastSeen, device.lastSeen),
+                    )
+                alive.toMutableList().apply { set(index, merged) }
             }
-            val merged = device.copy(
-                ip = bestIp,
-                alternateIps = allConfirmedIps.filter { it != bestIp },
-                deviceModel = device.deviceModel ?: known.deviceModel,
-                lastSeen = maxOf(known.lastSeen, device.lastSeen)
-            )
-            alive.toMutableList().apply { set(index, merged) }
-        }
         return devices
     }
 
@@ -67,6 +70,9 @@ class DeviceDirectory(
     companion object {
         const val DEFAULT_TTL_MS = 90_000L
 
-        fun isSameDevice(a: Device, b: Device): Boolean = a.matches(b)
+        fun isSameDevice(
+            a: Device,
+            b: Device,
+        ): Boolean = a.matches(b)
     }
 }

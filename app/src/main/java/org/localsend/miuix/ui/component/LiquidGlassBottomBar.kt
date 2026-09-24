@@ -130,50 +130,52 @@ fun LiquidGlassBottomBar(
     }
     val holder = remember { DampedDragAnimationHolder() }
 
-    val dampedDragAnimation = remember(animationScope, tabsCount, density, isLtr) {
-        DampedDragAnimation(
-            animationScope = animationScope,
-            initialValue = selectedIndex().toFloat(),
-            valueRange = 0f..(tabsCount - 1).toFloat(),
-            visibilityThreshold = 0.001f,
-            initialScale = 1f,
-            pressedScale = 78f / 56f,
-            canDrag = { offset ->
-                val anim = holder.instance ?: return@DampedDragAnimation true
-                if (tabWidthPx == 0f) return@DampedDragAnimation false
+    val dampedDragAnimation =
+        remember(animationScope, tabsCount, density, isLtr) {
+            DampedDragAnimation(
+                animationScope = animationScope,
+                initialValue = selectedIndex().toFloat(),
+                valueRange = 0f..(tabsCount - 1).toFloat(),
+                visibilityThreshold = 0.001f,
+                initialScale = 1f,
+                pressedScale = 78f / 56f,
+                canDrag = { offset ->
+                    val anim = holder.instance ?: return@DampedDragAnimation true
+                    if (tabWidthPx == 0f) return@DampedDragAnimation false
 
-                val currentValue = anim.value
-                val indicatorX = currentValue * tabWidthPx
-                val padding = with(density) { 4.dp.toPx() }
-                val globalTouchX = if (isLtr) {
-                    padding + indicatorX + offset.x
-                } else {
-                    totalWidthPx - padding - tabWidthPx - indicatorX + offset.x
-                }
-                globalTouchX in 0f..totalWidthPx
-            },
-            onDragStarted = {},
-            onDragStopped = {
-                val targetIndex = targetValue.fastRoundToInt().fastCoerceIn(0, tabsCount - 1)
-                animateToValue(targetIndex.toFloat())
-                onSelected(targetIndex)
-                animationScope.launch {
-                    offsetAnimation.animateTo(0f, spring(1f, 300f, 0.5f))
-                }
-            },
-            onDrag = { _, dragAmount ->
-                if (tabWidthPx > 0) {
-                    updateValue(
-                        (targetValue + dragAmount.x / tabWidthPx * if (isLtr) 1f else -1f)
-                            .fastCoerceIn(0f, (tabsCount - 1).toFloat())
-                    )
+                    val currentValue = anim.value
+                    val indicatorX = currentValue * tabWidthPx
+                    val padding = with(density) { 4.dp.toPx() }
+                    val globalTouchX =
+                        if (isLtr) {
+                            padding + indicatorX + offset.x
+                        } else {
+                            totalWidthPx - padding - tabWidthPx - indicatorX + offset.x
+                        }
+                    globalTouchX in 0f..totalWidthPx
+                },
+                onDragStarted = {},
+                onDragStopped = {
+                    val targetIndex = targetValue.fastRoundToInt().fastCoerceIn(0, tabsCount - 1)
+                    animateToValue(targetIndex.toFloat())
+                    onSelected(targetIndex)
                     animationScope.launch {
-                        offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x)
+                        offsetAnimation.animateTo(0f, spring(1f, 300f, 0.5f))
                     }
-                }
-            }
-        ).also { holder.instance = it }
-    }
+                },
+                onDrag = { _, dragAmount ->
+                    if (tabWidthPx > 0) {
+                        updateValue(
+                            (targetValue + dragAmount.x / tabWidthPx * if (isLtr) 1f else -1f)
+                                .fastCoerceIn(0f, (tabsCount - 1).toFloat()),
+                        )
+                        animationScope.launch {
+                            offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x)
+                        }
+                    }
+                },
+            ).also { holder.instance = it }
+        }
 
     LaunchedEffect(Unit) {
         snapshotFlow { selectedIndex() }.collectLatest { index ->
@@ -181,48 +183,57 @@ fun LiquidGlassBottomBar(
         }
     }
 
-    val interactiveHighlight = if (isLiquidGlassMode) {
-        remember(animationScope, tabWidthPx) {
-            InteractiveHighlight(
-                animationScope = animationScope,
-                position = { size, _ ->
-                    Offset(
-                        if (isLtr) (dampedDragAnimation.value + 0.5f) * tabWidthPx + panelOffset
-                        else size.width - (dampedDragAnimation.value + 0.5f) * tabWidthPx + panelOffset,
-                        size.height / 2f
-                    )
-                }
-            )
+    val interactiveHighlight =
+        if (isLiquidGlassMode) {
+            remember(animationScope, tabWidthPx) {
+                InteractiveHighlight(
+                    animationScope = animationScope,
+                    position = { size, _ ->
+                        Offset(
+                            if (isLtr) {
+                                (dampedDragAnimation.value + 0.5f) * tabWidthPx + panelOffset
+                            } else {
+                                size.width - (dampedDragAnimation.value + 0.5f) * tabWidthPx + panelOffset
+                            },
+                            size.height / 2f,
+                        )
+                    },
+                )
+            }
+        } else {
+            null
         }
-    } else null
 
-    val combinedBackdrop = if (isLiquidGlassMode && tabsBackdrop != null) {
-        rememberCombinedBackdrop(backdrop, tabsBackdrop)
-    } else null
+    val combinedBackdrop =
+        if (isLiquidGlassMode && tabsBackdrop != null) {
+            rememberCombinedBackdrop(backdrop, tabsBackdrop)
+        } else {
+            null
+        }
 
     val tabsContent: @Composable RowScope.() -> Unit = {
         val tabScale = LocalLiquidBarTabScale.current
         val activeColor = LocalLiquidBarContentColor.current
         items.forEachIndexed { index, item ->
             Column(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Tab,
-                        onClick = {
-                            onSelected(index)
+                modifier =
+                    Modifier
+                        .clip(CircleShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Tab,
+                            onClick = {
+                                onSelected(index)
+                            },
+                        ).fillMaxHeight()
+                        .weight(1f)
+                        .defaultMinSize(minWidth = 78.dp)
+                        .graphicsLayer {
+                            val s = tabScale()
+                            scaleX = s
+                            scaleY = s
                         },
-                    )
-                    .fillMaxHeight()
-                    .weight(1f)
-                    .defaultMinSize(minWidth = 78.dp)
-                    .graphicsLayer {
-                        val s = tabScale()
-                        scaleX = s
-                        scaleY = s
-                    },
                 verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -233,7 +244,7 @@ fun LiquidGlassBottomBar(
                             modifier = Modifier.size(24.dp),
                             imageVector = item.icon,
                             contentDescription = null,
-                            tint = activeColor
+                            tint = activeColor,
                         )
                         Box(modifier = Modifier.align(Alignment.TopEnd)) {
                             currentBadge()
@@ -244,7 +255,7 @@ fun LiquidGlassBottomBar(
                         modifier = Modifier.size(24.dp),
                         imageVector = item.icon,
                         contentDescription = null,
-                        tint = activeColor
+                        tint = activeColor,
                     )
                 }
                 Text(
@@ -270,63 +281,62 @@ fun LiquidGlassBottomBar(
     val scale16Px = with(density) { 16.dp.toPx() }
 
     Box(
-        modifier = modifier
-            .width(IntrinsicSize.Min)
-            .height(64.dp),
+        modifier =
+            modifier
+                .width(IntrinsicSize.Min)
+                .height(64.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         // ── 1. Base Layer: 底栏外壳（基础层，承载未激活文字与折射底层） ──
         CompositionLocalProvider(LocalLiquidBarContentColor provides contentColor) {
             Row(
-                modifier = Modifier
-                    .onGloballyPositioned { coords ->
-                        totalWidthPx = coords.size.width.toFloat()
-                        val contentWidthPx = totalWidthPx - with(density) { 8.dp.toPx() }
-                        tabWidthPx = (contentWidthPx / tabsCount).coerceAtLeast(0f)
-                    }
-                    .graphicsLayer { translationX = panelOffset }
-                    .dropShadow(
-                        shape = pillShape,
-                        shadow = Shadow(
-                            radius = 10.dp,
-                            color = Color.Black,
-                            alpha = if (isInDark) 0.2f else 0.1f,
-                        ),
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {}
-                    )
-                    .then(
-                        if (isLiquidGlassMode) {
-                            Modifier.drawBackdrop(
-                                backdrop = backdrop,
-                                shape = { pillShape },
-                                effects = {
-                                    padding = maxOf(padding, pad40Px)
-                                    vibrancy()
-                                    blur(blur4Px, blur4Px)
-                                    lens(
-                                        refractionHeight = lens24Px,
-                                        refractionAmount = lens24Px,
-                                    )
-                                },
-                                layerBlock = {
-                                    val width = size.width.coerceAtLeast(1f)
-                                    val s = lerp(1f, 1f + scale16Px / width, dampedDragAnimation.pressProgress)
-                                    scaleX = s
-                                    scaleY = s
-                                },
-                                onDrawSurface = { drawRect(containerColor) },
-                            )
-                        } else {
-                            Modifier.background(containerColor, pillShape)
-                        }
-                    )
-                    .then(if (isLiquidGlassMode && interactiveHighlight != null) interactiveHighlight.modifier else Modifier)
-                    .height(64.dp)
-                    .padding(4.dp),
+                modifier =
+                    Modifier
+                        .onGloballyPositioned { coords ->
+                            totalWidthPx = coords.size.width.toFloat()
+                            val contentWidthPx = totalWidthPx - with(density) { 8.dp.toPx() }
+                            tabWidthPx = (contentWidthPx / tabsCount).coerceAtLeast(0f)
+                        }.graphicsLayer { translationX = panelOffset }
+                        .dropShadow(
+                            shape = pillShape,
+                            shadow =
+                                Shadow(
+                                    radius = 10.dp,
+                                    color = Color.Black,
+                                    alpha = if (isInDark) 0.2f else 0.1f,
+                                ),
+                        ).clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                        ).then(
+                            if (isLiquidGlassMode) {
+                                Modifier.drawBackdrop(
+                                    backdrop = backdrop,
+                                    shape = { pillShape },
+                                    effects = {
+                                        padding = maxOf(padding, pad40Px)
+                                        vibrancy()
+                                        blur(blur4Px, blur4Px)
+                                        lens(
+                                            refractionHeight = lens24Px,
+                                            refractionAmount = lens24Px,
+                                        )
+                                    },
+                                    layerBlock = {
+                                        val width = size.width.coerceAtLeast(1f)
+                                        val s = lerp(1f, 1f + scale16Px / width, dampedDragAnimation.pressProgress)
+                                        scaleX = s
+                                        scaleY = s
+                                    },
+                                    onDrawSurface = { drawRect(containerColor) },
+                                )
+                            } else {
+                                Modifier.background(containerColor, pillShape)
+                            },
+                        ).then(if (isLiquidGlassMode && interactiveHighlight != null) interactiveHighlight.modifier else Modifier)
+                        .height(64.dp)
+                        .padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 content = tabsContent,
             )
@@ -338,27 +348,27 @@ fun LiquidGlassBottomBar(
                 LocalLiquidBarTabScale provides {
                     lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
                 },
-                LocalLiquidBarContentColor provides primaryColor
+                LocalLiquidBarContentColor provides primaryColor,
             ) {
                 Row(
-                    modifier = Modifier
-                        .clearAndSetSemantics {}
-                        .alpha(0f)
-                        .layerBackdrop(tabsBackdrop)
-                        .graphicsLayer { translationX = panelOffset }
-                        .drawBackdrop(
-                            backdrop = backdrop,
-                            shape = { pillShape },
-                            effects = {
-                                vibrancy()
-                                blur(blur4Px, blur4Px)
-                                lens(refractionHeight = lens24Px, refractionAmount = lens24Px)
-                            },
-                            onDrawSurface = { drawRect(containerColor) },
-                        )
-                        .then(interactiveHighlight?.modifier ?: Modifier)
-                        .height(56.dp)
-                        .padding(horizontal = 4.dp),
+                    modifier =
+                        Modifier
+                            .clearAndSetSemantics {}
+                            .alpha(0f)
+                            .layerBackdrop(tabsBackdrop)
+                            .graphicsLayer { translationX = panelOffset }
+                            .drawBackdrop(
+                                backdrop = backdrop,
+                                shape = { pillShape },
+                                effects = {
+                                    vibrancy()
+                                    blur(blur4Px, blur4Px)
+                                    lens(refractionHeight = lens24Px, refractionAmount = lens24Px)
+                                },
+                                onDrawSurface = { drawRect(containerColor) },
+                            ).then(interactiveHighlight?.modifier ?: Modifier)
+                            .height(56.dp)
+                            .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     content = tabsContent,
                 )
@@ -375,8 +385,7 @@ fun LiquidGlassBottomBar(
                         .graphicsLayer {
                             val progressOffset = dampedDragAnimation.value * tabWidthPx
                             translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
-                        }
-                        .then(interactiveHighlight?.gestureModifier ?: Modifier)
+                        }.then(interactiveHighlight?.gestureModifier ?: Modifier)
                         .then(dampedDragAnimation.modifier)
                         .drawBackdrop(
                             backdrop = combinedBackdrop,
@@ -407,32 +416,30 @@ fun LiquidGlassBottomBar(
                                 )
                                 drawRect(Color.Black.copy(alpha = 0.03f * progress))
                             },
-                        )
-                        .innerShadow(shape = pillShape) {
+                        ).innerShadow(shape = pillShape) {
                             InnerShadow(
                                 radius = 8.dp * (0.5f + 0.5f * dampedDragAnimation.pressProgress),
                                 color = Color.Black.copy(alpha = 0.15f),
                                 alpha = 0.5f + 0.5f * dampedDragAnimation.pressProgress,
                             )
-                        }
-                        .height(56.dp)
-                        .width(tabWidthDp)
+                        }.height(56.dp)
+                        .width(tabWidthDp),
                 )
             } else {
                 // 降级模式胶囊滑块
                 Box(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .graphicsLayer {
-                            val progressOffset = dampedDragAnimation.value * tabWidthPx
-                            translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
-                        }
-                        .then(dampedDragAnimation.modifier)
-                        .clip(pillShape)
-                        .background(primaryColor.copy(alpha = 0.15f), pillShape)
-                        .height(56.dp)
-                        .width(tabWidthDp),
-                    contentAlignment = Alignment.CenterStart
+                    modifier =
+                        Modifier
+                            .padding(horizontal = 4.dp)
+                            .graphicsLayer {
+                                val progressOffset = dampedDragAnimation.value * tabWidthPx
+                                translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
+                            }.then(dampedDragAnimation.modifier)
+                            .clip(pillShape)
+                            .background(primaryColor.copy(alpha = 0.15f), pillShape)
+                            .height(56.dp)
+                            .width(tabWidthDp),
+                    contentAlignment = Alignment.CenterStart,
                 ) {
                     CompositionLocalProvider(LocalLiquidBarContentColor provides primaryColor) {
                         Row(

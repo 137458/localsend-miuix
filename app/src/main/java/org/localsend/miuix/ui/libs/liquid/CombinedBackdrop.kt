@@ -14,7 +14,6 @@ class CombinedBackdrop(
     val first: Backdrop,
     val second: Backdrop,
 ) : Backdrop {
-
     override val isCoordinatesDependent: Boolean = first.isCoordinatesDependent || second.isCoordinatesDependent
 
     override val offsetResidualX: Float get() = first.offsetResidualX
@@ -32,5 +31,7 @@ class CombinedBackdrop(
 }
 
 @Composable
-fun rememberCombinedBackdrop(first: Backdrop, second: Backdrop): Backdrop =
-    remember(first, second) { CombinedBackdrop(first, second) }
+fun rememberCombinedBackdrop(
+    first: Backdrop,
+    second: Backdrop,
+): Backdrop = remember(first, second) { CombinedBackdrop(first, second) }

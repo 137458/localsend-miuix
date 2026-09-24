@@ -7,7 +7,6 @@ import org.localsend.miuix.network.LocalSendClient
 import org.localsend.miuix.network.TargetPinRequiredException
 
 class LocalSendClientPinTest {
-
     @Test
     fun urlWithoutPin() {
         val url = LocalSendClient.buildPrepareUploadUrl("https://192.168.1.100:53317", null)

@@ -13,12 +13,11 @@ import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.transfer.RemainingTime
 
 class TransferModelTest {
-
     private fun file(
         id: String,
         status: TransferStatus = TransferStatus.WaitingApproval,
         name: String = "$id.bin",
-        size: Long = 100L
+        size: Long = 100L,
     ) = FileItem(id = id, name = name, size = size, status = status)
 
     private fun session(
@@ -27,7 +26,7 @@ class TransferModelTest {
         totalBytes: Long = 1000L,
         transferredBytes: Long = 0L,
         speed: Long = 0L,
-        errorMessage: String? = null
+        errorMessage: String? = null,
     ) = TransferSession(
         sessionId = "sess-1",
         device = Device(alias = "Peer", fingerprint = "fp", ip = "10.0.0.1"),
@@ -37,7 +36,7 @@ class TransferModelTest {
         transferredBytes = transferredBytes,
         speed = speed,
         status = status,
-        errorMessage = errorMessage
+        errorMessage = errorMessage,
     )
 
     @Test
@@ -79,15 +78,17 @@ class TransferModelTest {
 
     @Test
     fun currentFileIndexTracksInProgressThenLastCompleted() {
-        val inProgress = session(
-            listOf(file("a", TransferStatus.Completed), file("b", TransferStatus.InProgress), file("c"))
-        )
+        val inProgress =
+            session(
+                listOf(file("a", TransferStatus.Completed), file("b", TransferStatus.InProgress), file("c")),
+            )
         assertEquals(1, inProgress.currentFileIndex)
         assertEquals("b.bin", inProgress.currentFile?.name)
 
-        val completed = session(
-            listOf(file("a", TransferStatus.Completed), file("b", TransferStatus.Completed))
-        )
+        val completed =
+            session(
+                listOf(file("a", TransferStatus.Completed), file("b", TransferStatus.Completed)),
+            )
         assertEquals(1, completed.currentFileIndex)
 
         val idle = session(listOf(file("a"), file("b")))

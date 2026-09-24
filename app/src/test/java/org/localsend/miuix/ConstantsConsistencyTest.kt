@@ -12,7 +12,6 @@ import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
 
 class ConstantsConsistencyTest {
-
     @Test
     fun protocolRoutesShareVersionedApiPrefix() {
         assertEquals("/", LocalSendRoutes.WEB_ROOT)
@@ -20,16 +19,17 @@ class ConstantsConsistencyTest {
         val v1Routes = listOf(LocalSendRoutes.INFO_V1, LocalSendRoutes.REGISTER_V1)
         assertEquals(2, v1Routes.count { it.startsWith("/api/localsend/v1/") })
 
-        val v2Routes = listOf(
-            LocalSendRoutes.INFO_V2,
-            LocalSendRoutes.REGISTER_V2,
-            LocalSendRoutes.PREPARE_UPLOAD,
-            LocalSendRoutes.UPLOAD,
-            LocalSendRoutes.CANCEL,
-            LocalSendRoutes.PREPARE_DOWNLOAD,
-            LocalSendRoutes.DOWNLOAD,
-            LocalSendRoutes.DOWNLOAD_ZIP
-        )
+        val v2Routes =
+            listOf(
+                LocalSendRoutes.INFO_V2,
+                LocalSendRoutes.REGISTER_V2,
+                LocalSendRoutes.PREPARE_UPLOAD,
+                LocalSendRoutes.UPLOAD,
+                LocalSendRoutes.CANCEL,
+                LocalSendRoutes.PREPARE_DOWNLOAD,
+                LocalSendRoutes.DOWNLOAD,
+                LocalSendRoutes.DOWNLOAD_ZIP,
+            )
         assertEquals(8, v2Routes.count { it.startsWith("/api/localsend/v2/") })
         assertEquals(8, v2Routes.distinct().size)
     }
@@ -54,13 +54,14 @@ class ConstantsConsistencyTest {
 
     @Test
     fun appActionsUseApplicationIdPrefix() {
-        val actions = listOf(
-            AppActions.ACTION_CANCEL_TRANSFER,
-            AppActions.ACTION_ACCEPT_TRANSFER,
-            AppActions.ACTION_DECLINE_TRANSFER,
-            AppActions.ACTION_START_SERVICE,
-            AppActions.ACTION_STOP_SERVICE
-        )
+        val actions =
+            listOf(
+                AppActions.ACTION_CANCEL_TRANSFER,
+                AppActions.ACTION_ACCEPT_TRANSFER,
+                AppActions.ACTION_DECLINE_TRANSFER,
+                AppActions.ACTION_START_SERVICE,
+                AppActions.ACTION_STOP_SERVICE,
+            )
         assertEquals(5, actions.count { it.startsWith("org.localsend.miuix.") })
         assertEquals(5, actions.distinct().size)
     }

@@ -15,17 +15,26 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 object SslHelper {
+    val trustAllCerts =
+        arrayOf<TrustManager>(
+            object : X509TrustManager {
+                override fun checkClientTrusted(
+                    chain: Array<out X509Certificate>?,
+                    authType: String?,
+                ) {}
 
-    val trustAllCerts = arrayOf<TrustManager>(
-        object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        }
-    )
+                override fun checkServerTrusted(
+                    chain: Array<out X509Certificate>?,
+                    authType: String?,
+                ) {}
+
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+            },
+        )
 
     @Volatile
     private var customSslContext: SSLContext? = null
+
     @Volatile
     private var customSslSocketFactory: SSLSocketFactory? = null
 
@@ -40,10 +49,16 @@ object SslHelper {
             customSslContext?.let { return it }
             synchronized(this) {
                 customSslContext?.let { return it }
-                val km = try { TlsStore.getKeyManagers() } catch (e: Exception) { null }
-                val sc = SSLContext.getInstance("TLS").apply {
-                    init(km, trustAllCerts, SecureRandom())
-                }
+                val km =
+                    try {
+                        TlsStore.getKeyManagers()
+                    } catch (e: Exception) {
+                        null
+                    }
+                val sc =
+                    SSLContext.getInstance("TLS").apply {
+                        init(km, trustAllCerts, SecureRandom())
+                    }
                 customSslContext = sc
                 return sc
             }
@@ -69,14 +84,23 @@ object SslHelper {
      */
     val lastDiscoveryCertFp = ThreadLocal<String>()
 
-    val discoveryTrustManager: X509TrustManager = object : X509TrustManager {
-        override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-        override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
-            if (chain.isNullOrEmpty()) return
-            lastDiscoveryCertFp.set(FingerprintTrust.normalize(FingerprintTrust.sha256(chain[0])))
+    val discoveryTrustManager: X509TrustManager =
+        object : X509TrustManager {
+            override fun checkClientTrusted(
+                chain: Array<out X509Certificate>?,
+                authType: String?,
+            ) {}
+
+            override fun checkServerTrusted(
+                chain: Array<out X509Certificate>?,
+                authType: String?,
+            ) {
+                if (chain.isNullOrEmpty()) return
+                lastDiscoveryCertFp.set(FingerprintTrust.normalize(FingerprintTrust.sha256(chain[0])))
+            }
+
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
         }
-        override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-    }
 
     fun observedDiscoveryCertFp(): String = lastDiscoveryCertFp.get().orEmpty()
 
@@ -101,12 +125,12 @@ object SslHelper {
  * 同时配置 LocalSend 自签名客户端证书（mTLS），使目标端在请求客户端证书（CertificateRequest）时能正常接收并完成握手。
  */
 object FingerprintTrust {
-
     private val pinCounts = ConcurrentHashMap<String, AtomicInteger>()
     private val trustedSet = ConcurrentHashMap.newKeySet<String>()
 
     @Volatile
     private var customPinnedSslContext: SSLContext? = null
+
     @Volatile
     private var customPinnedSslSocketFactory: SSLSocketFactory? = null
 
@@ -117,10 +141,16 @@ object FingerprintTrust {
     }
 
     fun normalize(fp: String): String =
-        fp.replace(":", "").replace(" ", "").lowercase(Locale.ROOT).trim()
+        fp
+            .replace(":", "")
+            .replace(" ", "")
+            .lowercase(Locale.ROOT)
+            .trim()
 
     fun sha256(cert: X509Certificate): String =
-        MessageDigest.getInstance("SHA-256").digest(cert.encoded)
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest(cert.encoded)
             .joinToString("") { "%02x".format(it) }
 
     /** True when [fingerprint] is currently pinned or previously trusted via discovery. */
@@ -131,27 +161,42 @@ object FingerprintTrust {
     }
 
     /** 供 CIO/HttpURLConnection 注入的指纹校验 TrustManager。 */
-    val trustManager: X509TrustManager = object : X509TrustManager {
-        override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-        override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
-            if (chain.isNullOrEmpty()) throw CertificateException("Empty certificate chain")
-            val certFp = normalize(sha256(chain[0]))
-            if (!isAccepted(certFp)) {
-                throw CertificateException("Untrusted server certificate fingerprint: $certFp")
+    val trustManager: X509TrustManager =
+        object : X509TrustManager {
+            override fun checkClientTrusted(
+                chain: Array<out X509Certificate>?,
+                authType: String?,
+            ) {}
+
+            override fun checkServerTrusted(
+                chain: Array<out X509Certificate>?,
+                authType: String?,
+            ) {
+                if (chain.isNullOrEmpty()) throw CertificateException("Empty certificate chain")
+                val certFp = normalize(sha256(chain[0]))
+                if (!isAccepted(certFp)) {
+                    throw CertificateException("Untrusted server certificate fingerprint: $certFp")
+                }
             }
+
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
         }
-        override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-    }
 
     val pinnedSslContext: SSLContext
         get() {
             customPinnedSslContext?.let { return it }
             synchronized(this) {
                 customPinnedSslContext?.let { return it }
-                val km = try { TlsStore.getKeyManagers() } catch (e: Exception) { null }
-                val sc = SSLContext.getInstance("TLS").apply {
-                    init(km, arrayOf<TrustManager>(trustManager), SecureRandom())
-                }
+                val km =
+                    try {
+                        TlsStore.getKeyManagers()
+                    } catch (e: Exception) {
+                        null
+                    }
+                val sc =
+                    SSLContext.getInstance("TLS").apply {
+                        init(km, arrayOf<TrustManager>(trustManager), SecureRandom())
+                    }
                 customPinnedSslContext = sc
                 return sc
             }

@@ -1,7 +1,5 @@
 package org.localsend.miuix.model
 
-import android.os.Build
-
 data class AppSettings(
     val alias: String = generateDefaultAlias(),
     val port: Int = 53317,
@@ -31,17 +29,53 @@ data class AppSettings(
     val isOs3Effect: Boolean = true,
     val wideScreenNavigationRail: Boolean = false,
     val saveTextAsFile: Boolean = false, // 是否将纯文本消息另存为 .txt 文件，默认关闭仅复制并写入历史
-    val autoCategorizeMedia: Boolean = false // 是否按文件类型分类保存（图片进Pictures，视频进Movies等）
+    val autoCategorizeMedia: Boolean = false, // 是否按文件类型分类保存（图片进Pictures，视频进Movies等）
 ) {
     companion object {
-        private val ADJECTIVES = listOf(
-            "Cool", "Fast", "Smart", "Brave", "Silent", "Cosmic", "Lunar", "Solar", "Happy", "Lucky",
-            "Swift", "Bright", "Mighty", "Gentle", "Magic", "Hyper", "Vibrant", "Active", "Dynamic"
-        )
-        private val NOUNS = listOf(
-            "Xiaomi", "Dragon", "Phoenix", "Tiger", "Falcon", "Panda", "Fox", "Wolf", "Eagle", "Lion",
-            "Device", "HyperOS", "Pixel", "Nova", "Star", "Comet", "Rocket", "Storm", "Spark"
-        )
+        private val ADJECTIVES =
+            listOf(
+                "Cool",
+                "Fast",
+                "Smart",
+                "Brave",
+                "Silent",
+                "Cosmic",
+                "Lunar",
+                "Solar",
+                "Happy",
+                "Lucky",
+                "Swift",
+                "Bright",
+                "Mighty",
+                "Gentle",
+                "Magic",
+                "Hyper",
+                "Vibrant",
+                "Active",
+                "Dynamic",
+            )
+        private val NOUNS =
+            listOf(
+                "Xiaomi",
+                "Dragon",
+                "Phoenix",
+                "Tiger",
+                "Falcon",
+                "Panda",
+                "Fox",
+                "Wolf",
+                "Eagle",
+                "Lion",
+                "Device",
+                "HyperOS",
+                "Pixel",
+                "Nova",
+                "Star",
+                "Comet",
+                "Rocket",
+                "Storm",
+                "Spark",
+            )
 
         fun generateDefaultAlias(): String {
             val adj = ADJECTIVES.random()

@@ -10,7 +10,7 @@ import org.localsend.miuix.model.TransferStatus
  */
 data class BatchOutcome(
     val status: TransferStatus,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )
 
 object TransferOutcome {
@@ -18,7 +18,7 @@ object TransferOutcome {
         files: List<FileItem>,
         currentStatus: TransferStatus,
         allFailedMessage: String,
-        partialFailedMessage: (failed: Int, total: Int) -> String
+        partialFailedMessage: (failed: Int, total: Int) -> String,
     ): BatchOutcome {
         if (currentStatus == TransferStatus.Canceled) {
             return BatchOutcome(TransferStatus.Canceled, null)
@@ -28,13 +28,14 @@ object TransferOutcome {
             files.isEmpty() || failedCount == files.size -> {
                 BatchOutcome(
                     TransferStatus.Failed,
-                    files.firstNotNullOfOrNull { it.error } ?: allFailedMessage
+                    files.firstNotNullOfOrNull { it.error } ?: allFailedMessage,
                 )
             }
-            failedCount > 0 -> BatchOutcome(
-                TransferStatus.Completed,
-                partialFailedMessage(failedCount, files.size)
-            )
+            failedCount > 0 ->
+                BatchOutcome(
+                    TransferStatus.Completed,
+                    partialFailedMessage(failedCount, files.size),
+                )
             else -> BatchOutcome(TransferStatus.Completed, null)
         }
     }

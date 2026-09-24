@@ -10,8 +10,10 @@ import org.localsend.miuix.manager.LocalSendManager
  * 用于响应系统通知栏、焦点胶囊等外部界面的快捷操作（如一键取消传输）。
  */
 class TransferActionReceiver : BroadcastReceiver() {
-
-    override fun onReceive(context: Context, intent: Intent?) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent?,
+    ) {
         val action = intent?.action ?: return
         val sessionId = intent.getStringExtra(EXTRA_SESSION_ID)
         if (sessionId.isNullOrEmpty()) return

@@ -8,18 +8,31 @@ import org.localsend.miuix.model.TransferStatus
  */
 sealed class RemainingTime {
     data object Hidden : RemainingTime()
+
     data object Calculating : RemainingTime()
+
     data object AlmostDone : RemainingTime()
-    data class Seconds(val value: Long) : RemainingTime()
-    data class Minutes(val minutes: Long, val seconds: Long) : RemainingTime()
-    data class Hours(val hours: Long, val minutes: Long) : RemainingTime()
+
+    data class Seconds(
+        val value: Long,
+    ) : RemainingTime()
+
+    data class Minutes(
+        val minutes: Long,
+        val seconds: Long,
+    ) : RemainingTime()
+
+    data class Hours(
+        val hours: Long,
+        val minutes: Long,
+    ) : RemainingTime()
 
     companion object {
         fun of(
             status: TransferStatus,
             speed: Long,
             totalBytes: Long,
-            transferredBytes: Long
+            transferredBytes: Long,
         ): RemainingTime {
             if (status != TransferStatus.InProgress) return Hidden
             if (speed <= 0L || totalBytes <= 0L) return Calculating

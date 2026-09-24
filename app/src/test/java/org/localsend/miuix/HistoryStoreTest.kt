@@ -11,8 +11,10 @@ import java.io.File
 import kotlin.io.path.createTempDirectory
 
 class HistoryStoreTest {
-
-    private fun item(id: String, alias: String = "Peer") = TransferHistoryItem(
+    private fun item(
+        id: String,
+        alias: String = "Peer",
+    ) = TransferHistoryItem(
         id = id,
         deviceAlias = alias,
         deviceIp = "192.168.1.8",
@@ -20,7 +22,7 @@ class HistoryStoreTest {
         fileCount = 1,
         totalSize = 10,
         status = TransferStatus.Completed,
-        fileNames = listOf("a.txt")
+        fileNames = listOf("a.txt"),
     )
 
     private fun storeInTemp(): Pair<HistoryStore, File> {
@@ -76,14 +78,15 @@ class HistoryStoreTest {
                     status = TransferStatus.Completed,
                     timestamp = 123L,
                     fileNames = listOf("a.png", "b.jpg"),
-                    fileEntries = listOf(
-                        HistoryFileEntry(
-                            name = "a.png",
-                            size = 2048L,
-                            uriString = "content://downloads/a.png",
-                            mimeType = "image/png"
-                        )
-                    )
+                    fileEntries =
+                        listOf(
+                            HistoryFileEntry(
+                                name = "a.png",
+                                size = 2048L,
+                                uriString = "content://downloads/a.png",
+                                mimeType = "image/png",
+                            ),
+                        ),
                 ),
                 TransferHistoryItem(
                     id = "h2",
@@ -96,9 +99,9 @@ class HistoryStoreTest {
                     timestamp = 456L,
                     fileNames = listOf("note"),
                     textContent = "hello history",
-                    isTextMessage = true
-                )
-            )
+                    isTextMessage = true,
+                ),
+            ),
         )
         val reloaded = store.load()
         assertEquals(2, reloaded.size)

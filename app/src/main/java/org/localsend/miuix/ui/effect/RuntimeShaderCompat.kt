@@ -7,36 +7,45 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.SolidColor
 
-fun isRuntimeShaderSupported(): Boolean =
-    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+fun isRuntimeShaderSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
-class RuntimeShaderCompat(sksl: String) {
-    private val shader: RuntimeShader? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        try {
-            RuntimeShader(sksl)
-        } catch (_: Throwable) {
+class RuntimeShaderCompat(
+    sksl: String,
+) {
+    private val shader: RuntimeShader? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            try {
+                RuntimeShader(sksl)
+            } catch (_: Throwable) {
+                null
+            }
+        } else {
             null
         }
-    } else {
-        null
-    }
 
-    fun setFloatUniform(name: String, value: Float) {
+    fun setFloatUniform(
+        name: String,
+        value: Float,
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             shader?.setFloatUniform(name, value)
         }
     }
 
-    fun setFloatUniform(name: String, values: FloatArray) {
+    fun setFloatUniform(
+        name: String,
+        values: FloatArray,
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             shader?.setFloatUniform(name, values)
         }
     }
 
     val brush: Brush
-        get() = if (shader != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ShaderBrush(shader)
-        } else {
-            SolidColor(Color.Transparent)
-        }
+        get() =
+            if (shader != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ShaderBrush(shader)
+            } else {
+                SolidColor(Color.Transparent)
+            }
 }

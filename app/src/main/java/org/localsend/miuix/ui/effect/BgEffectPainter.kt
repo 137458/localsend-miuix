@@ -7,7 +7,6 @@ import kotlin.math.sin
 class BgEffectPainter(
     private val isOs3: Boolean = true,
 ) {
-
     val runtimeShader by lazy {
         val shaderCode = if (isOs3) OS3_BG_FRAG else OS2_BG_FRAG
         RuntimeShaderCompat(shaderCode).also {
@@ -52,7 +51,10 @@ class BgEffectPainter(
         shader.setFloatUniform("uAlphaMulti", U_ALPHA_MULTI)
     }
 
-    fun updateResolution(width: Float, height: Float) {
+    fun updateResolution(
+        width: Float,
+        height: Float,
+    ) {
         if (width <= 0f || height <= 0f) return
         if (resolution[0] == width && resolution[1] == height) return
         resolution[0] = width
@@ -66,7 +68,10 @@ class BgEffectPainter(
         runtimeShader.setFloatUniform("uAnimTime", animTime)
     }
 
-    fun updatePointsAnim(time: Float, preset: BgEffectConfig.Config) {
+    fun updatePointsAnim(
+        time: Float,
+        preset: BgEffectConfig.Config,
+    ) {
         if (cachedPointsAnimTime == time && cachedPointsAnimPreset === preset) return
 
         val offset = preset.pointOffset
@@ -86,7 +91,10 @@ class BgEffectPainter(
         cachedPointsAnimPreset = preset
     }
 
-    fun updateColors(preset: BgEffectConfig.Config, stage: Float) {
+    fun updateColors(
+        preset: BgEffectConfig.Config,
+        stage: Float,
+    ) {
         if (cachedColorsPreset === preset && cachedColorStage == stage) return
 
         val base = stage.toInt()
@@ -102,11 +110,15 @@ class BgEffectPainter(
         cachedColorStage = stage
     }
 
-    private fun colorsForCycleIndex(preset: BgEffectConfig.Config, index: Int): FloatArray = when (index.mod(4)) {
-        1 -> preset.colors1
-        3 -> preset.colors3
-        else -> preset.colors2
-    }
+    private fun colorsForCycleIndex(
+        preset: BgEffectConfig.Config,
+        index: Int,
+    ): FloatArray =
+        when (index.mod(4)) {
+            1 -> preset.colors1
+            3 -> preset.colors3
+            else -> preset.colors2
+        }
 
     fun updateBoundIfNeeded(
         logoHeight: Float,
@@ -129,7 +141,10 @@ class BgEffectPainter(
         cachedTotalWidth = totalWidth
     }
 
-    fun updatePresetIfNeeded(deviceType: DeviceType, isDark: Boolean) {
+    fun updatePresetIfNeeded(
+        deviceType: DeviceType,
+        isDark: Boolean,
+    ) {
         if (presetApplied && isDarkCached == isDark && deviceTypeCached == deviceType) return
 
         applyPreset(deviceType, isDark)
@@ -139,7 +154,10 @@ class BgEffectPainter(
         presetApplied = true
     }
 
-    private fun applyPreset(deviceType: DeviceType, isDark: Boolean) {
+    private fun applyPreset(
+        deviceType: DeviceType,
+        isDark: Boolean,
+    ) {
         val preset = BgEffectConfig.get(deviceType, isDark, isOs3)
 
         runtimeShader.setFloatUniform("uPoints", preset.points)

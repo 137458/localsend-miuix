@@ -68,103 +68,109 @@ fun HistoryDetailDialog(
     show: Boolean,
     onDismissRequest: () -> Unit,
     onDelete: (String) -> Unit,
-    onResend: ((TransferHistoryItem) -> Unit)? = null
+    onResend: ((TransferHistoryItem) -> Unit)? = null,
 ) {
     if (item == null) return
     val context = LocalContext.current
-    val formattedTime = remember(item.timestamp) {
-        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(item.timestamp))
-    }
+    val formattedTime =
+        remember(item.timestamp) {
+            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(item.timestamp))
+        }
 
     WindowBottomSheet(
         show = show,
         onDismissRequest = onDismissRequest,
-        title = if (item.isTextMessage) stringResource(R.string.history_detail_text_title) else stringResource(R.string.history_detail_file_title)
+        title = if (item.isTextMessage) stringResource(R.string.history_detail_text_title) else stringResource(R.string.history_detail_file_title),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             // Section 1: Device & Status Info Card
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = if (item.isIncoming) {
-                                stringResource(R.string.history_detail_sender, item.deviceAlias)
-                            } else {
-                                stringResource(R.string.history_detail_receiver, item.deviceAlias)
-                            },
-                            style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.SemiBold)
+                            text =
+                                if (item.isIncoming) {
+                                    stringResource(R.string.history_detail_sender, item.deviceAlias)
+                                } else {
+                                    stringResource(R.string.history_detail_receiver, item.deviceAlias)
+                                },
+                            style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.SemiBold),
                         )
                         Text(
-                            text = when (item.status) {
-                                TransferStatus.Completed -> stringResource(R.string.status_completed)
-                                TransferStatus.Failed -> stringResource(R.string.status_failed)
-                                TransferStatus.Canceled -> stringResource(R.string.status_canceled)
-                                else -> stringResource(R.string.status_processing)
-                            },
+                            text =
+                                when (item.status) {
+                                    TransferStatus.Completed -> stringResource(R.string.status_completed)
+                                    TransferStatus.Failed -> stringResource(R.string.status_failed)
+                                    TransferStatus.Canceled -> stringResource(R.string.status_canceled)
+                                    else -> stringResource(R.string.status_processing)
+                                },
                             style = MiuixTheme.textStyles.footnote1,
-                            color = when (item.status) {
-                                TransferStatus.Completed -> MiuixTheme.colorScheme.primary
-                                TransferStatus.Failed -> MiuixTheme.colorScheme.error
-                                else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            }
+                            color =
+                                when (item.status) {
+                                    TransferStatus.Completed -> MiuixTheme.colorScheme.primary
+                                    TransferStatus.Failed -> MiuixTheme.colorScheme.error
+                                    else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                },
                         )
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
                             text = stringResource(R.string.history_detail_device_ip),
                             style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                         Text(
                             text = item.deviceIp,
-                            style = MiuixTheme.textStyles.footnote1
+                            style = MiuixTheme.textStyles.footnote1,
                         )
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
                             text = stringResource(R.string.history_detail_time),
                             style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                         Text(
                             text = formattedTime,
-                            style = MiuixTheme.textStyles.footnote1
+                            style = MiuixTheme.textStyles.footnote1,
                         )
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
                             text = stringResource(R.string.history_detail_total),
                             style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                         Text(
                             text = stringResource(R.string.history_detail_total_summary, item.fileCount, item.formattedSize),
-                            style = MiuixTheme.textStyles.footnote1
+                            style = MiuixTheme.textStyles.footnote1,
                         )
                     }
                 }
@@ -178,50 +184,56 @@ fun HistoryDetailDialog(
                     text = stringResource(R.string.history_detail_text_content),
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                 )
 
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
                     ) {
-                        val detectedUrl = remember(item.textContent) {
-                            val trimmed = item.textContent.trim()
-                            if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
-                                if (!trimmed.contains(" ") && !trimmed.contains("\n")) {
-                                    trimmed
-                                } else {
-                                    val matcher = android.util.Patterns.WEB_URL.matcher(trimmed)
-                                    if (matcher.find()) matcher.group() else null
-                                }
-                            } else {
-                                val matcher = android.util.Patterns.WEB_URL.matcher(trimmed)
-                                if (matcher.find()) {
-                                    val found = matcher.group()
-                                    if (found.startsWith("http://", ignoreCase = true) || found.startsWith("https://", ignoreCase = true)) {
-                                        found
+                        val detectedUrl =
+                            remember(item.textContent) {
+                                val trimmed = item.textContent.trim()
+                                if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+                                    if (!trimmed.contains(" ") && !trimmed.contains("\n")) {
+                                        trimmed
                                     } else {
-                                        "https://$found"
+                                        val matcher =
+                                            android.util.Patterns.WEB_URL
+                                                .matcher(trimmed)
+                                        if (matcher.find()) matcher.group() else null
                                     }
                                 } else {
-                                    null
+                                    val matcher =
+                                        android.util.Patterns.WEB_URL
+                                            .matcher(trimmed)
+                                    if (matcher.find()) {
+                                        val found = matcher.group()
+                                        if (found.startsWith("http://", ignoreCase = true) || found.startsWith("https://", ignoreCase = true)) {
+                                            found
+                                        } else {
+                                            "https://$found"
+                                        }
+                                    } else {
+                                        null
+                                    }
                                 }
                             }
-                        }
 
                         Text(
                             text = item.textContent,
                             style = MiuixTheme.textStyles.body2,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                         ) {
                             Button(
                                 onClick = {
@@ -229,7 +241,7 @@ fun HistoryDetailDialog(
                                     clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Text", item.textContent))
                                     Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                                 },
-                                colors = if (detectedUrl != null) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary()
+                                colors = if (detectedUrl != null) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary(),
                             ) {
                                 Text(stringResource(R.string.history_detail_btn_copy_text))
                             }
@@ -238,15 +250,16 @@ fun HistoryDetailDialog(
                                 Button(
                                     onClick = {
                                         try {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(detectedUrl)).apply {
-                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                            }
+                                            val intent =
+                                                Intent(Intent.ACTION_VIEW, Uri.parse(detectedUrl)).apply {
+                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                }
                                             context.startActivity(intent)
                                         } catch (e: Exception) {
                                             Toast.makeText(context, context.getString(R.string.toast_cannot_open_link), Toast.LENGTH_SHORT).show()
                                         }
                                     },
-                                    colors = ButtonDefaults.buttonColorsPrimary()
+                                    colors = ButtonDefaults.buttonColorsPrimary(),
                                 ) {
                                     Text(stringResource(R.string.btn_open_link))
                                 }
@@ -259,42 +272,46 @@ fun HistoryDetailDialog(
                     text = stringResource(R.string.history_detail_included_files, item.fileEntries.size),
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                 )
 
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 240.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     items(item.fileEntries) { file ->
                         Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    file.uri?.let { uri ->
-                                        try {
-                                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                setDataAndType(uri, file.mimeType)
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        file.uri?.let { uri ->
+                                            try {
+                                                val intent =
+                                                    Intent(Intent.ACTION_VIEW).apply {
+                                                        setDataAndType(uri, file.mimeType)
+                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, context.getString(R.string.toast_cannot_open_file), Toast.LENGTH_SHORT).show()
                                             }
-                                            context.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, context.getString(R.string.toast_cannot_open_file), Toast.LENGTH_SHORT).show()
                                         }
-                                    }
-                                }
+                                    },
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 HistoryFileThumbnailView(
                                     file = file,
-                                    size = 36.dp
+                                    size = 36.dp,
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -302,12 +319,12 @@ fun HistoryDetailDialog(
                                         text = file.name,
                                         style = MiuixTheme.textStyles.body2,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                     Text(
                                         text = FileItem.formatFileSize(file.size),
                                         style = MiuixTheme.textStyles.footnote1,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                     )
                                 }
                             }
@@ -321,13 +338,13 @@ fun HistoryDetailDialog(
             // Action Buttons (Delete / Close)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (onResend != null) {
                     Button(
                         onClick = { onResend(item) },
                         colors = ButtonDefaults.buttonColorsPrimary(),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     ) {
                         Text(stringResource(R.string.history_action_resend))
                     }
@@ -339,11 +356,12 @@ fun HistoryDetailDialog(
                         onDismissRequest()
                         Toast.makeText(context, context.getString(R.string.toast_history_item_deleted), Toast.LENGTH_SHORT).show()
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        color = MiuixTheme.colorScheme.error,
-                        contentColor = MiuixTheme.colorScheme.onError
-                    ),
-                    modifier = Modifier.weight(1f)
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            color = MiuixTheme.colorScheme.error,
+                            contentColor = MiuixTheme.colorScheme.onError,
+                        ),
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.history_detail_btn_delete_record))
                 }
@@ -351,7 +369,7 @@ fun HistoryDetailDialog(
                 Button(
                     onClick = onDismissRequest,
                     colors = ButtonDefaults.buttonColors(),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.btn_close))
                 }
@@ -364,57 +382,62 @@ fun HistoryDetailDialog(
 private fun HistoryFileThumbnailView(
     file: HistoryFileEntry,
     modifier: Modifier = Modifier,
-    size: Dp = 36.dp
+    size: Dp = 36.dp,
 ) {
     val context = LocalContext.current
-    val isMediaOrApk = ThumbnailHelper.isImage(file.name, file.mimeType) ||
+    val isMediaOrApk =
+        ThumbnailHelper.isImage(file.name, file.mimeType) ||
             ThumbnailHelper.isVideo(file.name, file.mimeType) ||
             ThumbnailHelper.isApk(file.name, file.mimeType)
 
     val thumbnailBitmap by produceState<Bitmap?>(initialValue = null, file.name) {
         if (isMediaOrApk) {
-            value = withContext(Dispatchers.IO) {
-                ThumbnailHelper.loadThumbnail(
-                    context,
-                    file.name,
-                    file.mimeType,
-                    file.uri,
-                    file.path,
-                    (size.value * 2.5f).toInt().coerceAtLeast(96)
-                )
-            }
+            value =
+                withContext(Dispatchers.IO) {
+                    ThumbnailHelper.loadThumbnail(
+                        context,
+                        file.name,
+                        file.mimeType,
+                        file.uri,
+                        file.path,
+                        (size.value * 2.5f).toInt().coerceAtLeast(96),
+                    )
+                }
         }
     }
 
     Box(
-        modifier = modifier
-            .size(size)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .size(size)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)),
+        contentAlignment = Alignment.Center,
     ) {
         if (thumbnailBitmap != null) {
             Image(
                 bitmap = thumbnailBitmap!!.asImageBitmap(),
                 contentDescription = file.name,
-                modifier = Modifier
-                    .size(size)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
+                modifier =
+                    Modifier
+                        .size(size)
+                        .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop,
             )
             if (ThumbnailHelper.isVideo(file.name, file.mimeType)) {
                 Box(
-                    modifier = Modifier
-                        .size(16.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.55f)),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.55f)),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(10.dp)
+                        modifier = Modifier.size(10.dp),
                     )
                 }
             }
@@ -424,7 +447,7 @@ private fun HistoryFileThumbnailView(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MiuixTheme.colorScheme.primary,
-                modifier = Modifier.size(size * 0.55f)
+                modifier = Modifier.size(size * 0.55f),
             )
         }
     }

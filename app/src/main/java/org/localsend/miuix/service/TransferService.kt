@@ -4,12 +4,11 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
-import org.localsend.miuix.notification.TransferNotifier
-
-import android.net.wifi.WifiManager
 import android.os.PowerManager
+import org.localsend.miuix.notification.TransferNotifier
 
 /**
  * 前台传输服务（Android 14+ dataSync 类型）。
@@ -17,13 +16,16 @@ import android.os.PowerManager
  * 息屏或多任务切换时冻结网络连接或杀死进程；全部传输完成后自动退出并释放前台通知。
  */
 class TransferService : Service() {
-
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         val action = intent?.action
         if (action == ACTION_STOP) {
             stopForegroundService()
@@ -41,7 +43,7 @@ class TransferService : Service() {
                 startForeground(
                     TransferNotifier.NOTIF_ID_FOREGROUND_SERVICE,
                     notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
                 )
             } else {
                 startForeground(TransferNotifier.NOTIF_ID_FOREGROUND_SERVICE, notification)
@@ -57,17 +59,19 @@ class TransferService : Service() {
         try {
             if (wakeLock == null) {
                 val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-                wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, org.localsend.miuix.core.NetworkConstants.WAKE_LOCK_TAG)?.apply {
-                    setReferenceCounted(false)
-                    acquire(60 * 60 * 1000L) // 最大持有 60 分钟保护
-                }
+                wakeLock =
+                    powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, org.localsend.miuix.core.NetworkConstants.WAKE_LOCK_TAG)?.apply {
+                        setReferenceCounted(false)
+                        acquire(60 * 60 * 1000L) // 最大持有 60 分钟保护
+                    }
             }
             if (wifiLock == null) {
                 val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-                wifiLock = wifiManager?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, org.localsend.miuix.core.NetworkConstants.WIFI_LOCK_TAG)?.apply {
-                    setReferenceCounted(false)
-                    acquire()
-                }
+                wifiLock =
+                    wifiManager?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, org.localsend.miuix.core.NetworkConstants.WIFI_LOCK_TAG)?.apply {
+                        setReferenceCounted(false)
+                        acquire()
+                    }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -80,13 +84,15 @@ class TransferService : Service() {
                 if (it.isHeld) it.release()
             }
             wakeLock = null
-        } catch (ignored: Exception) {}
+        } catch (ignored: Exception) {
+        }
         try {
             wifiLock?.let {
                 if (it.isHeld) it.release()
             }
             wifiLock = null
-        } catch (ignored: Exception) {}
+        } catch (ignored: Exception) {
+        }
     }
 
     private fun stopForegroundService() {
@@ -98,7 +104,8 @@ class TransferService : Service() {
                 @Suppress("DEPRECATION")
                 stopForeground(true)
             }
-        } catch (ignored: Exception) {}
+        } catch (ignored: Exception) {
+        }
         stopSelf()
     }
 
@@ -112,12 +119,16 @@ class TransferService : Service() {
         private const val ACTION_STOP = org.localsend.miuix.core.AppActions.ACTION_STOP_SERVICE
         private const val EXTRA_SESSION_COUNT = org.localsend.miuix.core.AppActions.EXTRA_SESSION_COUNT
 
-        fun start(context: Context, sessionCount: Int = 1) {
+        fun start(
+            context: Context,
+            sessionCount: Int = 1,
+        ) {
             try {
-                val intent = Intent(context, TransferService::class.java).apply {
-                    action = ACTION_START
-                    putExtra(EXTRA_SESSION_COUNT, sessionCount)
-                }
+                val intent =
+                    Intent(context, TransferService::class.java).apply {
+                        action = ACTION_START
+                        putExtra(EXTRA_SESSION_COUNT, sessionCount)
+                    }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(intent)
                 } else {
@@ -130,11 +141,13 @@ class TransferService : Service() {
 
         fun stop(context: Context) {
             try {
-                val intent = Intent(context, TransferService::class.java).apply {
-                    action = ACTION_STOP
-                }
+                val intent =
+                    Intent(context, TransferService::class.java).apply {
+                        action = ACTION_STOP
+                    }
                 context.startService(intent)
-            } catch (ignored: Exception) {}
+            } catch (ignored: Exception) {
+            }
         }
     }
 }

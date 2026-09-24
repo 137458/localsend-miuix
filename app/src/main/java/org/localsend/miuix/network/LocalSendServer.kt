@@ -5,9 +5,6 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.headersOf
-import io.ktor.http.Headers
-import io.ktor.http.content.OutgoingContent
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
@@ -57,15 +54,15 @@ import java.io.InputStream
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
 
 data class IncomingDecision(
     val accepted: Boolean,
-    val selectedFileIds: Set<String>? = null
+    val selectedFileIds: Set<String>? = null,
 ) {
     companion object {
         val Rejected = IncomingDecision(false)
         val AcceptAll = IncomingDecision(true)
+
         fun accept(selectedIds: Set<String>?) = IncomingDecision(true, selectedIds)
     }
 }
@@ -84,7 +81,7 @@ class LocalSendServer(
     private val onIncomingRequest: suspend (session: TransferSession) -> IncomingDecision,
     private val onSessionUpdated: (TransferSession) -> Unit,
     private val getSaveTextAsFile: () -> Boolean = { false },
-    private val getAutoCategorizeMedia: () -> Boolean = { false }
+    private val getAutoCategorizeMedia: () -> Boolean = { false },
 ) {
     private var engine: ApplicationEngine? = null
     private val json = AppJson.default
@@ -101,13 +98,17 @@ class LocalSendServer(
         val iterator = activeSessions.entries.iterator()
         while (iterator.hasNext()) {
             val (id, session) = iterator.next()
-            val isTerminal = session.status == TransferStatus.Completed ||
-                session.status == TransferStatus.Failed ||
-                session.status == TransferStatus.Canceled
-            val isStale = (now - session.lastActiveTime > 30_000L) ||
-                (session.endTime?.let { now - it > 5_000L } ?: false)
-            val isSameSenderReconnecting = incomingIp != null && session.device.ip == incomingIp &&
-                (session.status == TransferStatus.WaitingApproval || session.status == TransferStatus.Failed || (session.status != TransferStatus.InProgress && now - session.startTime > 10_000L))
+            val isTerminal =
+                session.status == TransferStatus.Completed ||
+                    session.status == TransferStatus.Failed ||
+                    session.status == TransferStatus.Canceled
+            val isStale =
+                (now - session.lastActiveTime > 30_000L) ||
+                    (session.endTime?.let { now - it > 5_000L } ?: false)
+            val isSameSenderReconnecting =
+                incomingIp != null &&
+                    session.device.ip == incomingIp &&
+                    (session.status == TransferStatus.WaitingApproval || session.status == TransferStatus.Failed || (session.status != TransferStatus.InProgress && now - session.startTime > 10_000L))
 
             if (isTerminal || isStale || isSameSenderReconnecting) {
                 iterator.remove()
@@ -122,22 +123,27 @@ class LocalSendServer(
     }
 
     /** 检查会话内所有文件是否均已到达终态（成功/失败/取消），全部终结时才结算会话状态并释放令牌。 */
-    private fun checkSessionFinished(session: TransferSession, sessionId: String) {
-        val allTerminal = session.files.all {
-            it.status == TransferStatus.Completed ||
-            it.status == TransferStatus.Failed ||
-            it.status == TransferStatus.Canceled
-        }
+    private fun checkSessionFinished(
+        session: TransferSession,
+        sessionId: String,
+    ) {
+        val allTerminal =
+            session.files.all {
+                it.status == TransferStatus.Completed ||
+                    it.status == TransferStatus.Failed ||
+                    it.status == TransferStatus.Canceled
+            }
         if (allTerminal) {
             // 复用与发送端一致的聚合规则：已取消的会话保持取消；部分失败仍判完成，但携带失败说明供界面展示
-            val outcome = TransferOutcome.aggregate(
-                files = session.files,
-                currentStatus = session.status,
-                allFailedMessage = context.getString(R.string.msg_all_files_failed),
-                partialFailedMessage = { failed, total ->
-                    context.getString(R.string.msg_partial_files_failed, failed, total)
-                }
-            )
+            val outcome =
+                TransferOutcome.aggregate(
+                    files = session.files,
+                    currentStatus = session.status,
+                    allFailedMessage = context.getString(R.string.msg_all_files_failed),
+                    partialFailedMessage = { failed, total ->
+                        context.getString(R.string.msg_partial_files_failed, failed, total)
+                    },
+                )
             session.status = outcome.status
             session.errorMessage = outcome.errorMessage
             session.endTime = System.currentTimeMillis()
@@ -152,7 +158,7 @@ class LocalSendServer(
         sessionId: String,
         fileItem: FileItem,
         status: TransferStatus,
-        error: String?
+        error: String?,
     ) {
         fileItem.status = status
         fileItem.error = error
@@ -188,6 +194,7 @@ class LocalSendServer(
     }
 
     private val startLock = Any()
+
     @Volatile
     private var isStarting = false
 
@@ -199,8 +206,8 @@ class LocalSendServer(
         }
     }
 
-    private fun isPortAvailable(port: Int): Boolean {
-        return try {
+    private fun isPortAvailable(port: Int): Boolean =
+        try {
             java.net.ServerSocket().use { socket ->
                 socket.reuseAddress = true
                 socket.bind(java.net.InetSocketAddress("0.0.0.0", port))
@@ -209,7 +216,6 @@ class LocalSendServer(
         } catch (e: Exception) {
             false
         }
-    }
 
     private fun findAvailablePort(preferredPort: Int): Int {
         if (isPortAvailable(preferredPort)) return preferredPort
@@ -250,17 +256,18 @@ class LocalSendServer(
 
     /** 纯 HTTP 模式：CIO 引擎直接监听指定端口。 */
     private fun startHttp(port: Int) {
-        engine = embeddedServer(
-            factory = CIO,
-            port = port,
-            host = "0.0.0.0",
-            configure = {
-                reuseAddress = true
-            }
-        ) {
-            installCommon()
-            configureRouting()
-        }.start(wait = false)
+        engine =
+            embeddedServer(
+                factory = CIO,
+                port = port,
+                host = "0.0.0.0",
+                configure = {
+                    reuseAddress = true
+                },
+            ) {
+                installCommon()
+                configureRouting()
+            }.start(wait = false)
     }
 
     /**
@@ -269,20 +276,21 @@ class LocalSendServer(
     private fun startHttps(port: Int) {
         val keystore = TlsStore.loadKeyStore(context)
         val password = TlsStore.STORE_PASSWORD.toCharArray()
-        val environment = applicationEngineEnvironment {
-            sslConnector(
-                keyStore = keystore,
-                keyAlias = TlsStore.KEY_ALIAS,
-                keyStorePassword = { password },
-                privateKeyPassword = { password }
-            ) {
-                this.port = port
+        val environment =
+            applicationEngineEnvironment {
+                sslConnector(
+                    keyStore = keystore,
+                    keyAlias = TlsStore.KEY_ALIAS,
+                    keyStorePassword = { password },
+                    privateKeyPassword = { password },
+                ) {
+                    this.port = port
+                }
+                module {
+                    installCommon()
+                    configureRouting()
+                }
             }
-            module {
-                installCommon()
-                configureRouting()
-            }
-        }
         engine = embeddedServer(Netty, environment).start(wait = false)
     }
 
@@ -311,7 +319,8 @@ class LocalSendServer(
         synchronized(startLock) {
             try {
                 engine?.stop(200, 500)
-            } catch (ignored: Exception) {}
+            } catch (ignored: Exception) {
+            }
             engine = null
             isStarting = false
             boundPort = 0
@@ -323,23 +332,24 @@ class LocalSendServer(
     }
 
     /** 打开 Web Share 共享文件的源输入流（URI / 路径 / 文本内容）。 */
-    private fun openShareStream(fileItem: FileItem): InputStream? = try {
-        val text = fileItem.textContent
-        when {
-            fileItem.uri != null -> {
-                if (fileItem.uri.scheme == "file") {
-                    fileItem.uri.path?.let { File(it).inputStream() } ?: context.contentResolver.openInputStream(fileItem.uri)
-                } else {
-                    context.contentResolver.openInputStream(fileItem.uri)
+    private fun openShareStream(fileItem: FileItem): InputStream? =
+        try {
+            val text = fileItem.textContent
+            when {
+                fileItem.uri != null -> {
+                    if (fileItem.uri.scheme == "file") {
+                        fileItem.uri.path?.let { File(it).inputStream() } ?: context.contentResolver.openInputStream(fileItem.uri)
+                    } else {
+                        context.contentResolver.openInputStream(fileItem.uri)
+                    }
                 }
+                fileItem.path != null -> File(fileItem.path).inputStream()
+                text != null -> text.byteInputStream(Charsets.UTF_8)
+                else -> null
             }
-            fileItem.path != null -> File(fileItem.path).inputStream()
-            text != null -> text.byteInputStream(Charsets.UTF_8)
-            else -> null
+        } catch (e: Exception) {
+            null
         }
-    } catch (e: Exception) {
-        null
-    }
 
     /** 校验 PIN：未配置 PIN 视为放行；配置后要求查询参数 ?pin= 精确匹配，否则回 401。 */
     private fun pinOk(pinFromRequest: String?): Boolean {
@@ -349,7 +359,6 @@ class LocalSendServer(
 
     private fun Application.configureRouting() {
         routing {
-
             // 协议 §5.1：Web Share 浏览器入口页，展示待共享文件并允许逐个下载与复制文本
             get("/") {
                 val rawIp = call.request.origin.remoteHost
@@ -357,17 +366,18 @@ class LocalSendServer(
                 val userAgent = call.request.headers[HttpHeaders.UserAgent] ?: ""
                 val copy = WebShareCopy.fromAcceptLanguage(call.request.headers[HttpHeaders.AcceptLanguage])
                 val model = WebShareCopy.browserModel(userAgent, copy)
-                val webDevice = Device(
-                    alias = copy.webAliasFor(remoteIp),
-                    version = "2.1",
-                    deviceModel = model,
-                    deviceType = DeviceType.web,
-                    fingerprint = "web-$remoteIp",
-                    port = 0,
-                    protocol = if (getUseHttps()) "https" else "http",
-                    download = false,
-                    ip = remoteIp
-                )
+                val webDevice =
+                    Device(
+                        alias = copy.webAliasFor(remoteIp),
+                        version = "2.1",
+                        deviceModel = model,
+                        deviceType = DeviceType.web,
+                        fingerprint = "web-$remoteIp",
+                        port = 0,
+                        protocol = if (getUseHttps()) "https" else "http",
+                        download = false,
+                        ip = remoteIp,
+                    )
                 onDeviceDiscovered(webDevice)
 
                 val shares = getShares()
@@ -393,19 +403,20 @@ class LocalSendServer(
                     return@post
                 }
                 val requestedSessionId = call.request.queryParameters["sessionId"]
-                val session = shares.firstOrNull {
-                    requestedSessionId == null || it.sessionId == requestedSessionId
-                } ?: run {
-                    call.respond(HttpStatusCode.Forbidden, "Session not found")
-                    return@post
-                }
+                val session =
+                    shares.firstOrNull {
+                        requestedSessionId == null || it.sessionId == requestedSessionId
+                    } ?: run {
+                        call.respond(HttpStatusCode.Forbidden, "Session not found")
+                        return@post
+                    }
                 val filesMap = session.files.associate { it.id to it.toDto() }
                 call.respond(
                     PrepareDownloadResponseDto(
                         info = getLocalDevice().toDto(),
                         sessionId = session.sessionId,
-                        files = filesMap
-                    )
+                        files = filesMap,
+                    ),
                 )
             }
 
@@ -434,7 +445,7 @@ class LocalSendServer(
                 }
                 call.response.header(
                     HttpHeaders.ContentDisposition,
-                    "inline; filename=\"${file.name.replace("\"", "")}\""
+                    "inline; filename=\"${file.name.replace("\"", "")}\"",
                 )
                 val contentType = ContentType.parse(file.mimeType.ifEmpty { "application/octet-stream" })
                 call.respondOutputStream(contentType = contentType, status = HttpStatusCode.OK) {
@@ -452,11 +463,12 @@ class LocalSendServer(
             // Web Share 增强：多文件一键打包流式下载为 ZIP
             get(LocalSendRoutes.DOWNLOAD_ZIP) {
                 val sessionId = call.request.queryParameters["sessionId"]
-                val session = if (sessionId != null) {
-                    getShares().firstOrNull { it.sessionId == sessionId }
-                } else {
-                    getShares().firstOrNull()
-                }
+                val session =
+                    if (sessionId != null) {
+                        getShares().firstOrNull { it.sessionId == sessionId }
+                    } else {
+                        getShares().firstOrNull()
+                    }
                 if (session == null || session.files.isEmpty()) {
                     call.respond(HttpStatusCode.NotFound, "No files found in share session")
                     return@get
@@ -464,7 +476,7 @@ class LocalSendServer(
                 val zipFileName = "LocalSend_${session.files.size}_Files.zip"
                 call.response.header(
                     HttpHeaders.ContentDisposition,
-                    "attachment; filename=\"$zipFileName\""
+                    "attachment; filename=\"$zipFileName\"",
                 )
                 call.respondOutputStream(contentType = ContentType("application", "zip"), status = HttpStatusCode.OK) {
                     java.util.zip.ZipOutputStream(this).use { zipOut ->
@@ -545,46 +557,50 @@ class LocalSendServer(
                 onDeviceDiscovered(senderDevice)
 
                 val sessionId = UUID.randomUUID().toString()
-                val fileItems = request.files.values.map { dto ->
-                    val isTextMessage = isInlineTextMessage(dto)
-                    FileItem(
-                        id = dto.id,
-                        name = dto.fileName,
-                        size = dto.size,
-                        mimeType = dto.fileType,
-                        textContent = if (isTextMessage) dto.preview else null,
-                        token = UUID.randomUUID().toString(),
-                        expectedSha256 = dto.sha256,
-                        status = TransferStatus.WaitingApproval,
-                        isTextMessage = isTextMessage
-                    )
-                }
+                val fileItems =
+                    request.files.values.map { dto ->
+                        val isTextMessage = isInlineTextMessage(dto)
+                        FileItem(
+                            id = dto.id,
+                            name = dto.fileName,
+                            size = dto.size,
+                            mimeType = dto.fileType,
+                            textContent = if (isTextMessage) dto.preview else null,
+                            token = UUID.randomUUID().toString(),
+                            expectedSha256 = dto.sha256,
+                            status = TransferStatus.WaitingApproval,
+                            isTextMessage = isTextMessage,
+                        )
+                    }
 
                 val totalBytes = fileItems.sumOf { it.size }
-                val session = TransferSession(
-                    sessionId = sessionId,
-                    device = senderDevice,
-                    isIncoming = true,
-                    files = fileItems,
-                    totalBytes = totalBytes,
-                    status = TransferStatus.WaitingApproval
-                )
+                val session =
+                    TransferSession(
+                        sessionId = sessionId,
+                        device = senderDevice,
+                        isIncoming = true,
+                        files = fileItems,
+                        totalBytes = totalBytes,
+                        status = TransferStatus.WaitingApproval,
+                    )
 
                 activeSessions[sessionId] = session
                 onSessionUpdated(session)
 
-                val approval = if (isQuickSave()) {
-                    IncomingDecision.AcceptAll
-                } else {
-                    onIncomingRequest(session)
-                }
+                val approval =
+                    if (isQuickSave()) {
+                        IncomingDecision.AcceptAll
+                    } else {
+                        onIncomingRequest(session)
+                    }
 
                 if (approval.accepted) {
-                    val decision = resolvePrepareUploadDecision(
-                        files = fileItems,
-                        saveTextAsFile = getSaveTextAsFile(),
-                        allowedFileIds = approval.selectedFileIds
-                    )
+                    val decision =
+                        resolvePrepareUploadDecision(
+                            files = fileItems,
+                            saveTextAsFile = getSaveTextAsFile(),
+                            allowedFileIds = approval.selectedFileIds,
+                        )
                     session.totalBytes = calculateEffectiveTotalBytes(fileItems, approval.selectedFileIds)
                     if (decision.shouldRespondNoContent) {
                         session.status = TransferStatus.Completed
@@ -605,8 +621,8 @@ class LocalSendServer(
                     call.respond(
                         PrepareUploadResponseDto(
                             sessionId = sessionId,
-                            files = decision.tokenMap
-                        )
+                            files = decision.tokenMap,
+                        ),
                     )
                 } else {
                     // 接收方主动取消与用户显式拒绝共用 403，但文案必须可区分：
@@ -619,7 +635,7 @@ class LocalSendServer(
                     onSessionUpdated(session)
                     call.respond(
                         HttpStatusCode.Forbidden,
-                        mapOf("message" to prepareUploadRejectionMessage(canceledByReceiver))
+                        mapOf("message" to prepareUploadRejectionMessage(canceledByReceiver)),
                     )
                 }
             }
@@ -661,69 +677,74 @@ class LocalSendServer(
                 fileItem.bytesTransferred = 0L
 
                 try {
-                    val checksum = withContext(Dispatchers.IO) {
-                        var digest: MessageDigest? = if (fileItem.expectedSha256 != null) {
-                            MessageDigest.getInstance("SHA-256")
-                        } else {
-                            null
-                        }
-                        val textBuffer = if (fileItem.isTextMessage && fileItem.size <= org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE) {
-                            java.io.ByteArrayOutputStream()
-                        } else null
-
-                        saveTargetWriter.openSaveStream(fileItem, saveTarget) { getAutoCategorizeMedia() }.buffered(128 * 1024).use { fos ->
-                            val channel = call.receiveChannel()
-                            val buffer = ByteArray(128 * 1024)
-                            var lastTime = System.currentTimeMillis()
-                            var bytesSinceLast = 0L
-                            var smoothedSpeed = 0L
-
-                            while (!channel.isClosedForRead) {
-                                val read = channel.readAvailable(buffer, 0, buffer.size)
-                                if (read <= 0) break
-                                fos.write(buffer, 0, read)
-                                textBuffer?.write(buffer, 0, read)
-                                digest?.update(buffer, 0, read)
-                                fileItem.bytesTransferred += read
-                                session.transferredBytes = session.files.sumOf { it.bytesTransferred }
-                                bytesSinceLast += read
-
-                                val now = System.currentTimeMillis()
-                                session.lastActiveTime = now
-                                if (session.status == TransferStatus.Canceled) {
-                                    throw kotlinx.coroutines.CancellationException("Transfer session canceled by receiver")
+                    val checksum =
+                        withContext(Dispatchers.IO) {
+                            var digest: MessageDigest? =
+                                if (fileItem.expectedSha256 != null) {
+                                    MessageDigest.getInstance("SHA-256")
+                                } else {
+                                    null
                                 }
-                                val delta = now - lastTime
-                                if (delta >= 64) {
-                                    val instantSpeed = (bytesSinceLast * 1000) / delta
-                                    smoothedSpeed = if (smoothedSpeed == 0L) instantSpeed else (smoothedSpeed * 3 + instantSpeed) / 4
-                                    fileItem.speed = smoothedSpeed
-                                    session.speed = smoothedSpeed
+                            val textBuffer =
+                                if (fileItem.isTextMessage && fileItem.size <= org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE) {
+                                    java.io.ByteArrayOutputStream()
+                                } else {
+                                    null
+                                }
+
+                            saveTargetWriter.openSaveStream(fileItem, saveTarget) { getAutoCategorizeMedia() }.buffered(128 * 1024).use { fos ->
+                                val channel = call.receiveChannel()
+                                val buffer = ByteArray(128 * 1024)
+                                var lastTime = System.currentTimeMillis()
+                                var bytesSinceLast = 0L
+                                var smoothedSpeed = 0L
+
+                                while (!channel.isClosedForRead) {
+                                    val read = channel.readAvailable(buffer, 0, buffer.size)
+                                    if (read <= 0) break
+                                    fos.write(buffer, 0, read)
+                                    textBuffer?.write(buffer, 0, read)
+                                    digest?.update(buffer, 0, read)
+                                    fileItem.bytesTransferred += read
+                                    session.transferredBytes = session.files.sumOf { it.bytesTransferred }
+                                    bytesSinceLast += read
+
+                                    val now = System.currentTimeMillis()
+                                    session.lastActiveTime = now
+                                    if (session.status == TransferStatus.Canceled) {
+                                        throw kotlinx.coroutines.CancellationException("Transfer session canceled by receiver")
+                                    }
+                                    val delta = now - lastTime
+                                    if (delta >= 64) {
+                                        val instantSpeed = (bytesSinceLast * 1000) / delta
+                                        smoothedSpeed = if (smoothedSpeed == 0L) instantSpeed else (smoothedSpeed * 3 + instantSpeed) / 4
+                                        fileItem.speed = smoothedSpeed
+                                        session.speed = smoothedSpeed
+                                        if (fileItem.size > 0) {
+                                            fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
+                                        }
+                                        bytesSinceLast = 0
+                                        lastTime = now
+                                        onSessionUpdated(session)
+                                    }
+                                }
+                                fos.flush()
+                                if (bytesSinceLast > 0 || fileItem.bytesTransferred == fileItem.size) {
                                     if (fileItem.size > 0) {
                                         fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
                                     }
-                                    bytesSinceLast = 0
-                                    lastTime = now
+                                    fileItem.speed = smoothedSpeed
+                                    session.speed = smoothedSpeed
                                     onSessionUpdated(session)
                                 }
                             }
-                            fos.flush()
-                            if (bytesSinceLast > 0 || fileItem.bytesTransferred == fileItem.size) {
-                                if (fileItem.size > 0) {
-                                    fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
-                                }
-                                fileItem.speed = smoothedSpeed
-                                session.speed = smoothedSpeed
-                                onSessionUpdated(session)
+                            if (textBuffer != null && textBuffer.size() > 0) {
+                                fileItem.textContent = textBuffer.toString(Charsets.UTF_8.name())
                             }
+                            // MediaStore 路径：写入完成后清除 IS_PENDING，使文件立即可见
+                            saveTargetWriter.confirmMediaStoreWrite(fileItem)
+                            digest?.digest()?.joinToString("") { "%02x".format(it) }
                         }
-                        if (textBuffer != null && textBuffer.size() > 0) {
-                            fileItem.textContent = textBuffer.toString(Charsets.UTF_8.name())
-                        }
-                        // MediaStore 路径：写入完成后清除 IS_PENDING，使文件立即可见
-                        saveTargetWriter.confirmMediaStoreWrite(fileItem)
-                        digest?.digest()?.joinToString("") { "%02x".format(it) }
-                    }
 
                     // 发送方声明了 sha256 且校验失败：删除已写入文件并按规范回 422
                     if (fileItem.expectedSha256 != null && fileItem.expectedSha256 != checksum) {
@@ -746,7 +767,7 @@ class LocalSendServer(
                         runCatching {
                             call.respond(
                                 HttpStatusCode.Forbidden,
-                                mapOf("message" to ProtocolMessages.CANCELED_BY_RECEIVER)
+                                mapOf("message" to ProtocolMessages.CANCELED_BY_RECEIVER),
                             )
                         }
                     } else {
@@ -776,16 +797,16 @@ class LocalSendServer(
 
     companion object {
         /** prepare-upload 被拒时的 403 文案：主动取消与显式拒绝必须可区分，发送方据此选择提示语义。 */
-        internal fun prepareUploadRejectionMessage(canceledByReceiver: Boolean): String =
-            if (canceledByReceiver) ProtocolMessages.CANCELED_BY_RECEIVER else ProtocolMessages.DECLINED_BY_USER
+        internal fun prepareUploadRejectionMessage(canceledByReceiver: Boolean): String = if (canceledByReceiver) ProtocolMessages.CANCELED_BY_RECEIVER else ProtocolMessages.DECLINED_BY_USER
 
-        val FORBIDDEN_HTTP2_HEADERS = setOf(
-            "connection",
-            "keep-alive",
-            "proxy-connection",
-            "transfer-encoding",
-            "upgrade"
-        )
+        val FORBIDDEN_HTTP2_HEADERS =
+            setOf(
+                "connection",
+                "keep-alive",
+                "proxy-connection",
+                "transfer-encoding",
+                "upgrade",
+            )
 
         fun getUploadResponseHeaders(httpVersion: String?): Map<String, String> {
             val isHttp2 = httpVersion?.contains("2") == true
@@ -799,7 +820,7 @@ class LocalSendServer(
         data class PrepareUploadDecision(
             val shouldRespondNoContent: Boolean,
             val tokenMap: Map<String, String>,
-            val isSessionCompletedImmediately: Boolean
+            val isSessionCompletedImmediately: Boolean,
         )
 
         /**
@@ -808,8 +829,9 @@ class LocalSendServer(
          */
         fun isInlineTextMessage(dto: org.localsend.miuix.model.FileDto): Boolean {
             val preview = dto.preview ?: return false
-            val isTextMime = dto.fileType.equals("text", ignoreCase = true) ||
-                dto.fileType.equals("text/plain", ignoreCase = true)
+            val isTextMime =
+                dto.fileType.equals("text", ignoreCase = true) ||
+                    dto.fileType.equals("text/plain", ignoreCase = true)
             if (!isTextMime) return false
             val previewBytes = preview.toByteArray(Charsets.UTF_8).size.toLong()
             return previewBytes == dto.size && dto.size <= org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE
@@ -817,14 +839,13 @@ class LocalSendServer(
 
         fun calculateEffectiveTotalBytes(
             files: List<FileItem>,
-            allowedFileIds: Set<String>? = null
-        ): Long {
-            return if (allowedFileIds != null) {
+            allowedFileIds: Set<String>? = null,
+        ): Long =
+            if (allowedFileIds != null) {
                 files.filter { allowedFileIds.contains(it.id) }.sumOf { it.size }
             } else {
                 files.sumOf { it.size }
             }
-        }
 
         /**
          * 依据 LocalSend 协议 §4.1 与配置，决定 prepare-upload 响应及各文件项的 Upload Token 与生命周期。
@@ -832,13 +853,14 @@ class LocalSendServer(
         fun resolvePrepareUploadDecision(
             files: List<FileItem>,
             saveTextAsFile: Boolean,
-            allowedFileIds: Set<String>? = null
+            allowedFileIds: Set<String>? = null,
         ): PrepareUploadDecision {
-            val effectiveFiles = if (allowedFileIds != null) {
-                files.filter { allowedFileIds.contains(it.id) }
-            } else {
-                files
-            }
+            val effectiveFiles =
+                if (allowedFileIds != null) {
+                    files.filter { allowedFileIds.contains(it.id) }
+                } else {
+                    files
+                }
 
             if (allowedFileIds != null) {
                 files.filterNot { allowedFileIds.contains(it.id) }.forEach {
@@ -859,7 +881,7 @@ class LocalSendServer(
                 return PrepareUploadDecision(
                     shouldRespondNoContent = true,
                     tokenMap = emptyMap(),
-                    isSessionCompletedImmediately = true
+                    isSessionCompletedImmediately = true,
                 )
             }
 
@@ -880,9 +902,8 @@ class LocalSendServer(
             return PrepareUploadDecision(
                 shouldRespondNoContent = false,
                 tokenMap = tokenMap,
-                isSessionCompletedImmediately = false
+                isSessionCompletedImmediately = false,
             )
         }
     }
 }
-

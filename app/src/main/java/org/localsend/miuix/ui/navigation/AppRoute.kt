@@ -9,7 +9,6 @@ import top.yukonga.miuix.kmp.nav.core.NavKey
  */
 @Serializable
 sealed interface AppRoute : NavKey {
-
     /**
      * 主框架路由：承载 LiquidGlassBottomBar 悬浮底栏与 接收/发送/设置 HorizontalPager。
      */

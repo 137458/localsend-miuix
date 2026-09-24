@@ -14,7 +14,7 @@ import java.io.File
 class HistoryStore(
     private val file: File,
     private val json: Json = AppJson.default,
-    private val maxItems: Int = DEFAULT_MAX_ITEMS
+    private val maxItems: Int = DEFAULT_MAX_ITEMS,
 ) {
     fun load(): List<TransferHistoryItem> {
         return try {
@@ -42,7 +42,10 @@ class HistoryStore(
         }
     }
 
-    fun add(current: List<TransferHistoryItem>, item: TransferHistoryItem): List<TransferHistoryItem> {
+    fun add(
+        current: List<TransferHistoryItem>,
+        item: TransferHistoryItem,
+    ): List<TransferHistoryItem> {
         val updated = (listOf(item) + current).take(maxItems)
         persist(updated)
         return updated
@@ -53,7 +56,10 @@ class HistoryStore(
         return emptyList()
     }
 
-    fun delete(current: List<TransferHistoryItem>, id: String): List<TransferHistoryItem> {
+    fun delete(
+        current: List<TransferHistoryItem>,
+        id: String,
+    ): List<TransferHistoryItem> {
         val updated = current.filterNot { it.id == id }
         persist(updated)
         return updated

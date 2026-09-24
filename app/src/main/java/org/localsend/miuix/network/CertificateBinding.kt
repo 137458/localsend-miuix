@@ -7,7 +7,10 @@ package org.localsend.miuix.network
  * the fingerprint the peer declared in that same response.
  */
 object CertificateBinding {
-    fun dtoMatchesCert(declaredFingerprint: String, certSha256: String): Boolean {
+    fun dtoMatchesCert(
+        declaredFingerprint: String,
+        certSha256: String,
+    ): Boolean {
         if (declaredFingerprint.isBlank() || certSha256.isBlank()) return true
         return FingerprintTrust.normalize(declaredFingerprint) == FingerprintTrust.normalize(certSha256)
     }

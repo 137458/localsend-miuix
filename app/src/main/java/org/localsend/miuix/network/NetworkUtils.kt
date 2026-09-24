@@ -1,12 +1,9 @@
 package org.localsend.miuix.network
 
 import java.net.Inet4Address
-import java.net.InterfaceAddress
 import java.net.NetworkInterface
-import java.util.Collections
 
 object NetworkUtils {
-
     /** 检查是否属于局域网私有 IPv4 地址（RFC 1918） */
     fun isPrivateIpv4(ip: String): Boolean {
         val parts = ip.split(".").mapNotNull { it.toIntOrNull() }
@@ -21,11 +18,17 @@ object NetworkUtils {
     }
 
     /** 检查两个 IP 是否在同一个 /24 子网网段内 */
-    fun isSameSubnet(ip1: String, ip2: String): Boolean {
+    fun isSameSubnet(
+        ip1: String,
+        ip2: String,
+    ): Boolean {
         val p1 = ip1.split(".")
         val p2 = ip2.split(".")
-        return p1.size == 4 && p2.size == 4 &&
-                p1[0] == p2[0] && p1[1] == p2[1] && p1[2] == p2[2]
+        return p1.size == 4 &&
+            p2.size == 4 &&
+            p1[0] == p2[0] &&
+            p1[1] == p2[1] &&
+            p1[2] == p2[2]
     }
 
     fun getLocalIpAddresses(): List<String> {
@@ -40,9 +43,15 @@ object NetworkUtils {
                 val name = intf.name.lowercase()
 
                 // 排除蜂窝移动数据网卡与虚拟 VPN 隧道接口，避免无效扫描与超时噪音
-                if (name.startsWith("rmnet") || name.startsWith("ccmni") || name.startsWith("pdp") ||
-                    name.startsWith("wwan") || name.startsWith("tun") || name.startsWith("ppp") ||
-                    name.startsWith("dummy") || name.startsWith("wg") || name.startsWith("clat")
+                if (name.startsWith("rmnet") ||
+                    name.startsWith("ccmni") ||
+                    name.startsWith("pdp") ||
+                    name.startsWith("wwan") ||
+                    name.startsWith("tun") ||
+                    name.startsWith("ppp") ||
+                    name.startsWith("dummy") ||
+                    name.startsWith("wg") ||
+                    name.startsWith("clat")
                 ) {
                     continue
                 }

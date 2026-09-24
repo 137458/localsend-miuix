@@ -7,7 +7,6 @@ import org.junit.Test
 import org.localsend.miuix.model.AppSettings
 
 class AppSettingsTest {
-
     @Test
     fun testDefaultSettingsIncludeUpdateAndEffectFlags() {
         val settings = AppSettings()
@@ -20,12 +19,13 @@ class AppSettingsTest {
     @Test
     fun testUpdateSettingsModifications() {
         val settings = AppSettings()
-        val updated = settings.copy(
-            autoCheckUpdate = false,
-            ignoredVersion = "v1.2.3",
-            isOs3Effect = false,
-            wideScreenNavigationRail = true
-        )
+        val updated =
+            settings.copy(
+                autoCheckUpdate = false,
+                ignoredVersion = "v1.2.3",
+                isOs3Effect = false,
+                wideScreenNavigationRail = true,
+            )
         assertEquals(false, updated.autoCheckUpdate)
         assertEquals("v1.2.3", updated.ignoredVersion)
         assertEquals(false, updated.isOs3Effect)
