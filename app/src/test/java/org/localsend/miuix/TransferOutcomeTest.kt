@@ -121,4 +121,44 @@ class TransferOutcomeTest {
         assertEquals(TransferStatus.Canceled, session.status)
         assertFalse(session.isPartialFailure)
     }
+
+    @Test
+    fun emptyFileListIsFailureWithAllFailedMessage() {
+        val outcome = TransferOutcome.aggregate(
+            files = emptyList(),
+            currentStatus = TransferStatus.InProgress,
+            allFailedMessage = "nothing to send",
+            partialFailedMessage = { failed, total -> "partial $failed/$total" }
+        )
+        assertEquals(TransferStatus.Failed, outcome.status)
+        assertEquals("nothing to send", outcome.errorMessage)
+    }
+
+    @Test
+    fun allFilesFailedWithoutFileErrorUsesFallbackMessage() {
+        val files = listOf(
+            FileItem(id = "1", name = "a.txt", size = 1, status = TransferStatus.Failed),
+            FileItem(id = "2", name = "b.txt", size = 1, status = TransferStatus.Failed)
+        )
+        val outcome = TransferOutcome.aggregate(
+            files = files,
+            currentStatus = TransferStatus.InProgress,
+            allFailedMessage = "all-failed",
+            partialFailedMessage = { failed, total -> "partial $failed/$total" }
+        )
+        assertEquals(TransferStatus.Failed, outcome.status)
+        assertEquals("all-failed", outcome.errorMessage)
+    }
+
+    @Test
+    fun canceledSessionWithNoFilesStaysCanceled() {
+        val outcome = TransferOutcome.aggregate(
+            files = emptyList(),
+            currentStatus = TransferStatus.Canceled,
+            allFailedMessage = "all-failed",
+            partialFailedMessage = { failed, total -> "partial $failed/$total" }
+        )
+        assertEquals(TransferStatus.Canceled, outcome.status)
+        assertNull(outcome.errorMessage)
+    }
 }

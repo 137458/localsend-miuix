@@ -47,4 +47,15 @@ class CertificateBindingTest {
             FingerprintTrust.clear()
         }
     }
+
+    @Test
+    fun spaceSeparatedFingerprintsNormalizeAndMatch() {
+        assertTrue(CertificateBinding.dtoMatchesCert("aa bb cc dd", "AABBCCDD"))
+        assertTrue(CertificateBinding.dtoMatchesCert("aabbccdd", "aabbccdd"))
+    }
+
+    @Test
+    fun whitespaceOnlyFingerprintsSkipBinding() {
+        assertTrue(CertificateBinding.dtoMatchesCert("   ", "   "))
+    }
 }

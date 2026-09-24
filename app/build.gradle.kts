@@ -2,6 +2,12 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("org.jlleitschuh.gradle.ktlint")
+}
+
+ktlint {
+    // 仅用于手动执行 ./gradlew ktlintCheck，不因样式问题导致 build/check 失败
+    ignoreFailures.set(true)
 }
 
 android {
@@ -79,7 +85,6 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.19.0")
-    implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
@@ -125,9 +130,6 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-
-    // Okio for fast streaming IO
-    implementation("com.squareup.okio:okio:3.9.1")
 
     // ZXing for compliant, fast and scan-friendly QR Code generation
     implementation("com.google.zxing:core:3.5.3")

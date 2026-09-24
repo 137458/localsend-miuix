@@ -1,0 +1,24 @@
+# EditorConfig 规范：https://editorconfig.org
+# 规则贴合本项目现状（Kotlin/Gradle 使用 4 空格缩进、LF 换行），不引入与现状冲突的强制规则。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+# 现有代码超长行较多（> 100 字符约 680 行、> 120 字符约 294 行、> 160 字符约 67 行），
+# 故不强制换行，避免 ktlint 大面积报错；如后续确需收紧，可改为具体数值（如 120）。
+max_line_length = off
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+# Markdown 行尾双空格表示软换行，不应裁剪
+trim_trailing_whitespace = false
+max_line_length = off

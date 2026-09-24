@@ -33,7 +33,6 @@
     <string name="nav_tab_settings">Settings</string>
 
     <!-- Common Toasts and Feedback -->
-    <string name="toast_transfer_declined">Transfer declined by peer</string>
     <string name="toast_files_added">Added %1$d files</string>
     <string name="toast_media_added">Added %1$d media files</string>
     <string name="toast_text_added">Text message added</string>

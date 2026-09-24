@@ -5,8 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
 import android.content.Intent
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -19,9 +17,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -71,22 +66,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.HttpsURLConnection
 
-data class AppInfoItem(
-    val label: String,
-    val packageName: String,
-    val versionName: String,
-    val sourceDir: String,
-    val apkSize: Long,
-    val isSystemApp: Boolean
-)
-
-data class PinPromptRequest(
-    val sessionId: String,
-    val device: Device,
-    val onPinEntered: (String) -> Unit,
-    val onDismiss: () -> Unit
-)
-
 class LocalSendManager(private val context: Context) {
 
     init {
@@ -109,38 +88,9 @@ class LocalSendManager(private val context: Context) {
     private val prefs = context.getSharedPreferences(org.localsend.miuix.core.PreferenceKeys.PREF_NAME, Context.MODE_PRIVATE)
 
     // 从持久化恢复设置；别名首次生成后即固化，避免冷启动每次都随机更换。
-    private val initialAlias = prefs.getString(KEY_ALIAS, null) ?: run {
-        val generated = AppSettings.generateDefaultAlias()
-        prefs.edit().putString(KEY_ALIAS, generated).apply()
-        generated
-    }
+    private val initialAlias = resolveInitialAlias(prefs)
 
-    private val _settings = MutableStateFlow(
-        AppSettings(
-            alias = initialAlias,
-            port = prefs.getInt(KEY_PORT, 53317),
-            quickSave = prefs.getBoolean(KEY_QUICK_SAVE, false),
-            autoCopyText = prefs.getBoolean(KEY_AUTO_COPY_TEXT, false),
-            saveToHistory = prefs.getBoolean(KEY_SAVE_TO_HISTORY, true),
-            useHttps = prefs.getBoolean(KEY_USE_HTTPS, false),
-            deviceType = DeviceType.fromString(prefs.getString(KEY_DEVICE_TYPE, DeviceType.mobile.value)),
-            download = prefs.getBoolean(KEY_DOWNLOAD, false),
-            pin = prefs.getString(KEY_PIN, null),
-            themeModeIndex = prefs.getInt(KEY_THEME, 0),
-            downloadTreeUri = prefs.getString(KEY_TREE_URI, null),
-            downloadDisplay = prefs.getString(KEY_DOWNLOAD_DISPLAY, null),
-            downloadPath = defaultDownloadPath,
-            vibrateOnComplete = prefs.getBoolean(KEY_VIBRATE, true),
-            lastSelectedTabIndex = prefs.getInt(KEY_LAST_TAB, 0),
-            autoCheckUpdate = prefs.getBoolean(KEY_AUTO_CHECK_UPDATE, true),
-            ignoredVersion = prefs.getString(KEY_IGNORED_VERSION, null),
-            promptedUpdateVersion = prefs.getString(KEY_PROMPTED_UPDATE_VERSION, null),
-            isOs3Effect = prefs.getBoolean(KEY_IS_OS3_EFFECT, true),
-            wideScreenNavigationRail = prefs.getBoolean(KEY_WIDE_SCREEN_NAVIGATION_RAIL, false),
-            saveTextAsFile = prefs.getBoolean(KEY_SAVE_TEXT_AS_FILE, false),
-            autoCategorizeMedia = prefs.getBoolean(KEY_AUTO_CATEGORIZE_MEDIA, false)
-        )
-    )
+    private val _settings = MutableStateFlow(loadSettings(prefs, initialAlias, defaultDownloadPath))
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
     private val favoriteStore = FavoriteStore(File(context.filesDir, FavoriteStore.FILENAME))
@@ -200,22 +150,15 @@ class LocalSendManager(private val context: Context) {
         _targetResendDevice.value = null
     }
 
+    private val recentIpStore = RecentIpStore(context)
+
     // 手动输入 IP 历史记录（最多保留最近 5 个不同 IP）
-    private val _recentManualIps = MutableStateFlow<List<String>>(loadRecentManualIps())
+    private val _recentManualIps = MutableStateFlow<List<String>>(recentIpStore.load())
     val recentManualIps: StateFlow<List<String>> = _recentManualIps.asStateFlow()
 
-    private fun loadRecentManualIps(): List<String> {
-        val raw = prefs.getString(KEY_RECENT_MANUAL_IPS, null) ?: return emptyList()
-        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-    }
-
     fun addRecentIp(ip: String) {
-        val trimmed = ip.trim()
-        if (trimmed.isEmpty()) return
         _recentManualIps.update { current ->
-            val updated = (listOf(trimmed) + current.filterNot { it == trimmed }).take(5)
-            prefs.edit().putString(KEY_RECENT_MANUAL_IPS, updated.joinToString(",")).apply()
-            updated
+            recentIpStore.add(ip, current)
         }
     }
 
@@ -921,17 +864,16 @@ class LocalSendManager(private val context: Context) {
     fun updateSettings(transform: (AppSettings) -> AppSettings) {
         val updated = transform(_settings.value)
         _settings.value = updated
-        persistSettings(updated)
+        persistSettingsTo(prefs, updated)
     }
 
-    private var cachedInstalledApps: List<AppInfoItem>? = null
-    private val installedAppsMutex = Mutex()
+    private val appCatalog = AppCatalog(context)
 
     /** 异步在后台预热本机应用列表缓存，避免首次打开弹窗时等待。 */
     fun preloadInstalledApps() {
         scope.launch(Dispatchers.IO) {
             try {
-                getInstalledApps(forceRefresh = false)
+                appCatalog.get(forceRefresh = false)
             } catch (_: Exception) {}
         }
     }
@@ -942,82 +884,12 @@ class LocalSendManager(private val context: Context) {
      * - 单次 IPC 批量获取 PackageInfo，消除数百次跨进程 Binder 往返
      * - 结合 CPU 核心数进行协程分块并发解析 (loadLabel 与 apkSize)
      */
-    suspend fun getInstalledApps(forceRefresh: Boolean = false): List<AppInfoItem> = withContext(Dispatchers.IO) {
-        if (!forceRefresh) {
-            cachedInstalledApps?.let { return@withContext it }
-        }
-        installedAppsMutex.withLock {
-            if (!forceRefresh) {
-                cachedInstalledApps?.let { return@withLock it }
-            }
-            val loaded = loadInstalledAppsInternal()
-            cachedInstalledApps = loaded
-            loaded
-        }
-    }
-
-    private suspend fun loadInstalledAppsInternal(): List<AppInfoItem> = coroutineScope {
-        val pm = context.packageManager
-        val packages = try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(0))
-            } else {
-                pm.getInstalledPackages(0)
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
-
-        if (packages.isEmpty()) return@coroutineScope emptyList()
-
-        val availableCores = Runtime.getRuntime().availableProcessors().coerceAtLeast(2)
-        val chunkSize = (packages.size / availableCores).coerceAtLeast(16)
-
-        packages.chunked(chunkSize).map { chunk ->
-            async(Dispatchers.IO) {
-                chunk.mapNotNull { pkgInfo ->
-                    try {
-                        val appInfo = pkgInfo.applicationInfo ?: return@mapNotNull null
-                        val sourceDir = appInfo.sourceDir ?: return@mapNotNull null
-                        val file = File(sourceDir)
-                        val size = file.length()
-                        if (size <= 0L) return@mapNotNull null
-
-                        val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                        val label = try {
-                            appInfo.loadLabel(pm).toString()
-                        } catch (_: Exception) {
-                            pkgInfo.packageName
-                        }.ifBlank { pkgInfo.packageName }
-
-                        AppInfoItem(
-                            label = label,
-                            packageName = pkgInfo.packageName,
-                            versionName = pkgInfo.versionName ?: "1.0",
-                            sourceDir = sourceDir,
-                            apkSize = size,
-                            isSystemApp = isSystem
-                        )
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
-            }
-        }.awaitAll().flatten().sortedWith(compareBy({ it.isSystemApp }, { it.label.lowercase() }))
-    }
+    suspend fun getInstalledApps(forceRefresh: Boolean = false): List<AppInfoItem> =
+        appCatalog.get(forceRefresh)
 
     /** 将选中的已安装应用作为 APK 文件添加到待发送列表。 */
     fun addAppsAsFiles(apps: List<AppInfoItem>) {
-        val items = apps.map { app ->
-            val cleanName = app.label.replace(Regex("[\\\\/:*?\"<>|]"), "_")
-            FileItem(
-                name = "$cleanName.apk",
-                size = app.apkSize,
-                path = app.sourceDir,
-                mimeType = "application/vnd.android.package-archive"
-            )
-        }
-        addFiles(items)
+        addFiles(appInfoToFileItems(apps))
     }
 
     /** 递归解析用户通过 SAF 选择的文件夹，将其下所有文件添加进发送队列。 */
@@ -1160,32 +1032,6 @@ class LocalSendManager(private val context: Context) {
         discoveryService.sendAnnouncement()
     }
 
-    private fun persistSettings(s: AppSettings) {
-        prefs.edit()
-            .putString(KEY_ALIAS, s.alias)
-            .putInt(KEY_PORT, s.port)
-            .putString(KEY_TREE_URI, s.downloadTreeUri)
-            .putString(KEY_DOWNLOAD_DISPLAY, s.downloadDisplay)
-            .putBoolean(KEY_QUICK_SAVE, s.quickSave)
-            .putBoolean(KEY_AUTO_COPY_TEXT, s.autoCopyText)
-            .putBoolean(KEY_SAVE_TO_HISTORY, s.saveToHistory)
-            .putBoolean(KEY_USE_HTTPS, s.useHttps)
-            .putString(KEY_DEVICE_TYPE, s.deviceType.value)
-            .putBoolean(KEY_DOWNLOAD, s.download)
-            .putString(KEY_PIN, s.pin)
-            .putInt(KEY_THEME, s.themeModeIndex)
-            .putBoolean(KEY_VIBRATE, s.vibrateOnComplete)
-            .putInt(KEY_LAST_TAB, s.lastSelectedTabIndex)
-            .putBoolean(KEY_AUTO_CHECK_UPDATE, s.autoCheckUpdate)
-            .putString(KEY_IGNORED_VERSION, s.ignoredVersion)
-            .putString(KEY_PROMPTED_UPDATE_VERSION, s.promptedUpdateVersion)
-            .putBoolean(KEY_IS_OS3_EFFECT, s.isOs3Effect)
-            .putBoolean(KEY_WIDE_SCREEN_NAVIGATION_RAIL, s.wideScreenNavigationRail)
-            .putBoolean(KEY_SAVE_TEXT_AS_FILE, s.saveTextAsFile)
-            .putBoolean(KEY_AUTO_CATEGORIZE_MEDIA, s.autoCategorizeMedia)
-            .apply()
-    }
-
     companion object {
         private const val TAG = "LocalSendTransfer"
 
@@ -1204,27 +1050,5 @@ class LocalSendManager(private val context: Context) {
                 return LocalSendManager(context.applicationContext).also { instance = it }
             }
         }
-        private const val KEY_ALIAS = org.localsend.miuix.core.PreferenceKeys.KEY_ALIAS
-        private const val KEY_PORT = org.localsend.miuix.core.PreferenceKeys.KEY_PORT
-        private const val KEY_QUICK_SAVE = org.localsend.miuix.core.PreferenceKeys.KEY_QUICK_SAVE
-        private const val KEY_AUTO_COPY_TEXT = org.localsend.miuix.core.PreferenceKeys.KEY_AUTO_COPY_TEXT
-        private const val KEY_SAVE_TO_HISTORY = org.localsend.miuix.core.PreferenceKeys.KEY_SAVE_TO_HISTORY
-        private const val KEY_USE_HTTPS = org.localsend.miuix.core.PreferenceKeys.KEY_USE_HTTPS
-        private const val KEY_DEVICE_TYPE = org.localsend.miuix.core.PreferenceKeys.KEY_DEVICE_TYPE
-        private const val KEY_DOWNLOAD = org.localsend.miuix.core.PreferenceKeys.KEY_DOWNLOAD
-        private const val KEY_PIN = org.localsend.miuix.core.PreferenceKeys.KEY_PIN
-        private const val KEY_THEME = org.localsend.miuix.core.PreferenceKeys.KEY_THEME
-        private const val KEY_TREE_URI = org.localsend.miuix.core.PreferenceKeys.KEY_TREE_URI
-        private const val KEY_DOWNLOAD_DISPLAY = org.localsend.miuix.core.PreferenceKeys.KEY_DOWNLOAD_DISPLAY
-        private const val KEY_VIBRATE = org.localsend.miuix.core.PreferenceKeys.KEY_VIBRATE
-        private const val KEY_LAST_TAB = org.localsend.miuix.core.PreferenceKeys.KEY_LAST_TAB
-        private const val KEY_RECENT_MANUAL_IPS = org.localsend.miuix.core.PreferenceKeys.KEY_RECENT_MANUAL_IPS
-        private const val KEY_AUTO_CHECK_UPDATE = org.localsend.miuix.core.PreferenceKeys.KEY_AUTO_CHECK_UPDATE
-        private const val KEY_IGNORED_VERSION = org.localsend.miuix.core.PreferenceKeys.KEY_IGNORED_VERSION
-        private const val KEY_PROMPTED_UPDATE_VERSION = org.localsend.miuix.core.PreferenceKeys.KEY_PROMPTED_UPDATE_VERSION
-        private const val KEY_IS_OS3_EFFECT = org.localsend.miuix.core.PreferenceKeys.KEY_IS_OS3_EFFECT
-        private const val KEY_WIDE_SCREEN_NAVIGATION_RAIL = org.localsend.miuix.core.PreferenceKeys.KEY_WIDE_SCREEN_NAVIGATION_RAIL
-        private const val KEY_SAVE_TEXT_AS_FILE = org.localsend.miuix.core.PreferenceKeys.KEY_SAVE_TEXT_AS_FILE
-        private const val KEY_AUTO_CATEGORIZE_MEDIA = org.localsend.miuix.core.PreferenceKeys.KEY_AUTO_CATEGORIZE_MEDIA
     }
 }

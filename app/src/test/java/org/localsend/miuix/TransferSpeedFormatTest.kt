@@ -10,6 +10,7 @@ class TransferSpeedFormatTest {
     fun testFormatSpeed_full() {
         assertEquals("0 B/s", FileItem.formatSpeed(0L, compact = false))
         assertEquals("500 B/s", FileItem.formatSpeed(500L, compact = false))
+        assertEquals("512 B/s", FileItem.formatSpeed(512L, compact = false))
         assertEquals("1.0 KB/s", FileItem.formatSpeed(1024L, compact = false))
         assertEquals("1.5 KB/s", FileItem.formatSpeed(1536L, compact = false))
         assertEquals("1.0 MB/s", FileItem.formatSpeed(1024L * 1024L, compact = false))
@@ -24,6 +25,9 @@ class TransferSpeedFormatTest {
         assertEquals("1K/s", FileItem.formatSpeed(1024L, compact = true))
         assertEquals("1K/s", FileItem.formatSpeed(1536L, compact = true))
         assertEquals("1M/s", FileItem.formatSpeed(1024L * 1024L, compact = true))
+        assertEquals("1.5M/s", FileItem.formatSpeed(1572864L, compact = true))
+        assertEquals("2M/s", FileItem.formatSpeed(2L * 1024 * 1024, compact = true))
+        assertEquals("512K/s", FileItem.formatSpeed(524288L, compact = true))
         assertEquals("2.5M/s", FileItem.formatSpeed((2.5 * 1024 * 1024).toLong(), compact = true))
         assertEquals("25M/s", FileItem.formatSpeed(25L * 1024 * 1024, compact = true))
     }
