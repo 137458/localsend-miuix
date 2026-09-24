@@ -47,6 +47,20 @@ class DeviceDirectory(
         return devices
     }
 
+    /**
+     * 周期性剔除已超过 TTL 未再出现的设备。
+     * [upsert] 只在收到新数据包时顺带清理，若局域网长期无广播，离线设备会一直留在列表中，故需要外部定时调用。
+     */
+    @Synchronized
+    fun prune(): List<Device> {
+        val now = clock()
+        val alive = devices.filter { now - it.lastSeen < ttlMs }
+        if (alive.size != devices.size) {
+            devices = alive
+        }
+        return devices
+    }
+
     companion object {
         const val DEFAULT_TTL_MS = 90_000L
 

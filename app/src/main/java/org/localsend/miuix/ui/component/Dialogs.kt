@@ -522,10 +522,7 @@ fun CertFingerprintDialog(
                 }
 
                 Button(
-                    onClick = {
-                        onRegenerate()
-                        onDismissRequest()
-                    },
+                    onClick = { onRegenerate() },
                     colors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.error, contentColor = MiuixTheme.colorScheme.onError),
                     modifier = Modifier.weight(1f)
                 ) {
@@ -561,7 +558,8 @@ fun IncomingTransferDialog(
     WindowDialog(
         show = session != null,
         title = if (session?.isTextMessage == true) stringResource(R.string.dialog_incoming_text_title) else stringResource(R.string.dialog_incoming_files_title),
-        onDismissRequest = onDecline
+        // 点击弹窗外部或返回键不再等同于拒绝：请求必须由用户显式选择，超时后才由系统判定为拒绝
+        onDismissRequest = {}
     ) {
         if (session != null) {
             Column(

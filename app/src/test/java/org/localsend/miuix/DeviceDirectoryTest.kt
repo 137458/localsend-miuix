@@ -114,4 +114,27 @@ class DeviceDirectoryTest {
         val remaining = directory.upsert(device("New", "fp-new", "10.0.0.3", lastSeen = 2_000L))
         assertEquals(listOf("fp-new"), remaining.map { it.fingerprint })
     }
+
+    @Test
+    fun pruneDropsExpiredDevicesWithoutNewUpsert() {
+        var now = 0L
+        val directory = DeviceDirectory(
+            ttlMs = 1_000L,
+            clock = { now },
+            primaryIp = { null }
+        )
+        directory.upsert(device("Stay", "fp-stay", "10.0.0.2", lastSeen = 0L))
+
+        // TTL 内保留，避免把仍在线的设备剔除
+        now = 500L
+        assertEquals(listOf("fp-stay"), directory.prune().map { it.fingerprint })
+
+        // 超过 TTL 且局域网无任何新广播时，离线设备同样要被清理
+        now = 2_000L
+        assertTrue(directory.prune().isEmpty())
+
+        // 清理后设备重新上线不会产生重复条目
+        val rejoined = directory.upsert(device("Stay", "fp-stay", "10.0.0.2", lastSeen = 2_000L))
+        assertEquals(listOf("fp-stay"), rejoined.map { it.fingerprint })
+    }
 }

@@ -63,8 +63,8 @@
     <string name="receive_title">接收</string>
     <string name="receive_section_local_device">本机设备</string>
     <string name="receive_pref_alias_summary">设备别名 (点击修改)</string>
-    <string name="receive_pref_all_ips_summary">所有网卡 IP: %1$s</string>
-    <string name="receive_pref_ip_port_summary">局域网 IPv4 地址与服务端口</string>
+    <string name="receive_pref_all_ips_summary">所有网卡 IP: %1$s (点击复制)</string>
+    <string name="receive_pref_ip_port_summary">局域网 IPv4 地址与服务端口 (点击复制)</string>
     <string name="receive_section_options">接收选项</string>
     <string name="receive_pref_quick_save_title">快速保存</string>
     <string name="receive_pref_quick_save_summary">自动接收同局域网所有设备的传输请求，无需每次手动确认</string>
@@ -237,6 +237,8 @@
     <string name="dialog_cert_empty">未生成或 HTTPS 未启用</string>
     <string name="dialog_cert_btn_copy">复制指纹</string>
     <string name="dialog_cert_btn_regenerate">重新生成</string>
+    <string name="dialog_cert_regen_confirm_title">重新生成安全证书</string>
+    <string name="dialog_cert_regen_confirm_msg">重新生成后证书指纹会发生变化，所有已记录旧指纹的设备在下次连接时都会校验失败并要求重新确认。确定要继续吗？</string>
 
     <string name="dialog_incoming_text_title">收到纯文本消息</string>
     <string name="dialog_incoming_files_title">收到传输请求</string>
@@ -330,6 +332,7 @@
     <string name="webshare_ready_desc_empty">对方在浏览器打开此链接可直接拖拽或选择文件回传到手机。如需共享文件给对方，请先在发送页添加内容。</string>
     <string name="webshare_btn_stop_share">停止共享</string>
     <string name="webshare_btn_share_selected">共享已选 %1$d 项</string>
+    <string name="webshare_https_warning">已开启 HTTPS：浏览器访问自签名证书链接会提示安全风险，建议临时关闭 HTTPS 后再使用网页快传</string>
 
     <string name="update_dialog_title">发现新版本</string>
     <string name="update_dialog_no_changelog">暂无详细更新日志</string>
@@ -351,6 +354,8 @@
     <string name="notif_channel_live_desc">显示焦点胶囊与实时传输进度</string>
     <string name="notif_channel_receive_name">接收通知</string>
     <string name="notif_channel_receive_desc">接收文件与文本时的结果提示</string>
+    <string name="notif_channel_receive_request_name">接收请求提醒</string>
+    <string name="notif_channel_receive_request_desc">对方发起传输请求时的高优先级提醒，可直接在通知栏接收或拒绝</string>
     <string name="notif_channel_send_name">发送通知</string>
     <string name="notif_channel_send_desc">发送文件与文本时的结果提示</string>
     <string name="notif_channel_service_name">后台传输服务</string>
@@ -426,6 +431,9 @@
     <string name="msg_too_many_requests">请求过于频繁，请稍后再试（429）</string>
     <string name="msg_peer_rejected_http">对方拒绝了接收请求: %1$d (%2$s)</string>
     <string name="msg_upload_forbidden">上传被拒绝：令牌或来源 IP 无效（403）</string>
+    <string name="msg_receiver_canceled">对方已取消接收</string>
+    <string name="msg_busy_cannot_change_network">有传输正在进行，请等待结束后再修改端口或 HTTPS</string>
+    <string name="msg_port_occupied_fallback">端口 %1$d 已被占用，已自动改用 %2$d</string>
     <string name="msg_sha256_mismatch">文件校验失败：SHA-256 不匹配（422）</string>
     <string name="msg_session_not_found">会话或文件在对端不存在（404）</string>
     <string name="msg_upload_http">上传失败: HTTP %1$d %2$s</string>

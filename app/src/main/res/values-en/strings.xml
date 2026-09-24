@@ -63,8 +63,8 @@
     <string name="receive_title">Receive</string>
     <string name="receive_section_local_device">This Device</string>
     <string name="receive_pref_alias_summary">Device alias (tap to edit)</string>
-    <string name="receive_pref_all_ips_summary">All IP addresses: %1$s</string>
-    <string name="receive_pref_ip_port_summary">Local IPv4 address and server port</string>
+    <string name="receive_pref_all_ips_summary">All IP addresses: %1$s (tap to copy)</string>
+    <string name="receive_pref_ip_port_summary">Local IPv4 address and server port (tap to copy)</string>
     <string name="receive_section_options">Receive Options</string>
     <string name="receive_pref_quick_save_title">Quick Save</string>
     <string name="receive_pref_quick_save_summary">Automatically accept transfer requests from local network without prompt</string>
@@ -237,6 +237,8 @@
     <string name="dialog_cert_empty">Not generated or HTTPS disabled</string>
     <string name="dialog_cert_btn_copy">Copy Fingerprint</string>
     <string name="dialog_cert_btn_regenerate">Regenerate</string>
+    <string name="dialog_cert_regen_confirm_title">Regenerate Security Certificate</string>
+    <string name="dialog_cert_regen_confirm_msg">Regenerating changes the certificate fingerprint. Every device that has recorded the old fingerprint will fail verification and ask for confirmation on the next connection. Continue?</string>
 
     <string name="dialog_incoming_text_title">Incoming Text Message</string>
     <string name="dialog_incoming_files_title">Incoming Transfer Request</string>
@@ -330,6 +332,7 @@
     <string name="webshare_ready_desc_empty">Open link in browser to upload files directly to this phone. Add files in Send tab to share with browser.</string>
     <string name="webshare_btn_stop_share">Stop Sharing</string>
     <string name="webshare_btn_share_selected">Share Selected (%1$d)</string>
+    <string name="webshare_https_warning">HTTPS is on: browsers will warn about the self-signed certificate. Turn HTTPS off temporarily before using Web Share</string>
 
     <string name="update_dialog_title">New Version Available</string>
     <string name="update_dialog_no_changelog">No detailed changelog provided</string>
@@ -351,6 +354,8 @@
     <string name="notif_channel_live_desc">Shows Aqua Dynamics capsule &amp; real-time transfer progress</string>
     <string name="notif_channel_receive_name">Receive Notifications</string>
     <string name="notif_channel_receive_desc">Alerts for received files and text messages</string>
+    <string name="notif_channel_receive_request_name">Incoming Request Alerts</string>
+    <string name="notif_channel_receive_request_desc">High priority alert when a peer sends a transfer request; accept or decline straight from the notification</string>
     <string name="notif_channel_send_name">Send Notifications</string>
     <string name="notif_channel_send_desc">Alerts for sent files and text messages</string>
     <string name="notif_channel_service_name">Background Transfer Service</string>
@@ -426,6 +431,9 @@
     <string name="msg_too_many_requests">Too many requests, try again later (429)</string>
     <string name="msg_peer_rejected_http">Peer rejected the request: %1$d (%2$s)</string>
     <string name="msg_upload_forbidden">Upload rejected: invalid token or source IP (403)</string>
+    <string name="msg_receiver_canceled">The receiver canceled the transfer</string>
+    <string name="msg_busy_cannot_change_network">A transfer is in progress. Change the port or HTTPS after it finishes</string>
+    <string name="msg_port_occupied_fallback">Port %1$d is in use, switched to %2$d automatically</string>
     <string name="msg_sha256_mismatch">File verification failed: SHA-256 mismatch (422)</string>
     <string name="msg_session_not_found">Session or file not found on peer (404)</string>
     <string name="msg_upload_http">Upload failed: HTTP %1$d %2$s</string>

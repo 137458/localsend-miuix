@@ -54,7 +54,9 @@ fun WebShareDialog(
     val localIps = NetworkUtils.getLocalIpAddresses()
     val primaryIp = localIps.firstOrNull() ?: "127.0.0.1"
     val scheme = if (settings.useHttps) "https" else "http"
-    val shareUrl = "$scheme://$primaryIp:${settings.port}"
+    // 端口被占用时服务端会自动顺延，必须用真实监听端口生成链接，否则二维码/网址指向未监听的端口
+    val port = manager.getServerPort().takeIf { it > 0 } ?: settings.port
+    val shareUrl = "$scheme://$primaryIp:$port"
 
     WindowBottomSheet(
         show = show,
@@ -93,6 +95,18 @@ fun WebShareDialog(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (settings.useHttps) {
+                Text(
+                    text = stringResource(R.string.webshare_https_warning),
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                )
+            }
 
             Card(
                 modifier = Modifier.fillMaxWidth()

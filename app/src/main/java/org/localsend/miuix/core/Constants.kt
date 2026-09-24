@@ -22,6 +22,7 @@ object PreferenceKeys {
     const val KEY_RECENT_MANUAL_IPS = "recent_manual_ips"
     const val KEY_AUTO_CHECK_UPDATE = "auto_check_update"
     const val KEY_IGNORED_VERSION = "ignored_version"
+    const val KEY_PROMPTED_UPDATE_VERSION = "prompted_update_version"
     const val KEY_IS_OS3_EFFECT = "is_os3_effect"
     const val KEY_WIDE_SCREEN_NAVIGATION_RAIL = "wide_screen_navigation_rail"
     const val KEY_SAVE_TEXT_AS_FILE = "save_text_as_file"
@@ -47,8 +48,15 @@ object LocalSendRoutes {
     const val DOWNLOAD_ZIP = "/api/localsend/v2/download-zip"
 }
 
+/** 协议层固定提示文本：接收方主动取消时回传，发送方据此区分取消与令牌/权限拒绝。 */
+object ProtocolMessages {
+    const val CANCELED_BY_RECEIVER = "Transfer canceled by receiver"
+}
+
 object AppActions {
     const val ACTION_CANCEL_TRANSFER = "org.localsend.miuix.action.CANCEL_TRANSFER"
+    const val ACTION_ACCEPT_TRANSFER = "org.localsend.miuix.action.ACCEPT_TRANSFER"
+    const val ACTION_DECLINE_TRANSFER = "org.localsend.miuix.action.DECLINE_TRANSFER"
     const val EXTRA_SESSION_ID = "extra_session_id"
     const val ACTION_START_SERVICE = "org.localsend.miuix.service.ACTION_START"
     const val ACTION_STOP_SERVICE = "org.localsend.miuix.service.ACTION_STOP"

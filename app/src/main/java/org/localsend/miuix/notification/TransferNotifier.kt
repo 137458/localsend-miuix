@@ -24,6 +24,7 @@ import org.localsend.miuix.ui.MainActivity
 object TransferNotifier {
 
     const val CHANNEL_RECEIVE = "localsend_receive"
+    const val CHANNEL_RECEIVE_REQUEST = "localsend_receive_request"
     const val CHANNEL_SEND = "localsend_send"
     const val CHANNEL_SERVICE = "localsend_service"
     const val CHANNEL_LIVE = "localsend_live_channel"
@@ -64,6 +65,16 @@ object TransferNotifier {
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             setShowBadge(false)
         }
+        // 接收请求需要用户及时处理（60 秒内不响应即视为拒绝），必须高优先级提醒而非静默通知
+        val receiveRequestChannel = NotificationChannel(
+            CHANNEL_RECEIVE_REQUEST,
+            context.getString(R.string.notif_channel_receive_request_name),
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = context.getString(R.string.notif_channel_receive_request_desc)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setShowBadge(false)
+        }
         val sendChannel = NotificationChannel(
             CHANNEL_SEND,
             context.getString(R.string.notif_channel_send_name),
@@ -83,6 +94,7 @@ object TransferNotifier {
         }
         nm.createNotificationChannel(liveChannel)
         nm.createNotificationChannel(receiveChannel)
+        nm.createNotificationChannel(receiveRequestChannel)
         nm.createNotificationChannel(sendChannel)
         nm.createNotificationChannel(serviceChannel)
     }
@@ -171,6 +183,17 @@ object TransferNotifier {
         return base + (session.sessionId.hashCode() and 0x7FFF) % 100
     }
 
+    /** 通知快捷操作后清除该会话的通知（收发两个通道的 ID 一并清理，避免残留）。 */
+    fun cancelSessionNotification(context: Context, sessionId: String) {
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val suffix = (sessionId.hashCode() and 0x7FFF) % 100
+            nm.cancel(NOTIF_ID_RECEIVE_BASE + suffix)
+            nm.cancel(NOTIF_ID_SEND_BASE + suffix)
+        } catch (ignored: Exception) {
+        }
+    }
+
     private fun appPendingIntent(context: Context): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -192,6 +215,16 @@ object TransferNotifier {
         return PendingIntent.getBroadcast(context, sessionId.hashCode(), intent, flags)
     }
 
+    /** 接收请求通知上的快捷操作：直接允许或拒绝，避免必须打开应用才能处理。 */
+    private fun decisionPendingIntent(context: Context, sessionId: String, accept: Boolean): PendingIntent {
+        val intent = Intent(context, TransferActionReceiver::class.java).apply {
+            action = if (accept) TransferActionReceiver.ACTION_ACCEPT_TRANSFER else TransferActionReceiver.ACTION_DECLINE_TRANSFER
+            putExtra(TransferActionReceiver.EXTRA_SESSION_ID, sessionId)
+        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+        return PendingIntent.getBroadcast(context, sessionId.hashCode(), intent, flags)
+    }
+
     fun notifyIncoming(context: Context, session: TransferSession) {
         if (!isAllowed(context)) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -207,13 +240,23 @@ object TransferNotifier {
         } else {
             context.getString(R.string.notif_files_count_and_size, session.files.size, session.formattedTotalSize)
         }
-        val builder = NotificationCompat.Builder(context, CHANNEL_RECEIVE)
+        val builder = NotificationCompat.Builder(context, CHANNEL_RECEIVE_REQUEST)
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_stat_receive)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(appPendingIntent(context))
             .setAutoCancel(true)
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                context.getString(R.string.btn_decline),
+                decisionPendingIntent(context, session.sessionId, accept = false)
+            )
+            .addAction(
+                android.R.drawable.ic_menu_save,
+                context.getString(R.string.btn_accept),
+                decisionPendingIntent(context, session.sessionId, accept = true)
+            )
         nm.notify(sessionNotifId(session), builder.build())
     }
 
@@ -252,7 +295,11 @@ object TransferNotifier {
                     if (session.isTextMessage) {
                         context.getString(R.string.notif_receive_completed_text, session.device.alias) to (session.singleTextMessageContent?.take(100) ?: context.getString(R.string.notif_plain_text_message))
                     } else {
-                        context.getString(R.string.notif_receive_completed_files_title) to context.getString(R.string.notif_receive_completed_files_desc, session.device.alias, session.files.size)
+                        // 部分文件失败时会话仍判完成，用聚合说明替代"全部成功"文案，避免用户以为文件已收齐
+                        context.getString(R.string.notif_receive_completed_files_title) to (
+                            session.errorMessage?.takeIf { it.isNotBlank() }
+                                ?: context.getString(R.string.notif_receive_completed_files_desc, session.device.alias, session.files.size)
+                            )
                     }
                 } else {
                     if (session.isTextMessage) {

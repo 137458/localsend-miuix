@@ -38,7 +38,6 @@ import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.FileItem
-import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.network.NetworkUtils
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.TransferSessionCard
@@ -183,7 +182,7 @@ fun ReceiveScreen(
             if (incomingSessions.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = stringResource(R.string.receive_section_incoming_count, incomingSessions.count { it.status == TransferStatus.InProgress || it.status == TransferStatus.WaitingApproval }))
+                    SmallTitle(text = stringResource(R.string.receive_section_incoming_count, incomingSessions.size))
                 }
                 items(incomingSessions, key = { it.sessionId }) { session ->
                     TransferSessionCard(

@@ -18,11 +18,21 @@ class TransferActionReceiver : BroadcastReceiver() {
 
         if (action == ACTION_CANCEL_TRANSFER && !sessionId.isNullOrEmpty()) {
             LocalSendManager.getInstance()?.cancelTransfer(sessionId)
+            TransferNotifier.cancelSessionNotification(context, sessionId)
+        } else if (action == ACTION_ACCEPT_TRANSFER && !sessionId.isNullOrEmpty()) {
+            // 通知栏快捷操作：直接接受全部文件（等价于弹窗中的"接收"）
+            LocalSendManager.getInstance()?.acceptIncomingTransfer(sessionId, null)
+            TransferNotifier.cancelSessionNotification(context, sessionId)
+        } else if (action == ACTION_DECLINE_TRANSFER && !sessionId.isNullOrEmpty()) {
+            LocalSendManager.getInstance()?.declineIncomingTransfer(sessionId)
+            TransferNotifier.cancelSessionNotification(context, sessionId)
         }
     }
 
     companion object {
         const val ACTION_CANCEL_TRANSFER = org.localsend.miuix.core.AppActions.ACTION_CANCEL_TRANSFER
+        const val ACTION_ACCEPT_TRANSFER = org.localsend.miuix.core.AppActions.ACTION_ACCEPT_TRANSFER
+        const val ACTION_DECLINE_TRANSFER = org.localsend.miuix.core.AppActions.ACTION_DECLINE_TRANSFER
         const val EXTRA_SESSION_ID = org.localsend.miuix.core.AppActions.EXTRA_SESSION_ID
     }
 }

@@ -311,14 +311,17 @@ private fun FileTransferCardContent(
                     text = when (session.status) {
                         TransferStatus.WaitingApproval -> stringResource(R.string.session_waiting_peer)
                         TransferStatus.InProgress -> stringResource(R.string.session_files_in_progress, session.files.size, session.formattedTotalSize)
-                        TransferStatus.Completed -> stringResource(R.string.session_files_completed, session.files.size, session.formattedTotalSize)
+                        // 部分文件失败时会话仍判完成，用聚合说明替换"传输完成"，避免用户以为文件已收齐
+                        TransferStatus.Completed -> session.errorMessage?.takeIf { it.isNotBlank() }
+                            ?: stringResource(R.string.session_files_completed, session.files.size, session.formattedTotalSize)
                         TransferStatus.Failed -> stringResource(R.string.session_transfer_failed, session.errorMessage ?: stringResource(R.string.session_unknown_error))
                         TransferStatus.Canceled -> stringResource(R.string.session_canceled)
                     },
                     style = MiuixTheme.textStyles.footnote1,
-                    color = when (session.status) {
-                        TransferStatus.Failed -> MiuixTheme.colorScheme.error
-                        TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
+                    color = when {
+                        session.status == TransferStatus.Failed -> MiuixTheme.colorScheme.error
+                        session.status == TransferStatus.Completed && !session.errorMessage.isNullOrBlank() -> MiuixTheme.colorScheme.error
+                        session.status == TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
                         else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
                     },
                     maxLines = 1,
@@ -778,15 +781,18 @@ private fun InlineFileTransferProgress(
                             stringResource(R.string.session_preparing_transfer)
                         }
                     }
-                    TransferStatus.Completed -> stringResource(R.string.session_transfer_complete_check, session.files.size, session.formattedTotalSize)
+                    // 部分文件失败时会话仍判完成，用聚合说明替换"传输完成"，避免用户以为文件已送达
+                    TransferStatus.Completed -> session.errorMessage?.takeIf { it.isNotBlank() }
+                        ?: stringResource(R.string.session_transfer_complete_check, session.files.size, session.formattedTotalSize)
                     TransferStatus.Failed -> stringResource(R.string.session_transfer_failed, session.errorMessage ?: stringResource(R.string.session_unknown_error))
                     TransferStatus.Canceled -> stringResource(R.string.session_canceled)
                 },
                 style = MiuixTheme.textStyles.footnote1,
-                color = when (session.status) {
-                    TransferStatus.Completed -> MiuixTheme.colorScheme.primary
-                    TransferStatus.Failed -> MiuixTheme.colorScheme.error
-                    TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
+                color = when {
+                    session.status == TransferStatus.Failed -> MiuixTheme.colorScheme.error
+                    session.status == TransferStatus.Completed && !session.errorMessage.isNullOrBlank() -> MiuixTheme.colorScheme.error
+                    session.status == TransferStatus.Completed -> MiuixTheme.colorScheme.primary
+                    session.status == TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
                     else -> MiuixTheme.colorScheme.onSurface
                 },
                 maxLines = 1,

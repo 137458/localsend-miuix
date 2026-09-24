@@ -17,6 +17,7 @@ import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -132,6 +134,7 @@ class LocalSendManager(private val context: Context) {
             lastSelectedTabIndex = prefs.getInt(KEY_LAST_TAB, 0),
             autoCheckUpdate = prefs.getBoolean(KEY_AUTO_CHECK_UPDATE, true),
             ignoredVersion = prefs.getString(KEY_IGNORED_VERSION, null),
+            promptedUpdateVersion = prefs.getString(KEY_PROMPTED_UPDATE_VERSION, null),
             isOs3Effect = prefs.getBoolean(KEY_IS_OS3_EFFECT, true),
             wideScreenNavigationRail = prefs.getBoolean(KEY_WIDE_SCREEN_NAVIGATION_RAIL, false),
             saveTextAsFile = prefs.getBoolean(KEY_SAVE_TEXT_AS_FILE, false),
@@ -282,8 +285,26 @@ class LocalSendManager(private val context: Context) {
             val history = historyStore.load()
             _transferHistory.value = history
             server.start()
+            syncBoundPortFromServer()
             discoveryService.start()
             preloadInstalledApps()
+            startDevicePruneLoop()
+        }
+    }
+
+    /** 局域网长时间无广播时，离线设备不会因收包而被动清理，这里按 TTL 周期剔除。 */
+    private fun startDevicePruneLoop() {
+        devicePruneJob?.cancel()
+        devicePruneJob = scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                delay(10_000L)
+                synchronized(deviceDirectory) {
+                    val pruned = deviceDirectory.prune()
+                    if (pruned.size != _nearbyDevices.value.size) {
+                        _nearbyDevices.value = pruned
+                    }
+                }
+            }
         }
     }
 
@@ -297,10 +318,14 @@ class LocalSendManager(private val context: Context) {
 
     private var lastForegroundActiveCount = 0
 
+    private var devicePruneJob: Job? = null
+
     fun stop() {
         if (!started.compareAndSet(true, false)) return
         discoveryService.stop()
         server.stop()
+        devicePruneJob?.cancel()
+        devicePruneJob = null
         lastForegroundActiveCount = 0
         org.localsend.miuix.service.TransferService.stop(context)
     }
@@ -765,8 +790,8 @@ class LocalSendManager(private val context: Context) {
                     addHistory(historyItem)
                 }
 
-                // 终结状态保留 2 秒，以便用户在设备 Card 内看清完成反馈动效，随后自动清理
-                delay(2000L)
+                // 终结状态保留片刻，以便用户在设备 Card 内看清结果；失败与取消保留更久，便于读完错误原因
+                delay(if (session.status == TransferStatus.Completed) 2000L else 4000L)
                 _activeSessions.update { list -> list.filterNot { it.sessionId == session.sessionId } }
                 syncForegroundServiceState(_activeSessions.value.size)
             } else {
@@ -841,13 +866,17 @@ class LocalSendManager(private val context: Context) {
 
     fun cancelTransfer(sessionId: String) {
         canceledSessionIds.add(sessionId)
-        val session = _activeSessions.value.firstOrNull { it.sessionId == sessionId } ?: return
-        session.status = TransferStatus.Canceled
-        session.endTime = System.currentTimeMillis()
-        updateSessionState(session)
-
-        scope.launch(Dispatchers.IO) {
-            if (!session.isIncoming) {
+        val session = _activeSessions.value.firstOrNull { it.sessionId == sessionId }
+        if (session != null) {
+            session.status = TransferStatus.Canceled
+            session.endTime = System.currentTimeMillis()
+            updateSessionState(session)
+        }
+        if (session == null || session.isIncoming) {
+            // 接收侧取消必须同时终止本地服务端的接收循环，否则会话只被标记为取消，文件仍会继续写盘
+            server.cancelIncomingSession(sessionId)
+        } else {
+            scope.launch(Dispatchers.IO) {
                 val remoteId = remoteSessionIds[sessionId] ?: sessionId
                 client.cancelUpload(session.device, remoteId)
             }
@@ -1049,23 +1078,51 @@ class LocalSendManager(private val context: Context) {
 
     fun getServerPort(): Int = server.getBoundPort()
 
-    fun applyPortChange(newPort: Int) {
-        if (newPort == _settings.value.port) return
+    fun applyPortChange(newPort: Int): Boolean {
+        if (newPort == _settings.value.port) return true
+        if (hasActiveIncomingTransfer()) {
+            _sessionMessage.value = context.getString(R.string.msg_busy_cannot_change_network)
+            return false
+        }
         updateSettings { it.copy(port = newPort) }
         scope.launch(Dispatchers.IO) {
             server.stop()
             server.start()
+            syncBoundPortFromServer()
         }
+        return true
     }
 
     fun applyUseHttpsChange(useHttps: Boolean) {
         if (useHttps == _settings.value.useHttps) return
+        if (hasActiveIncomingTransfer()) {
+            _sessionMessage.value = context.getString(R.string.msg_busy_cannot_change_network)
+            return
+        }
         updateSettings { it.copy(useHttps = useHttps) }
         scope.launch(Dispatchers.IO) {
             server.stop()
             server.start()
+            syncBoundPortFromServer()
             scope.launch { discoveryService.sendAnnouncement() }
         }
+    }
+
+    /**
+     * 正在接收时重启服务端会丢弃会话并中断对方上传，故此时拒绝修改端口与 HTTPS 开关。
+     * 界面读取设置状态，因此拒绝后开关会自动回弹，并由提示告知原因。
+     */
+    private fun hasActiveIncomingTransfer(): Boolean = _activeSessions.value.any {
+        it.isIncoming && (it.status == TransferStatus.InProgress || it.status == TransferStatus.WaitingApproval)
+    }
+
+    /** 端口被占用时服务端会自动顺延，这里把真实监听端口回写为设置值，保证设置页与 Web Share 链接一致。 */
+    private fun syncBoundPortFromServer() {
+        val boundPort = server.getBoundPort()
+        val requestedPort = _settings.value.port
+        if (boundPort <= 0 || boundPort == requestedPort) return
+        updateSettings { it.copy(port = boundPort) }
+        _sessionMessage.value = context.getString(R.string.msg_port_occupied_fallback, requestedPort, boundPort)
     }
 
     fun startShare(files: List<FileItem>) {
@@ -1099,6 +1156,7 @@ class LocalSendManager(private val context: Context) {
             .putInt(KEY_LAST_TAB, s.lastSelectedTabIndex)
             .putBoolean(KEY_AUTO_CHECK_UPDATE, s.autoCheckUpdate)
             .putString(KEY_IGNORED_VERSION, s.ignoredVersion)
+            .putString(KEY_PROMPTED_UPDATE_VERSION, s.promptedUpdateVersion)
             .putBoolean(KEY_IS_OS3_EFFECT, s.isOs3Effect)
             .putBoolean(KEY_WIDE_SCREEN_NAVIGATION_RAIL, s.wideScreenNavigationRail)
             .putBoolean(KEY_SAVE_TEXT_AS_FILE, s.saveTextAsFile)
@@ -1138,6 +1196,7 @@ class LocalSendManager(private val context: Context) {
         private const val KEY_RECENT_MANUAL_IPS = org.localsend.miuix.core.PreferenceKeys.KEY_RECENT_MANUAL_IPS
         private const val KEY_AUTO_CHECK_UPDATE = org.localsend.miuix.core.PreferenceKeys.KEY_AUTO_CHECK_UPDATE
         private const val KEY_IGNORED_VERSION = org.localsend.miuix.core.PreferenceKeys.KEY_IGNORED_VERSION
+        private const val KEY_PROMPTED_UPDATE_VERSION = org.localsend.miuix.core.PreferenceKeys.KEY_PROMPTED_UPDATE_VERSION
         private const val KEY_IS_OS3_EFFECT = org.localsend.miuix.core.PreferenceKeys.KEY_IS_OS3_EFFECT
         private const val KEY_WIDE_SCREEN_NAVIGATION_RAIL = org.localsend.miuix.core.PreferenceKeys.KEY_WIDE_SCREEN_NAVIGATION_RAIL
         private const val KEY_SAVE_TEXT_AS_FILE = org.localsend.miuix.core.PreferenceKeys.KEY_SAVE_TEXT_AS_FILE

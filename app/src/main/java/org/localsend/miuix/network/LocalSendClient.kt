@@ -24,12 +24,23 @@ import javax.net.ssl.HttpsURLConnection
 
 class TargetPinRequiredException(message: String = "PIN required") : IllegalStateException(message)
 
+/** 对端明确拒绝本次上传（403/404/422 等业务错误），重试无意义，直接以该原因结束该项文件。 */
+class PeerRejectedException(message: String) : IllegalStateException(message)
+
 class LocalSendClient(
     private val context: Context,
     private val getLocalDevice: () -> Device
 ) {
     companion object {
         private const val TAG = "LocalSendTransfer"
+
+        /** 上传阶段对端的业务级拒绝状态码：命中即判定为不可重试。 */
+        private val TERMINAL_REJECTION_CODES = setOf(
+            HttpURLConnection.HTTP_FORBIDDEN,
+            HttpURLConnection.HTTP_NOT_FOUND,
+            HttpURLConnection.HTTP_UNAUTHORIZED,
+            422
+        )
 
         fun buildPrepareUploadUrl(baseUrl: String, targetPin: String?): String {
             val pin = targetPin?.trim()?.takeIf { it.isNotEmpty() } ?: return "$baseUrl${LocalSendRoutes.PREPARE_UPLOAD}"
@@ -160,6 +171,14 @@ class LocalSendClient(
         else -> safeGetString(R.string.msg_peer_rejected_http, "HTTP $code: $body", code, body).trim()
     }
 
+    /** 403 通用文案会误导用户以为是令牌问题，接收方主动取消时改用明确的取消提示。 */
+    private fun forbiddenErrorText(errorBody: String?): String =
+        if (errorBody?.contains(org.localsend.miuix.core.ProtocolMessages.CANCELED_BY_RECEIVER) == true) {
+            safeGetString(R.string.msg_receiver_canceled, "Receiver canceled the transfer")
+        } else {
+            context.getString(R.string.msg_upload_forbidden)
+        }
+
     suspend fun uploadFile(
         targetDevice: Device,
         sessionId: String,
@@ -198,7 +217,7 @@ class LocalSendClient(
                 msg.contains("broken pipe")
 
             // 若是对端明确返回的业务拒绝（如 403 / 404 / 422 / 401），重试无意义，立即终止
-            if (msg.contains("403") || msg.contains("404") || msg.contains("422") || msg.contains("401")) {
+            if (lastError is PeerRejectedException || msg.contains("403") || msg.contains("404") || msg.contains("422") || msg.contains("401")) {
                 Log.w(TAG, "Upload rejected with terminal HTTP status, aborting retry: $msg")
                 break
             }
@@ -313,12 +332,12 @@ class LocalSendClient(
                 } catch (ignored: Exception) { null }
                 Log.e(TAG, "uploadFileOnce: upload rejected by peer for '${fileItem.name}', HTTP $responseCode: $errorBody")
                 val message = when (responseCode) {
-                    HttpURLConnection.HTTP_FORBIDDEN -> context.getString(R.string.msg_upload_forbidden)
+                    HttpURLConnection.HTTP_FORBIDDEN -> forbiddenErrorText(errorBody)
                     422 -> context.getString(R.string.msg_sha256_mismatch)
                     404 -> context.getString(R.string.msg_session_not_found)
                     else -> context.getString(R.string.msg_upload_http, responseCode, errorBody?.take(100) ?: "").trim()
                 }
-                Result.failure(Exception(message))
+                Result.failure(if (responseCode in TERMINAL_REJECTION_CODES) PeerRejectedException(message) else Exception(message))
             }
         } catch (e: Exception) {
             val responseCode = try { connection?.responseCode } catch (_: Exception) { -1 }
@@ -329,13 +348,13 @@ class LocalSendClient(
 
             val mappedException = if (responseCode != -1 && responseCode != 200 && responseCode != 204) {
                 val message = when (responseCode) {
-                    HttpURLConnection.HTTP_FORBIDDEN -> context.getString(R.string.msg_upload_forbidden)
+                    HttpURLConnection.HTTP_FORBIDDEN -> forbiddenErrorText(errorBody)
                     422 -> context.getString(R.string.msg_sha256_mismatch)
                     404 -> context.getString(R.string.msg_session_not_found)
                     500 -> context.getString(R.string.msg_peer_internal_error, errorBody ?: "").trim()
                     else -> context.getString(R.string.msg_peer_http, responseCode, errorBody ?: "").trim()
                 }
-                Exception(message, e)
+                if (responseCode in TERMINAL_REJECTION_CODES) PeerRejectedException(message) else Exception(message, e)
             } else {
                 e
             }

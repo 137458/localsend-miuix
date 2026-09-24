@@ -26,6 +26,8 @@ data class AppSettings(
     val lastSelectedTabIndex: Int = 0, // 记录离开时的 Tab 索引，进程恢复时自动还原页面
     val autoCheckUpdate: Boolean = true,
     val ignoredVersion: String? = null,
+    // 已经自动弹窗提示过的版本号：同一版本只在首次启动提示一次，避免每次冷启动都打断用户
+    val promptedUpdateVersion: String? = null,
     val isOs3Effect: Boolean = true,
     val wideScreenNavigationRail: Boolean = false,
     val saveTextAsFile: Boolean = false, // 是否将纯文本消息另存为 .txt 文件，默认关闭仅复制并写入历史

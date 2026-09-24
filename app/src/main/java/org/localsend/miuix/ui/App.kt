@@ -148,7 +148,12 @@ fun App(manager: LocalSendManager) {
         scope.launch(Dispatchers.IO) {
             val result = updateManager.checkForUpdate()
             result.onSuccess { info ->
-                if (info.hasUpdate && info.latestVersion != settings.ignoredVersion) {
+                // 同一版本只在首次发现时自动弹窗，避免每次冷启动都打断用户；忽略过的版本不再提示
+                val isNewlyPrompted = info.hasUpdate &&
+                    info.latestVersion != settings.ignoredVersion &&
+                    info.latestVersion != settings.promptedUpdateVersion
+                if (isNewlyPrompted) {
+                    manager.updateSettings { it.copy(promptedUpdateVersion = info.latestVersion) }
                     availableUpdate = info
                     showUpdateDialog = true
                 }
@@ -491,8 +496,9 @@ fun App(manager: LocalSendManager) {
             initialPort = settings.port,
             onDismissRequest = { showPortDialog = false },
             onConfirm = { newPort ->
-                manager.applyPortChange(newPort)
-                Toast.makeText(context, context.getString(R.string.toast_port_updated, newPort), Toast.LENGTH_SHORT).show()
+                if (manager.applyPortChange(newPort)) {
+                    Toast.makeText(context, context.getString(R.string.toast_port_updated, newPort), Toast.LENGTH_SHORT).show()
+                }
             }
         )
 

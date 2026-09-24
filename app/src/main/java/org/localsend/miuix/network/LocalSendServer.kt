@@ -43,6 +43,7 @@ import kotlinx.coroutines.withContext
 import org.localsend.miuix.R
 import org.localsend.miuix.core.AppJson
 import org.localsend.miuix.core.LocalSendRoutes
+import org.localsend.miuix.core.ProtocolMessages
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
 import org.localsend.miuix.model.DeviceType
@@ -55,6 +56,7 @@ import org.localsend.miuix.model.SaveTarget
 import org.localsend.miuix.model.ShareSession
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.transfer.TransferOutcome
 import org.localsend.miuix.webshare.WebShareCopy
 import java.io.File
 import java.io.InputStream
@@ -285,8 +287,17 @@ class LocalSendServer(
             it.status == TransferStatus.Canceled
         }
         if (allTerminal) {
-            val hasCompleted = session.files.any { it.status == TransferStatus.Completed }
-            session.status = if (hasCompleted) TransferStatus.Completed else TransferStatus.Failed
+            // 复用与发送端一致的聚合规则：已取消的会话保持取消；部分失败仍判完成，但携带失败说明供界面展示
+            val outcome = TransferOutcome.aggregate(
+                files = session.files,
+                currentStatus = session.status,
+                allFailedMessage = context.getString(R.string.msg_all_files_failed),
+                partialFailedMessage = { failed, total ->
+                    context.getString(R.string.msg_partial_files_failed, failed, total)
+                }
+            )
+            session.status = outcome.status
+            session.errorMessage = outcome.errorMessage
             session.endTime = System.currentTimeMillis()
             activeSessions.remove(sessionId)
             sessionTokens.remove(sessionId)
@@ -297,6 +308,21 @@ class LocalSendServer(
     private var boundPort: Int = 53317
 
     fun getBoundPort(): Int = boundPort
+
+    /**
+     * 接收方主动取消传输：把会话置为终态。正在写入的上传循环会在下一个数据块处中止，
+     * 半截文件由上传路由的取消分支负责删除，发送方收到明确的取消提示而非令牌错误。
+     */
+    fun cancelIncomingSession(sessionId: String) {
+        val session = activeSessions[sessionId] ?: return
+        if (session.status == TransferStatus.Canceled) return
+        session.status = TransferStatus.Canceled
+        session.endTime = System.currentTimeMillis()
+        session.files.forEach { file ->
+            if (file.status != TransferStatus.Completed) file.status = TransferStatus.Canceled
+        }
+        onSessionUpdated(session)
+    }
 
     private val startLock = Any()
     @Volatile
@@ -1577,14 +1603,28 @@ class LocalSendServer(
                     }
                     call.respond(HttpStatusCode.OK, mapOf("message" to "File uploaded successfully"))
                 } catch (e: Throwable) {
-                    e.printStackTrace()
                     deleteSavedFile(fileItem, saveTarget)
-                    fileItem.status = TransferStatus.Failed
-                    fileItem.progress = 0f
-                    fileItem.error = e.message ?: "Upload failed"
-                    checkSessionFinished(session, sessionId)
-                    onSessionUpdated(session)
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("message" to (e.message ?: "Upload failed")))
+                    if (session.status == TransferStatus.Canceled) {
+                        fileItem.status = TransferStatus.Canceled
+                        fileItem.progress = 0f
+                        fileItem.error = null
+                        checkSessionFinished(session, sessionId)
+                        onSessionUpdated(session)
+                        runCatching {
+                            call.respond(
+                                HttpStatusCode.Forbidden,
+                                mapOf("message" to ProtocolMessages.CANCELED_BY_RECEIVER)
+                            )
+                        }
+                    } else {
+                        e.printStackTrace()
+                        fileItem.status = TransferStatus.Failed
+                        fileItem.progress = 0f
+                        fileItem.error = e.message ?: "Upload failed"
+                        checkSessionFinished(session, sessionId)
+                        onSessionUpdated(session)
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("message" to (e.message ?: "Upload failed")))
+                    }
                 }
             }
 
