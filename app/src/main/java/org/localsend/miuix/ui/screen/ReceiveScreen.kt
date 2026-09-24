@@ -80,7 +80,7 @@ fun ReceiveScreen(
 
     val localIps = remember { NetworkUtils.getLocalIpAddresses() }
     val primaryIp = localIps.firstOrNull() ?: "127.0.0.1"
-    val boundPort = manager.getServerPort()
+    val boundPort by manager.serverPort.collectAsState()
     val displayPort = if (boundPort > 0) boundPort else settings.port
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberBlurBackdrop()
@@ -187,7 +187,8 @@ fun ReceiveScreen(
                 items(incomingSessions, key = { it.sessionId }) { session ->
                     TransferSessionCard(
                         session = session,
-                        onCancel = { manager.cancelTransfer(session.sessionId) }
+                        onCancel = { manager.cancelTransfer(session.sessionId) },
+                        onAccept = { manager.acceptAllIncomingTransfer(session.sessionId) }
                     )
                 }
             } else {

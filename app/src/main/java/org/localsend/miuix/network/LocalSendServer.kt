@@ -304,8 +304,29 @@ class LocalSendServer(
         }
     }
 
+    /** 单文件到达终态：统一落状态、收敛进度与错误信息，再结算会话并通知界面。 */
+    private fun finishUploadFile(
+        session: TransferSession,
+        sessionId: String,
+        fileItem: FileItem,
+        status: TransferStatus,
+        error: String?
+    ) {
+        fileItem.status = status
+        fileItem.error = error
+        if (status == TransferStatus.Completed) {
+            fileItem.progress = 1f
+            fileItem.bytesTransferred = fileItem.size
+        } else {
+            fileItem.progress = 0f
+        }
+        checkSessionFinished(session, sessionId)
+        onSessionUpdated(session)
+    }
+
+    /** 服务端真实监听端口；0 表示尚未启动（端口可能被占用而顺延，消费方必须用真实值而非请求值）。 */
     @Volatile
-    private var boundPort: Int = 53317
+    private var boundPort: Int = 0
 
     fun getBoundPort(): Int = boundPort
 
@@ -451,6 +472,7 @@ class LocalSendServer(
             } catch (ignored: Exception) {}
             engine = null
             isStarting = false
+            boundPort = 0
             activeSessions.clear()
             sessionTokens.clear()
             requestHits.clear()
@@ -1469,12 +1491,18 @@ class LocalSendServer(
                         )
                     )
                 } else {
+                    // 接收方主动取消与用户显式拒绝共用 403，但文案必须可区分：
+                    // 发送方据 CANCELED_BY_RECEIVER 提示“对方已取消”，否则会被当成误导性的令牌/来源错误
+                    val canceledByReceiver = session.status == TransferStatus.Canceled
                     session.status = TransferStatus.Canceled
                     session.endTime = System.currentTimeMillis()
                     activeSessions.remove(sessionId)
                     sessionTokens.remove(sessionId)
                     onSessionUpdated(session)
-                    call.respond(HttpStatusCode.Forbidden, mapOf("message" to "Transfer declined by user"))
+                    call.respond(
+                        HttpStatusCode.Forbidden,
+                        mapOf("message" to prepareUploadRejectionMessage(canceledByReceiver))
+                    )
                 }
             }
 
@@ -1582,21 +1610,12 @@ class LocalSendServer(
                     // 发送方声明了 sha256 且校验失败：删除已写入文件并按规范回 422
                     if (fileItem.expectedSha256 != null && fileItem.expectedSha256 != checksum) {
                         deleteSavedFile(fileItem, saveTarget)
-                        fileItem.status = TransferStatus.Failed
-                        fileItem.progress = 0f
-                        fileItem.error = "CHECKSUM_MISMATCH"
-                        checkSessionFinished(session, sessionId)
-                        onSessionUpdated(session)
+                        finishUploadFile(session, sessionId, fileItem, TransferStatus.Failed, "CHECKSUM_MISMATCH")
                         call.respond(HttpStatusCode.UnprocessableEntity, "CHECKSUM_MISMATCH")
                         return@post
                     }
 
-                    fileItem.status = TransferStatus.Completed
-                    fileItem.progress = 1f
-                    fileItem.bytesTransferred = fileItem.size
-
-                    checkSessionFinished(session, sessionId)
-                    onSessionUpdated(session)
+                    finishUploadFile(session, sessionId, fileItem, TransferStatus.Completed, null)
 
                     getUploadResponseHeaders(call.request.origin.version).forEach { (name, value) ->
                         call.response.header(name, value)
@@ -1605,11 +1624,7 @@ class LocalSendServer(
                 } catch (e: Throwable) {
                     deleteSavedFile(fileItem, saveTarget)
                     if (session.status == TransferStatus.Canceled) {
-                        fileItem.status = TransferStatus.Canceled
-                        fileItem.progress = 0f
-                        fileItem.error = null
-                        checkSessionFinished(session, sessionId)
-                        onSessionUpdated(session)
+                        finishUploadFile(session, sessionId, fileItem, TransferStatus.Canceled, null)
                         runCatching {
                             call.respond(
                                 HttpStatusCode.Forbidden,
@@ -1618,12 +1633,9 @@ class LocalSendServer(
                         }
                     } else {
                         e.printStackTrace()
-                        fileItem.status = TransferStatus.Failed
-                        fileItem.progress = 0f
-                        fileItem.error = e.message ?: "Upload failed"
-                        checkSessionFinished(session, sessionId)
-                        onSessionUpdated(session)
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("message" to (e.message ?: "Upload failed")))
+                        val failureMessage = e.message ?: "Upload failed"
+                        finishUploadFile(session, sessionId, fileItem, TransferStatus.Failed, failureMessage)
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("message" to failureMessage))
                     }
                 }
             }
@@ -1645,6 +1657,10 @@ class LocalSendServer(
     }
 
     companion object {
+        /** prepare-upload 被拒时的 403 文案：主动取消与显式拒绝必须可区分，发送方据此选择提示语义。 */
+        internal fun prepareUploadRejectionMessage(canceledByReceiver: Boolean): String =
+            if (canceledByReceiver) ProtocolMessages.CANCELED_BY_RECEIVER else ProtocolMessages.DECLINED_BY_USER
+
         val FORBIDDEN_HTTP2_HEADERS = setOf(
             "connection",
             "keep-alive",

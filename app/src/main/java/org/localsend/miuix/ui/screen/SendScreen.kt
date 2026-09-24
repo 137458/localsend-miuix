@@ -24,7 +24,6 @@ import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Image
@@ -175,7 +174,7 @@ fun SendScreen(
                     color = if (backdrop != null) Color.Transparent else colorScheme.surface,
                     actions = {
                         IconButton(onClick = onManualIp) {
-                            Icon(imageVector = Icons.Default.Dialpad, contentDescription = stringResource(R.string.action_input_ip))
+                            Icon(imageVector = AppIcons.Dialpad, contentDescription = stringResource(R.string.action_input_ip))
                         }
                         IconButton(
                             onClick = {

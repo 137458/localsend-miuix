@@ -55,7 +55,8 @@ fun WebShareDialog(
     val primaryIp = localIps.firstOrNull() ?: "127.0.0.1"
     val scheme = if (settings.useHttps) "https" else "http"
     // 端口被占用时服务端会自动顺延，必须用真实监听端口生成链接，否则二维码/网址指向未监听的端口
-    val port = manager.getServerPort().takeIf { it > 0 } ?: settings.port
+    val boundPort by manager.serverPort.collectAsState()
+    val port = boundPort.takeIf { it > 0 } ?: settings.port
     val shareUrl = "$scheme://$primaryIp:$port"
 
     WindowBottomSheet(

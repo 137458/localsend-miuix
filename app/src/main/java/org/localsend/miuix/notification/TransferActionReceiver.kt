@@ -12,21 +12,19 @@ import org.localsend.miuix.manager.LocalSendManager
 class TransferActionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent?) {
-        if (intent == null) return
-        val action = intent.action
+        val action = intent?.action ?: return
         val sessionId = intent.getStringExtra(EXTRA_SESSION_ID)
+        if (sessionId.isNullOrEmpty()) return
+        val manager = LocalSendManager.getInstance() ?: return
 
-        if (action == ACTION_CANCEL_TRANSFER && !sessionId.isNullOrEmpty()) {
-            LocalSendManager.getInstance()?.cancelTransfer(sessionId)
-            TransferNotifier.cancelSessionNotification(context, sessionId)
-        } else if (action == ACTION_ACCEPT_TRANSFER && !sessionId.isNullOrEmpty()) {
+        when (action) {
+            ACTION_CANCEL_TRANSFER -> manager.cancelTransfer(sessionId)
             // 通知栏快捷操作：直接接受全部文件（等价于弹窗中的"接收"）
-            LocalSendManager.getInstance()?.acceptIncomingTransfer(sessionId, null)
-            TransferNotifier.cancelSessionNotification(context, sessionId)
-        } else if (action == ACTION_DECLINE_TRANSFER && !sessionId.isNullOrEmpty()) {
-            LocalSendManager.getInstance()?.declineIncomingTransfer(sessionId)
-            TransferNotifier.cancelSessionNotification(context, sessionId)
+            ACTION_ACCEPT_TRANSFER -> manager.acceptAllIncomingTransfer(sessionId)
+            ACTION_DECLINE_TRANSFER -> manager.declineIncomingTransfer(sessionId)
+            else -> return
         }
+        TransferNotifier.cancelSessionNotification(context, sessionId)
     }
 
     companion object {

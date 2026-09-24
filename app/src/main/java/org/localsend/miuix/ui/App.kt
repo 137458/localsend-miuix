@@ -131,6 +131,9 @@ fun App(manager: LocalSendManager) {
 
     // 4. Dialog Visibility States
     var showRenameDialog by remember { mutableStateOf(false) }
+    // 被用户关闭弹窗（返回键/点击外部）的接收请求：关闭不等于拒绝，请求仍在等待处理，
+    // 因此只记住这个会话不再弹窗，接收页卡片与通知栏仍可完成接收或拒绝
+    var dismissedIncomingSessionId by remember { mutableStateOf<String?>(null) }
     var showSendTextDialog by remember { mutableStateOf(false) }
     var showAddContentSheet by remember { mutableStateOf(false) }
     var showPortDialog by remember { mutableStateOf(false) }
@@ -461,9 +464,16 @@ fun App(manager: LocalSendManager) {
 
         // Global Overlay Dialogs & BottomSheets
         IncomingTransferDialog(
-            session = pendingIncomingSession,
+            session = pendingIncomingSession?.takeIf { it.sessionId != dismissedIncomingSessionId },
             onAccept = { selectedIds ->
-                pendingIncomingSession?.let { manager.acceptIncomingTransfer(it.sessionId, selectedIds) }
+                pendingIncomingSession?.let { session ->
+                    // 弹窗以 null 表示“不限定文件”（打开链接后全部接收），此处换成语义明确的全部接收入口
+                    if (selectedIds == null) {
+                        manager.acceptAllIncomingTransfer(session.sessionId)
+                    } else {
+                        manager.acceptIncomingTransfer(session.sessionId, selectedIds)
+                    }
+                }
             },
             onAcceptAndCopy = {
                 pendingIncomingSession?.let { session ->
@@ -473,11 +483,14 @@ fun App(manager: LocalSendManager) {
                         clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", text))
                         Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                     }
-                    manager.acceptIncomingTransfer(session.sessionId)
+                    manager.acceptAllIncomingTransfer(session.sessionId)
                 }
             },
             onDecline = {
                 pendingIncomingSession?.let { manager.declineIncomingTransfer(it.sessionId) }
+            },
+            onDismiss = {
+                dismissedIncomingSessionId = pendingIncomingSession?.sessionId
             }
         )
 
@@ -495,11 +508,8 @@ fun App(manager: LocalSendManager) {
             show = showPortDialog,
             initialPort = settings.port,
             onDismissRequest = { showPortDialog = false },
-            onConfirm = { newPort ->
-                if (manager.applyPortChange(newPort)) {
-                    Toast.makeText(context, context.getString(R.string.toast_port_updated, newPort), Toast.LENGTH_SHORT).show()
-                }
-            }
+            // 重启是异步的且端口可能顺延，更新结果由 manager 依据真实监听端口统一提示，避免这里先报出未生效的请求端口
+            onConfirm = { newPort -> manager.applyPortChange(newPort) }
         )
 
         SendTextDialog(

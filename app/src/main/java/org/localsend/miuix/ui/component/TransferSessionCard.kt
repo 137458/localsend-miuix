@@ -71,30 +71,86 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 @Composable
 fun TransferSessionCard(
     session: TransferSession,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onAccept: (() -> Unit)? = null
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             if (session.isTextMessage) {
-                TextMessageCardContent(session = session, onCancel = onCancel)
+                TextMessageCardContent(session = session, onCancel = onCancel, onAccept = onAccept)
             } else {
                 FileTransferCardContent(
                     session = session,
                     isExpanded = isExpanded,
                     onToggleExpanded = { isExpanded = !isExpanded },
-                    onCancel = onCancel
+                    onCancel = onCancel,
+                    onAccept = onAccept
                 )
             }
         }
     }
 }
 
+/**
+ * 待批准会话的「接收」按钮：仅在卡片提供接收回调时出现，尺寸与相邻按钮保持一致。
+ */
+@Composable
+private fun AcceptIconButton(
+    onAccept: () -> Unit,
+    modifier: Modifier = Modifier,
+    iconModifier: Modifier = Modifier
+) {
+    IconButton(onClick = onAccept, modifier = modifier) {
+        Icon(
+            imageVector = AppIcons.Check,
+            contentDescription = stringResource(R.string.btn_accept),
+            tint = MiuixTheme.colorScheme.primary,
+            modifier = iconModifier
+        )
+    }
+}
+
+/**
+ * 文件传输状态文案：等待确认、失败与取消三态收发措辞一致，统一收敛在此处；
+ * 传输中与完成态因收发语义不同由调用方传入。
+ */
+@Composable
+private fun fileStatusText(
+    session: TransferSession,
+    inProgressText: String,
+    completedText: String
+): String = when (session.status) {
+    TransferStatus.WaitingApproval -> stringResource(R.string.session_waiting_peer)
+    TransferStatus.InProgress -> inProgressText
+    TransferStatus.Completed -> completedText
+    TransferStatus.Failed -> stringResource(R.string.session_transfer_failed, session.errorMessage ?: stringResource(R.string.session_unknown_error))
+    TransferStatus.Canceled -> stringResource(R.string.session_canceled)
+}
+
+/**
+ * 文件传输状态文案颜色：失败与部分失败统一用错误色、等待确认用主色；
+ * 完成态与其余状态的配色收件与发件卡片不同，由调用方传入。
+ */
+@Composable
+private fun fileStatusColor(
+    session: TransferSession,
+    defaultColor: Color,
+    completedColor: Color = defaultColor
+): Color = when {
+    session.status == TransferStatus.Failed -> MiuixTheme.colorScheme.error
+    session.isPartialFailure -> MiuixTheme.colorScheme.error
+    session.status == TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
+    session.status == TransferStatus.Completed -> completedColor
+    else -> defaultColor
+}
+
 @Composable
 private fun TextMessageCardContent(
     session: TransferSession,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onAccept: (() -> Unit)?
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: stringResource(R.string.notif_plain_text_message)
@@ -153,12 +209,18 @@ private fun TextMessageCardContent(
         }
 
         if (session.status == TransferStatus.InProgress || session.status == TransferStatus.WaitingApproval) {
-            IconButton(onClick = onCancel) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = stringResource(R.string.action_cancel_transfer),
-                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 待批准的自收请求可直接在卡片上接收，无需回到弹窗
+                if (session.isIncoming && session.status == TransferStatus.WaitingApproval && onAccept != null) {
+                    AcceptIconButton(onAccept = onAccept)
+                }
+                IconButton(onClick = onCancel) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel_transfer),
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                }
             }
         }
     }
@@ -266,7 +328,8 @@ private fun FileTransferCardContent(
     session: TransferSession,
     isExpanded: Boolean,
     onToggleExpanded: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onAccept: (() -> Unit)?
 ) {
     var previewInitialIndex by remember { mutableIntStateOf(-1) }
 
@@ -308,22 +371,15 @@ private fun FileTransferCardContent(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = when (session.status) {
-                        TransferStatus.WaitingApproval -> stringResource(R.string.session_waiting_peer)
-                        TransferStatus.InProgress -> stringResource(R.string.session_files_in_progress, session.files.size, session.formattedTotalSize)
+                    text = fileStatusText(
+                        session = session,
+                        inProgressText = stringResource(R.string.session_files_in_progress, session.files.size, session.formattedTotalSize),
                         // 部分文件失败时会话仍判完成，用聚合说明替换"传输完成"，避免用户以为文件已收齐
-                        TransferStatus.Completed -> session.errorMessage?.takeIf { it.isNotBlank() }
+                        completedText = session.errorMessage?.takeIf { it.isNotBlank() }
                             ?: stringResource(R.string.session_files_completed, session.files.size, session.formattedTotalSize)
-                        TransferStatus.Failed -> stringResource(R.string.session_transfer_failed, session.errorMessage ?: stringResource(R.string.session_unknown_error))
-                        TransferStatus.Canceled -> stringResource(R.string.session_canceled)
-                    },
+                    ),
                     style = MiuixTheme.textStyles.footnote1,
-                    color = when {
-                        session.status == TransferStatus.Failed -> MiuixTheme.colorScheme.error
-                        session.status == TransferStatus.Completed && !session.errorMessage.isNullOrBlank() -> MiuixTheme.colorScheme.error
-                        session.status == TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
-                        else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    },
+                    color = fileStatusColor(session, defaultColor = MiuixTheme.colorScheme.onSurfaceVariantSummary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -331,12 +387,18 @@ private fun FileTransferCardContent(
         }
 
         if (session.status == TransferStatus.InProgress || session.status == TransferStatus.WaitingApproval) {
-            IconButton(onClick = onCancel) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = stringResource(R.string.action_cancel_transfer),
-                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 待批准的自收请求可直接在卡片上接收，无需回到弹窗
+                if (session.isIncoming && session.status == TransferStatus.WaitingApproval && onAccept != null) {
+                    AcceptIconButton(onAccept = onAccept)
+                }
+                IconButton(onClick = onCancel) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel_transfer),
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                }
             }
         }
     }
@@ -601,7 +663,8 @@ private fun FileDetailItem(
 fun InlineTransferProgress(
     session: TransferSession,
     onCancel: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAccept: (() -> Unit)? = null
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
@@ -626,7 +689,8 @@ fun InlineTransferProgress(
                 session = session,
                 isExpanded = isExpanded,
                 onToggleExpanded = { isExpanded = !isExpanded },
-                onCancel = onCancel
+                onCancel = onCancel,
+                onAccept = onAccept
             )
         }
     }
@@ -721,7 +785,8 @@ private fun InlineFileTransferProgress(
     session: TransferSession,
     isExpanded: Boolean,
     onToggleExpanded: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onAccept: (() -> Unit)?
 ) {
     var previewInitialIndex by remember { mutableIntStateOf(-1) }
 
@@ -768,33 +833,26 @@ private fun InlineFileTransferProgress(
                 )
             }
             Spacer(modifier = Modifier.width(6.dp))
+            val currentFile = session.currentFile
+            val inProgressText = when {
+                currentFile != null && session.files.size > 1 -> stringResource(R.string.session_transferring_indexed, session.currentFileIndex + 1, session.files.size, currentFile.name)
+                currentFile != null -> stringResource(R.string.session_transferring_single, currentFile.name)
+                else -> stringResource(R.string.session_preparing_transfer)
+            }
             Text(
-                text = when (session.status) {
-                    TransferStatus.WaitingApproval -> stringResource(R.string.session_waiting_peer)
-                    TransferStatus.InProgress -> {
-                        val current = session.currentFile
-                        if (current != null && session.files.size > 1) {
-                            stringResource(R.string.session_transferring_indexed, session.currentFileIndex + 1, session.files.size, current.name)
-                        } else if (current != null) {
-                            stringResource(R.string.session_transferring_single, current.name)
-                        } else {
-                            stringResource(R.string.session_preparing_transfer)
-                        }
-                    }
+                text = fileStatusText(
+                    session = session,
+                    inProgressText = inProgressText,
                     // 部分文件失败时会话仍判完成，用聚合说明替换"传输完成"，避免用户以为文件已送达
-                    TransferStatus.Completed -> session.errorMessage?.takeIf { it.isNotBlank() }
+                    completedText = session.errorMessage?.takeIf { it.isNotBlank() }
                         ?: stringResource(R.string.session_transfer_complete_check, session.files.size, session.formattedTotalSize)
-                    TransferStatus.Failed -> stringResource(R.string.session_transfer_failed, session.errorMessage ?: stringResource(R.string.session_unknown_error))
-                    TransferStatus.Canceled -> stringResource(R.string.session_canceled)
-                },
+                ),
                 style = MiuixTheme.textStyles.footnote1,
-                color = when {
-                    session.status == TransferStatus.Failed -> MiuixTheme.colorScheme.error
-                    session.status == TransferStatus.Completed && !session.errorMessage.isNullOrBlank() -> MiuixTheme.colorScheme.error
-                    session.status == TransferStatus.Completed -> MiuixTheme.colorScheme.primary
-                    session.status == TransferStatus.WaitingApproval -> MiuixTheme.colorScheme.primary
-                    else -> MiuixTheme.colorScheme.onSurface
-                },
+                color = fileStatusColor(
+                    session,
+                    defaultColor = MiuixTheme.colorScheme.onSurface,
+                    completedColor = MiuixTheme.colorScheme.primary
+                ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -802,13 +860,23 @@ private fun InlineFileTransferProgress(
         }
 
         if (session.status == TransferStatus.InProgress || session.status == TransferStatus.WaitingApproval) {
-            IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = stringResource(R.string.action_cancel_transfer),
-                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.size(16.dp)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 待批准的自收请求可直接在卡片上接收，无需回到弹窗
+                if (session.isIncoming && session.status == TransferStatus.WaitingApproval && onAccept != null) {
+                    AcceptIconButton(
+                        onAccept = onAccept,
+                        modifier = Modifier.size(30.dp),
+                        iconModifier = Modifier.size(16.dp)
+                    )
+                }
+                IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.action_cancel_transfer),
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }

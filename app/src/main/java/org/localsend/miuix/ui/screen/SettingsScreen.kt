@@ -3,7 +3,6 @@ package org.localsend.miuix.ui.screen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,8 +26,8 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.ui.component.CertFingerprintDialog
+import org.localsend.miuix.ui.component.DialogButtonRow
 import org.localsend.miuix.ui.component.PinDialog
-import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -323,7 +322,11 @@ fun SettingsScreen(
         show = showCertDialog,
         fingerprint = if (settings.useHttps) manager.getLocalDevice().fingerprint else "",
         onDismissRequest = { showCertDialog = false },
-        onRegenerate = { showRegenerateConfirm = true }
+        // 先收起证书弹窗再弹二次确认，避免两个弹窗叠层同时为 true
+        onRegenerate = {
+            showCertDialog = false
+            showRegenerateConfirm = true
+        }
     )
 
     // 重新生成证书会让所有已记录该指纹的设备下次校验失败，属于破坏性操作，需二次确认
@@ -344,32 +347,20 @@ fun SettingsScreen(
                     color = MiuixTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(20.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Button(
-                        onClick = { showRegenerateConfirm = false },
-                        colors = ButtonDefaults.buttonColors(),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(stringResource(R.string.btn_cancel))
-                    }
-                    Button(
-                        onClick = {
-                            showRegenerateConfirm = false
-                            showCertDialog = false
-                            manager.regenerateCertificate()
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            color = MiuixTheme.colorScheme.error,
-                            contentColor = MiuixTheme.colorScheme.onError
-                        ),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(stringResource(R.string.btn_confirm))
-                    }
-                }
+                DialogButtonRow(
+                    secondaryText = stringResource(R.string.btn_cancel),
+                    onSecondary = { showRegenerateConfirm = false },
+                    primaryText = stringResource(R.string.btn_confirm),
+                    onPrimary = {
+                        showRegenerateConfirm = false
+                        showCertDialog = false
+                        manager.regenerateCertificate()
+                    },
+                    primaryColors = ButtonDefaults.buttonColors(
+                        color = MiuixTheme.colorScheme.error,
+                        contentColor = MiuixTheme.colorScheme.onError
+                    )
+                )
             }
         }
     }

@@ -51,6 +51,9 @@ object LocalSendRoutes {
 /** 协议层固定提示文本：接收方主动取消时回传，发送方据此区分取消与令牌/权限拒绝。 */
 object ProtocolMessages {
     const val CANCELED_BY_RECEIVER = "Transfer canceled by receiver"
+
+    /** 用户显式拒绝（超时或点“拒绝”）：与主动取消共用 403，但文案必须可区分。 */
+    const val DECLINED_BY_USER = "Transfer declined by user"
 }
 
 object AppActions {

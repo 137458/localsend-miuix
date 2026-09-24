@@ -4,8 +4,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
@@ -46,6 +48,8 @@ object AppIcons {
     val History: ImageVector = Icons.Default.History
     val Star: ImageVector = Icons.Default.Star
     val StarBorder: ImageVector = Icons.Default.StarBorder
+    val Dialpad: ImageVector = Icons.Default.Dialpad
+    val Check: ImageVector = Icons.Default.Check
 
     fun getDeviceIcon(type: DeviceType): ImageVector {
         return when (type) {

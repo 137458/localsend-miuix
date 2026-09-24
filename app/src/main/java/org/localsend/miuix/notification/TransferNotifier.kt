@@ -178,16 +178,20 @@ object TransferNotifier {
         } catch (_: Exception) {}
     }
 
+    /** 由会话 ID 派生的通知 ID 后缀，供接收/发送两个 ID 段共用。 */
+    private fun sessionNotifSuffix(sessionId: String): Int =
+        (sessionId.hashCode() and 0x7FFF) % 100
+
     private fun sessionNotifId(session: TransferSession): Int {
         val base = if (session.isIncoming) NOTIF_ID_RECEIVE_BASE else NOTIF_ID_SEND_BASE
-        return base + (session.sessionId.hashCode() and 0x7FFF) % 100
+        return base + sessionNotifSuffix(session.sessionId)
     }
 
     /** 通知快捷操作后清除该会话的通知（收发两个通道的 ID 一并清理，避免残留）。 */
     fun cancelSessionNotification(context: Context, sessionId: String) {
         try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val suffix = (sessionId.hashCode() and 0x7FFF) % 100
+            val suffix = sessionNotifSuffix(sessionId)
             nm.cancel(NOTIF_ID_RECEIVE_BASE + suffix)
             nm.cancel(NOTIF_ID_SEND_BASE + suffix)
         } catch (ignored: Exception) {
@@ -206,24 +210,26 @@ object TransferNotifier {
         )
     }
 
-    private fun cancelPendingIntent(context: Context, sessionId: String): PendingIntent {
+    /** 构造指向传输动作广播接收器的 PendingIntent，供通知快捷操作复用。 */
+    private fun receiverPendingIntent(context: Context, action: String, sessionId: String): PendingIntent {
         val intent = Intent(context, TransferActionReceiver::class.java).apply {
-            action = TransferActionReceiver.ACTION_CANCEL_TRANSFER
+            this.action = action
             putExtra(TransferActionReceiver.EXTRA_SESSION_ID, sessionId)
         }
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
         return PendingIntent.getBroadcast(context, sessionId.hashCode(), intent, flags)
     }
 
+    private fun cancelPendingIntent(context: Context, sessionId: String): PendingIntent =
+        receiverPendingIntent(context, TransferActionReceiver.ACTION_CANCEL_TRANSFER, sessionId)
+
     /** 接收请求通知上的快捷操作：直接允许或拒绝，避免必须打开应用才能处理。 */
-    private fun decisionPendingIntent(context: Context, sessionId: String, accept: Boolean): PendingIntent {
-        val intent = Intent(context, TransferActionReceiver::class.java).apply {
-            action = if (accept) TransferActionReceiver.ACTION_ACCEPT_TRANSFER else TransferActionReceiver.ACTION_DECLINE_TRANSFER
-            putExtra(TransferActionReceiver.EXTRA_SESSION_ID, sessionId)
-        }
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
-        return PendingIntent.getBroadcast(context, sessionId.hashCode(), intent, flags)
-    }
+    private fun decisionPendingIntent(context: Context, sessionId: String, accept: Boolean): PendingIntent =
+        receiverPendingIntent(
+            context,
+            if (accept) TransferActionReceiver.ACTION_ACCEPT_TRANSFER else TransferActionReceiver.ACTION_DECLINE_TRANSFER,
+            sessionId
+        )
 
     fun notifyIncoming(context: Context, session: TransferSession) {
         if (!isAllowed(context)) return
@@ -248,12 +254,12 @@ object TransferNotifier {
             .setContentIntent(appPendingIntent(context))
             .setAutoCancel(true)
             .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
+                R.drawable.ic_stat_decline,
                 context.getString(R.string.btn_decline),
                 decisionPendingIntent(context, session.sessionId, accept = false)
             )
             .addAction(
-                android.R.drawable.ic_menu_save,
+                R.drawable.ic_stat_accept,
                 context.getString(R.string.btn_accept),
                 decisionPendingIntent(context, session.sessionId, accept = true)
             )
@@ -297,7 +303,7 @@ object TransferNotifier {
                     } else {
                         // 部分文件失败时会话仍判完成，用聚合说明替代"全部成功"文案，避免用户以为文件已收齐
                         context.getString(R.string.notif_receive_completed_files_title) to (
-                            session.errorMessage?.takeIf { it.isNotBlank() }
+                            session.errorMessage?.takeIf { session.isPartialFailure }
                                 ?: context.getString(R.string.notif_receive_completed_files_desc, session.device.alias, session.files.size)
                             )
                     }

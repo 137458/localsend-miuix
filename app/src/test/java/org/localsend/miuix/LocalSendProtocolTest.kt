@@ -2,9 +2,11 @@ package org.localsend.miuix
 
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.localsend.miuix.core.ProtocolMessages
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
 import org.localsend.miuix.model.DeviceType
@@ -12,6 +14,7 @@ import org.localsend.miuix.model.FileDto
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.PrepareUploadRequestDto
 import org.localsend.miuix.model.PrepareUploadResponseDto
+import org.localsend.miuix.network.LocalSendServer
 
 class LocalSendProtocolTest {
 
@@ -71,6 +74,15 @@ class LocalSendProtocolTest {
         val resDecoded = json.decodeFromString<PrepareUploadResponseDto>(resEncoded)
         assertEquals("session-123", resDecoded.sessionId)
         assertEquals("token-abc", resDecoded.files["file-uuid-1"])
+    }
+
+    @Test
+    fun declineMessageCannotBeMistakenForReceiverCancel() {
+        // 发送方在 403 文案里检索取消标记来决定提示语义：显式拒绝不得命中该标记，否则会误报“对方已取消”
+        val canceled = LocalSendServer.prepareUploadRejectionMessage(canceledByReceiver = true)
+        val declined = LocalSendServer.prepareUploadRejectionMessage(canceledByReceiver = false)
+        assertTrue(canceled.contains(ProtocolMessages.CANCELED_BY_RECEIVER))
+        assertFalse(declined.contains(ProtocolMessages.CANCELED_BY_RECEIVER))
     }
 
     @Test

@@ -170,6 +170,10 @@ class LocalSendManager(private val context: Context) {
     private val _activeSessions = MutableStateFlow<List<TransferSession>>(emptyList())
     val activeSessions: StateFlow<List<TransferSession>> = _activeSessions.asStateFlow()
 
+    // 服务端真实监听端口（0 = 未启动）。端口被占用顺延时此处与设置项一致，界面据此生成链接而非使用请求值
+    private val _serverPort = MutableStateFlow(0)
+    val serverPort: StateFlow<Int> = _serverPort.asStateFlow()
+
     private val _transferHistory = MutableStateFlow<List<TransferHistoryItem>>(emptyList())
     val transferHistory: StateFlow<List<TransferHistoryItem>> = _transferHistory.asStateFlow()
 
@@ -225,6 +229,9 @@ class LocalSendManager(private val context: Context) {
 
     private val incomingApprovalDeferreds = ConcurrentHashMap<String, CompletableDeferred<IncomingDecision>>()
     private val notifiedIncoming = ConcurrentHashMap.newKeySet<String>()
+
+    /** 串行化服务端重启（改端口 / 改 HTTPS 都会重启），避免两次变更并行时互相覆盖端口回写。 */
+    private val serverRestartMutex = Mutex()
 
     private val discoveryService = DiscoveryService(
         context = context,
@@ -297,12 +304,10 @@ class LocalSendManager(private val context: Context) {
         devicePruneJob?.cancel()
         devicePruneJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
-                delay(10_000L)
-                synchronized(deviceDirectory) {
-                    val pruned = deviceDirectory.prune()
-                    if (pruned.size != _nearbyDevices.value.size) {
-                        _nearbyDevices.value = pruned
-                    }
+                delay(DEVICE_PRUNE_INTERVAL_MS)
+                val pruned = deviceDirectory.prune()
+                if (pruned.size != _nearbyDevices.value.size) {
+                    _nearbyDevices.value = pruned
                 }
             }
         }
@@ -390,8 +395,14 @@ class LocalSendManager(private val context: Context) {
         }
     }
 
-    fun acceptIncomingTransfer(sessionId: String, selectedFileIds: Set<String>? = null) {
+    /** 弹窗“接收”：仅接收勾选的文件。 */
+    fun acceptIncomingTransfer(sessionId: String, selectedFileIds: Set<String>) {
         incomingApprovalDeferreds[sessionId]?.complete(IncomingDecision.accept(selectedFileIds))
+    }
+
+    /** 全部接收：接收页卡片与通知栏快捷操作使用。 */
+    fun acceptAllIncomingTransfer(sessionId: String) {
+        incomingApprovalDeferreds[sessionId]?.complete(IncomingDecision.AcceptAll)
     }
 
     fun declineIncomingTransfer(sessionId: String) {
@@ -875,6 +886,9 @@ class LocalSendManager(private val context: Context) {
         if (session == null || session.isIncoming) {
             // 接收侧取消必须同时终止本地服务端的接收循环，否则会话只被标记为取消，文件仍会继续写盘
             server.cancelIncomingSession(sessionId)
+            // 尚在等待批准的请求没有接收循环可终止，必须立刻终结挂起的审批：
+            // 否则发送方要白等到 60 秒超时才收到 403，且拿不到“已取消”的明确提示
+            incomingApprovalDeferreds[sessionId]?.complete(IncomingDecision.Rejected)
         } else {
             scope.launch(Dispatchers.IO) {
                 val remoteId = remoteSessionIds[sessionId] ?: sessionId
@@ -1076,8 +1090,6 @@ class LocalSendManager(private val context: Context) {
         updateSettings { it.copy(downloadTreeUri = uri.toString(), downloadDisplay = display, downloadPath = display) }
     }
 
-    fun getServerPort(): Int = server.getBoundPort()
-
     fun applyPortChange(newPort: Int): Boolean {
         if (newPort == _settings.value.port) return true
         if (hasActiveIncomingTransfer()) {
@@ -1085,11 +1097,7 @@ class LocalSendManager(private val context: Context) {
             return false
         }
         updateSettings { it.copy(port = newPort) }
-        scope.launch(Dispatchers.IO) {
-            server.stop()
-            server.start()
-            syncBoundPortFromServer()
-        }
+        scope.launch(Dispatchers.IO) { restartServerAndSyncPort(notifyUser = true) }
         return true
     }
 
@@ -1100,12 +1108,18 @@ class LocalSendManager(private val context: Context) {
             return
         }
         updateSettings { it.copy(useHttps = useHttps) }
-        scope.launch(Dispatchers.IO) {
-            server.stop()
-            server.start()
-            syncBoundPortFromServer()
-            scope.launch { discoveryService.sendAnnouncement() }
-        }
+        scope.launch(Dispatchers.IO) { restartServerAndSyncPort(notifyUser = false) }
+    }
+
+    /**
+     * 端口与协议变更都要重启服务端：串行化避免两次变更互相覆盖回写，
+     * 重启后统一同步真实监听端口并重新广播，否则对端仍会按旧端口连接。
+     */
+    private suspend fun restartServerAndSyncPort(notifyUser: Boolean) = serverRestartMutex.withLock {
+        server.stop()
+        server.start()
+        syncBoundPortFromServer(notifyUser)
+        discoveryService.sendAnnouncement()
     }
 
     /**
@@ -1116,11 +1130,19 @@ class LocalSendManager(private val context: Context) {
         it.isIncoming && (it.status == TransferStatus.InProgress || it.status == TransferStatus.WaitingApproval)
     }
 
-    /** 端口被占用时服务端会自动顺延，这里把真实监听端口回写为设置值，保证设置页与 Web Share 链接一致。 */
-    private fun syncBoundPortFromServer() {
+    /**
+     * 端口被占用时服务端会自动顺延，这里把真实监听端口回写为设置值，保证设置页与 Web Share 链接一致。
+     * [notifyUser] 仅在用户主动改端口时为 true：未顺延时也要给出确认提示，避免用户以为改动未生效。
+     */
+    private fun syncBoundPortFromServer(notifyUser: Boolean = false) {
         val boundPort = server.getBoundPort()
+        if (boundPort <= 0) return
+        _serverPort.value = boundPort
         val requestedPort = _settings.value.port
-        if (boundPort <= 0 || boundPort == requestedPort) return
+        if (boundPort == requestedPort) {
+            if (notifyUser) _sessionMessage.value = context.getString(R.string.toast_port_updated, boundPort)
+            return
+        }
         updateSettings { it.copy(port = boundPort) }
         _sessionMessage.value = context.getString(R.string.msg_port_occupied_fallback, requestedPort, boundPort)
     }
@@ -1166,6 +1188,9 @@ class LocalSendManager(private val context: Context) {
 
     companion object {
         private const val TAG = "LocalSendTransfer"
+
+        /** 离线设备清理轮询间隔：upsert 只在收包时被动清理，长时间无广播需定时兜底。 */
+        private const val DEVICE_PRUNE_INTERVAL_MS = 10_000L
 
         @Volatile
         private var instance: LocalSendManager? = null

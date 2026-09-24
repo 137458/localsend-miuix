@@ -216,8 +216,8 @@ class LocalSendClient(
                 msg.contains("eof") ||
                 msg.contains("broken pipe")
 
-            // 若是对端明确返回的业务拒绝（如 403 / 404 / 422 / 401），重试无意义，立即终止
-            if (lastError is PeerRejectedException || msg.contains("403") || msg.contains("404") || msg.contains("422") || msg.contains("401")) {
+            // 对端的业务级拒绝（403/404/422/401）统一由 uploadFileOnce 包装为该异常，命中即不再重试
+            if (lastError is PeerRejectedException) {
                 Log.w(TAG, "Upload rejected with terminal HTTP status, aborting retry: $msg")
                 break
             }

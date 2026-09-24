@@ -33,10 +33,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
 import org.localsend.miuix.model.TransferSession
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonColors
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Checkbox
@@ -507,28 +509,17 @@ fun CertFingerprintDialog(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = {
-                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Certificate Fingerprint", fingerprint))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(stringResource(R.string.dialog_cert_btn_copy))
-                }
-
-                Button(
-                    onClick = { onRegenerate() },
-                    colors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.error, contentColor = MiuixTheme.colorScheme.onError),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(stringResource(R.string.dialog_cert_btn_regenerate))
-                }
-            }
+            DialogButtonRow(
+                secondaryText = stringResource(R.string.dialog_cert_btn_copy),
+                onSecondary = {
+                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Certificate Fingerprint", fingerprint))
+                },
+                primaryText = stringResource(R.string.dialog_cert_btn_regenerate),
+                onPrimary = { onRegenerate() },
+                primaryColors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.error, contentColor = MiuixTheme.colorScheme.onError),
+                spacing = 8.dp
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -548,7 +539,8 @@ fun IncomingTransferDialog(
     session: TransferSession?,
     onAccept: (selectedFileIds: Set<String>?) -> Unit,
     onAcceptAndCopy: () -> Unit,
-    onDecline: () -> Unit
+    onDecline: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var selectedFileIds by remember(session?.sessionId) {
@@ -558,8 +550,9 @@ fun IncomingTransferDialog(
     WindowDialog(
         show = session != null,
         title = if (session?.isTextMessage == true) stringResource(R.string.dialog_incoming_text_title) else stringResource(R.string.dialog_incoming_files_title),
-        // 点击弹窗外部或返回键不再等同于拒绝：请求必须由用户显式选择，超时后才由系统判定为拒绝
-        onDismissRequest = {}
+        // 关闭弹窗（点击外部或返回键）只是收起提示，不等于拒绝：请求仍由系统保持待处理，
+        // 接收页卡片上的"接收"按钮与通知栏操作都还能继续处理，只有超时或用户显式拒绝才回 403。
+        onDismissRequest = onDismiss
     ) {
         if (session != null) {
             Column(
@@ -868,6 +861,37 @@ fun AddContentBottomSheet(
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+/** 对话框底部双按钮行：左侧次要操作、右侧主操作（可为危险色），供确认类弹窗复用。 */
+@Composable
+internal fun DialogButtonRow(
+    secondaryText: String,
+    onSecondary: () -> Unit,
+    primaryText: String,
+    onPrimary: () -> Unit,
+    primaryColors: ButtonColors = ButtonDefaults.buttonColors(),
+    spacing: Dp = 12.dp
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(spacing)
+    ) {
+        Button(
+            onClick = onSecondary,
+            colors = ButtonDefaults.buttonColors(),
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(secondaryText)
+        }
+        Button(
+            onClick = onPrimary,
+            colors = primaryColors,
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(primaryText)
         }
     }
 }

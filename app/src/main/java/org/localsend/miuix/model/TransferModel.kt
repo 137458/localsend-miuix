@@ -156,6 +156,13 @@ data class TransferSession(
     val isTextMessage: Boolean
         get() = files.size == 1 && files.first().isTextMessage
 
+    /**
+     * 部分文件失败：会话仍判完成（与官方 LocalSend 一致），由 [errorMessage] 携带失败说明。
+     * 界面与通知据此区分“全部成功”与“部分失败”，不再各自重复同一判定。
+     */
+    val isPartialFailure: Boolean
+        get() = status == TransferStatus.Completed && !errorMessage.isNullOrBlank()
+
     val singleTextMessageContent: String?
         get() = if (isTextMessage) files.first().textContent else null
 

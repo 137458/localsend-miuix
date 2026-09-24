@@ -20,10 +20,13 @@ class DeviceDirectory(
 
     fun snapshot(): List<Device> = devices
 
+    /** TTL 内仍存活的设备；upsert 与 prune 共用同一判定，避免两处漂移。 */
+    private fun aliveDevices(now: Long): List<Device> = devices.filter { now - it.lastSeen < ttlMs }
+
     @Synchronized
     fun upsert(device: Device): List<Device> {
         val now = clock()
-        val alive = devices.filter { now - it.lastSeen < ttlMs }
+        val alive = aliveDevices(now)
         val index = alive.indexOfFirst { isSameDevice(it, device) }
         devices = if (index < 0) {
             alive + device
@@ -54,7 +57,7 @@ class DeviceDirectory(
     @Synchronized
     fun prune(): List<Device> {
         val now = clock()
-        val alive = devices.filter { now - it.lastSeen < ttlMs }
+        val alive = aliveDevices(now)
         if (alive.size != devices.size) {
             devices = alive
         }
