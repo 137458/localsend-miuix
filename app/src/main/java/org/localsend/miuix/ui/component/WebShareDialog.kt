@@ -3,6 +3,8 @@ package org.localsend.miuix.ui.component
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +20,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,13 +56,15 @@ fun WebShareDialog(
     val context = LocalContext.current
 
     val isSharing = shares.isNotEmpty()
-    val localIps = NetworkUtils.getLocalIpAddresses()
-    val primaryIp = localIps.firstOrNull() ?: "127.0.0.1"
+    val localIps = remember { NetworkUtils.getLocalIpAddresses() }
+    var selectedIp by remember(localIps) {
+        mutableStateOf(localIps.firstOrNull() ?: "127.0.0.1")
+    }
     val scheme = if (settings.useHttps) "https" else "http"
     // 端口被占用时服务端会自动顺延，必须用真实监听端口生成链接，否则二维码/网址指向未监听的端口
     val boundPort by manager.serverPort.collectAsState()
     val port = boundPort.takeIf { it > 0 } ?: settings.port
-    val shareUrl = "$scheme://$primaryIp:$port"
+    val shareUrl = "$scheme://$selectedIp:$port"
 
     WindowBottomSheet(
         show = show,
@@ -112,6 +119,55 @@ fun WebShareDialog(
                 )
             }
 
+            if (localIps.size > 1) {
+                Card(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                ) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.webshare_network_interface),
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.padding(bottom = 6.dp),
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            localIps.forEach { ip ->
+                                val isSelected = ip == selectedIp
+                                val label =
+                                    when {
+                                        ip.startsWith("192.168.43.") -> "$ip (热点)"
+                                        ip == localIps.first() -> "$ip (推荐)"
+                                        else -> ip
+                                    }
+                                Button(
+                                    onClick = { selectedIp = ip },
+                                    colors = if (isSelected) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors(),
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MiuixTheme.textStyles.footnote1,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -138,15 +194,32 @@ fun WebShareDialog(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-
-                    Button(
-                        onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Web URL", shareUrl))
-                        },
-                        colors = ButtonDefaults.buttonColorsPrimary(),
-                    ) {
-                        Text(stringResource(R.string.btn_copy))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Button(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Web URL", shareUrl))
+                                Toast.makeText(context, context.getString(R.string.webshare_copied_toast), Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(),
+                        ) {
+                            Text(stringResource(R.string.btn_copy))
+                        }
+                        Button(
+                            onClick = {
+                                val sendIntent =
+                                    Intent(Intent.ACTION_SEND).apply {
+                                        putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                        type = "text/plain"
+                                    }
+                                val chooser = Intent.createChooser(sendIntent, null)
+                                context.startActivity(chooser)
+                            },
+                            colors = ButtonDefaults.buttonColorsPrimary(),
+                        ) {
+                            Text(stringResource(R.string.webshare_btn_share_url))
+                        }
                     }
                 }
             }

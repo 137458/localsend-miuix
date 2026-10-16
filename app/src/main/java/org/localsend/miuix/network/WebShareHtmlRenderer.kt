@@ -48,6 +48,58 @@ internal object WebShareHtmlRenderer {
         }
     }
 
+    private val PREVIEWABLE_MIME_PREFIXES = listOf("image/", "video/", "audio/", "text/")
+    private val PREVIEWABLE_EXACT_MIMES = setOf("application/json", "application/xml")
+    private val PREVIEWABLE_EXTENSIONS =
+        setOf(
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "gif",
+            "bmp",
+            "svg",
+            "mp4",
+            "webm",
+            "mov",
+            "mkv",
+            "mp3",
+            "flac",
+            "wav",
+            "ogg",
+            "m4a",
+            "aac",
+            "txt",
+            "md",
+            "json",
+            "kt",
+            "java",
+            "py",
+            "js",
+            "ts",
+            "html",
+            "css",
+            "xml",
+            "log",
+            "c",
+            "cpp",
+            "h",
+            "sh",
+            "yml",
+            "yaml",
+        )
+
+    internal fun isPreviewable(
+        mimeType: String,
+        fileName: String,
+    ): Boolean {
+        val lowerMime = mimeType.lowercase()
+        if (PREVIEWABLE_MIME_PREFIXES.any { lowerMime.startsWith(it) }) return true
+        if (lowerMime in PREVIEWABLE_EXACT_MIMES) return true
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        return ext.isNotEmpty() && ext in PREVIEWABLE_EXTENSIONS
+    }
+
     internal fun isSameIp(
         ip1: String,
         ip2: String,
@@ -107,9 +159,21 @@ internal object WebShareHtmlRenderer {
                     binaryFiles.joinToString("") { file ->
                         val downloadUrl = "${LocalSendRoutes.DOWNLOAD}?sessionId=${session?.sessionId}&fileId=${file.id}"
                         val iconSvg = getWebFileSvgIcon(file.mimeType, file.name)
+                        val canPreview = isPreviewable(file.mimeType, file.name)
+                        val previewBtnHtml =
+                            if (canPreview) {
+                                """
+                                <button type="button" class="btn btn-sec preview-btn" onclick="openPreview('$downloadUrl', '${escapeHtml(file.name)}', '${file.mimeType}')" style="margin-right:8px; padding:7px 12px;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    ${copy.preview}
+                                </button>
+                                """.trimIndent()
+                            } else {
+                                ""
+                            }
                         """
                         <div class="file-item">
-                            <div style="display:flex; align-items:center; gap:12px; max-width:70%;">
+                            <div style="display:flex; align-items:center; gap:12px; max-width:65%;">
                                 <div style="flex-shrink:0; display:flex; align-items:center;">
                                     $iconSvg
                                 </div>
@@ -118,10 +182,13 @@ internal object WebShareHtmlRenderer {
                                     <span class="file-meta">${file.formattedSize}</span>
                                 </div>
                             </div>
-                            <a class="btn btn-primary" href="$downloadUrl" download="${escapeHtml(file.name)}">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                                ${copy.download}
-                            </a>
+                            <div style="display:flex; align-items:center; flex-shrink:0;">
+                                $previewBtnHtml
+                                <a class="btn btn-primary" href="$downloadUrl" download="${escapeHtml(file.name)}">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    ${copy.download}
+                                </a>
+                            </div>
                         </div>
                         """.trimIndent()
                     }
@@ -335,6 +402,54 @@ internal object WebShareHtmlRenderer {
                     .dropzone-icon { display: flex; justify-content: center; margin-bottom: 8px; }
                     .dropzone-text { font-size: 14px; font-weight: 600; color: var(--primary); margin-bottom: 4px; }
                     .dropzone-hint { font-size: 12px; color: var(--text-sub); }
+                    .segmented-control {
+                        display: flex;
+                        background: var(--bg);
+                        padding: 3px;
+                        border-radius: var(--radius-md);
+                        margin-bottom: 14px;
+                        border: 1px solid var(--border);
+                    }
+                    .segment-btn {
+                        flex: 1;
+                        padding: 7px 12px;
+                        border: none;
+                        background: transparent;
+                        border-radius: calc(var(--radius-md) - 3px);
+                        font-size: 13px;
+                        font-weight: 600;
+                        color: var(--text-sub);
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 6px;
+                        transition: all 0.2s ease;
+                    }
+                    .segment-btn.active {
+                        background: var(--card-bg);
+                        color: var(--text-main);
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+                    }
+                    .text-input-area {
+                        width: 100%;
+                        height: 110px;
+                        padding: 12px;
+                        border-radius: var(--radius-md);
+                        border: 1px solid var(--border);
+                        background: var(--bg);
+                        color: var(--text-main);
+                        font-family: inherit;
+                        font-size: 14px;
+                        line-height: 1.5;
+                        resize: vertical;
+                        box-sizing: border-box;
+                        outline: none;
+                        transition: border-color 0.2s ease;
+                    }
+                    .text-input-area:focus {
+                        border-color: var(--primary);
+                    }
                     .upload-status-box {
                         display: none;
                         margin-top: 12px;
@@ -361,8 +476,45 @@ internal object WebShareHtmlRenderer {
                     .status-row {
                         display: flex;
                         justify-content: space-between;
+                        align-items: center;
                         font-size: 12px;
                         color: var(--text-sub);
+                    }
+                    .btn-cancel {
+                        border: none;
+                        background: rgba(255, 59, 48, 0.12);
+                        color: var(--danger);
+                        padding: 3px 8px;
+                        border-radius: 6px;
+                        font-size: 12px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: background 0.2s ease;
+                    }
+                    .btn-cancel:hover {
+                        background: rgba(255, 59, 48, 0.2);
+                    }
+                    .update-banner {
+                        display: none;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 10px 16px;
+                        background: var(--primary-light);
+                        border: 1px solid var(--primary);
+                        border-radius: var(--radius-md);
+                        color: var(--primary);
+                        font-size: 13px;
+                        font-weight: 600;
+                    }
+                    .btn-banner {
+                        background: var(--primary);
+                        color: #ffffff;
+                        border: none;
+                        padding: 4px 12px;
+                        border-radius: 12px;
+                        font-size: 12px;
+                        font-weight: 600;
+                        cursor: pointer;
                     }
                     .drag-overlay {
                         position: fixed;
@@ -382,6 +534,104 @@ internal object WebShareHtmlRenderer {
                     .drag-overlay.active { opacity: 1; pointer-events: all; }
                     .drag-overlay-icon { display: flex; justify-content: center; margin-bottom: 16px; }
                     .drag-overlay-title { font-size: 20px; font-weight: 700; }
+                    .preview-modal {
+                        position: fixed;
+                        top: 0; left: 0; right: 0; bottom: 0;
+                        z-index: 10001;
+                        display: none;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 16px;
+                    }
+                    .preview-modal.active { display: flex; }
+                    .preview-backdrop {
+                        position: absolute;
+                        top: 0; left: 0; right: 0; bottom: 0;
+                        background: rgba(0, 0, 0, 0.65);
+                        backdrop-filter: blur(14px);
+                    }
+                    .preview-dialog {
+                        position: relative;
+                        background: var(--card-bg);
+                        border-radius: var(--radius-lg);
+                        border: 1px solid var(--card-border);
+                        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                        max-width: 92vw;
+                        width: 600px;
+                        max-height: 85vh;
+                        display: flex;
+                        flex-direction: column;
+                        z-index: 1;
+                        overflow: hidden;
+                    }
+                    .preview-header {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 14px 18px;
+                        border-bottom: 1px solid var(--border);
+                    }
+                    .preview-title {
+                        font-size: 15px;
+                        font-weight: 600;
+                        color: var(--text-main);
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                        padding-right: 12px;
+                    }
+                    .preview-close-btn {
+                        background: transparent;
+                        border: none;
+                        color: var(--text-sub);
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        padding: 4px;
+                        border-radius: 8px;
+                    }
+                    .preview-close-btn:hover {
+                        color: var(--text-main);
+                        background: var(--bg);
+                    }
+                    .preview-body {
+                        padding: 16px;
+                        overflow-y: auto;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 180px;
+                        max-height: 60vh;
+                    }
+                    .preview-media {
+                        max-width: 100%;
+                        max-height: 55vh;
+                        border-radius: var(--radius-md);
+                        object-fit: contain;
+                    }
+                    .preview-text-box {
+                        width: 100%;
+                        max-height: 55vh;
+                        background: var(--bg);
+                        border: 1px solid var(--border);
+                        border-radius: var(--radius-md);
+                        padding: 12px;
+                        font-family: monospace;
+                        font-size: 13px;
+                        line-height: 1.5;
+                        white-space: pre-wrap;
+                        word-break: break-all;
+                        overflow-y: auto;
+                        color: var(--text-main);
+                    }
+                    .preview-footer {
+                        display: flex;
+                        align-items: center;
+                        justify-content: flex-end;
+                        gap: 10px;
+                        padding: 12px 18px;
+                        border-top: 1px solid var(--border);
+                    }
                     .toast {
                         position: fixed;
                         bottom: 28px;
@@ -404,6 +654,10 @@ internal object WebShareHtmlRenderer {
             </head>
             <body>
                 <div class="container">
+                    <div class="update-banner" id="updateBanner">
+                        <span id="updateBannerText">${copy.contentUpdated}</span>
+                        <button type="button" class="btn-banner" onclick="location.reload()">${copy.refresh}</button>
+                    </div>
                     <div class="header-card">
                         <div class="device-badge">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
@@ -423,26 +677,72 @@ internal object WebShareHtmlRenderer {
                             </span>
                             <span class="section-tag">${copy.bidirectional}</span>
                         </div>
-                        <div class="upload-dropzone" id="uploadDropzone">
-                            <div class="dropzone-icon">
-                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                            </div>
-                            <div class="dropzone-text">${copy.dropzoneText}</div>
-                            <div class="dropzone-hint">${copy.dropzoneHint}</div>
+                        <div class="segmented-control">
+                            <button type="button" class="segment-btn active" id="tabBtnFile" onclick="switchSendTab('file')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                                ${copy.sendFileTab}
+                            </button>
+                            <button type="button" class="segment-btn" id="tabBtnText" onclick="switchSendTab('text')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                                ${copy.sendTextTab}
+                            </button>
                         </div>
-                        <input type="file" id="fileInput" multiple style="display:none">
+                        <div id="fileSendPanel">
+                            <div class="upload-dropzone" id="uploadDropzone">
+                                <div class="dropzone-icon">
+                                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                </div>
+                                <div class="dropzone-text">${copy.dropzoneText}</div>
+                                <div class="dropzone-hint">${copy.dropzoneHint}</div>
+                            </div>
+                            <input type="file" id="fileInput" multiple style="display:none">
+                        </div>
+                        <div id="textSendPanel" style="display:none">
+                            <textarea id="sendTextInput" class="text-input-area" placeholder="${copy.textInputPlaceholder}"></textarea>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                                <span style="font-size:12px; color:var(--text-sub);">Ctrl + Enter 快捷发送</span>
+                                <button type="button" class="btn btn-primary" id="sendTextBtn" onclick="sendTextToPhone()">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                                    ${copy.sendTextBtn}
+                                </button>
+                            </div>
+                        </div>
                         <div class="upload-status-box" id="uploadStatusBox">
                             <div class="status-row">
                                 <span id="uploadStatusTitle" style="font-weight:600; color:var(--text-main)">${copy.preparingUpload}</span>
-                                <span id="uploadStatusPercent">0%</span>
+                                <span id="uploadStatusPercent" style="font-weight:600;">0%</span>
                             </div>
                             <div class="progress-bar-wrap">
                                 <div class="progress-bar" id="uploadProgressBar"></div>
                             </div>
                             <div class="status-row">
                                 <span id="uploadDetail">${copy.waiting}</span>
-                                <span id="uploadCount">0/0</span>
+                                <div style="display:inline-flex; align-items:center; gap:8px;">
+                                    <span id="uploadSpeed" style="font-size:12px; color:var(--primary); font-weight:500;"></span>
+                                    <span id="uploadCount">0/0</span>
+                                    <button type="button" class="btn-cancel" onclick="cancelUpload()">${copy.cancel}</button>
+                                </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="preview-modal" id="previewModal">
+                    <div class="preview-backdrop" onclick="closePreview()"></div>
+                    <div class="preview-dialog">
+                        <div class="preview-header">
+                            <span class="preview-title" id="previewModalTitle"></span>
+                            <button type="button" class="preview-close-btn" onclick="closePreview()" aria-label="${copy.close}">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
+                        <div class="preview-body" id="previewModalBody"></div>
+                        <div class="preview-footer">
+                            <button type="button" class="btn btn-sec" onclick="closePreview()">${copy.close}</button>
+                            <a id="previewDownloadBtn" class="btn btn-primary" href="#" download>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                ${copy.download}
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -458,6 +758,13 @@ internal object WebShareHtmlRenderer {
 
                 <script>
                     var I18N = ${copy.toJsObject()};
+                    var initialSessionId = "${session?.sessionId ?: ""}";
+                    var initialFilesCount = ${session?.files?.size ?: 0};
+                    var currentXhr = null;
+                    var isUploading = false;
+                    var dragDepth = 0;
+                    var currentPin = null;
+
                     function showToast(msg) {
                         var t = document.getElementById('toast');
                         t.innerText = msg;
@@ -482,9 +789,13 @@ internal object WebShareHtmlRenderer {
                         return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
                     }
 
-                    var isUploading = false;
-                    var dragDepth = 0;
-                    var currentPin = null;
+                    function formatSpeed(bytesPerSec) {
+                        if (bytesPerSec <= 0) return '';
+                        if (bytesPerSec < 1024 * 1024) {
+                            return (bytesPerSec / 1024).toFixed(1) + ' KB/s';
+                        }
+                        return (bytesPerSec / (1024 * 1024)).toFixed(1) + ' MB/s';
+                    }
 
                     function getFingerprint() {
                         var fp = sessionStorage.getItem('localsend_web_fp');
@@ -495,6 +806,237 @@ internal object WebShareHtmlRenderer {
                         return fp;
                     }
 
+                    function getBrowserModel() {
+                        var ua = navigator.userAgent;
+                        if (ua.indexOf('Macintosh') !== -1 || ua.indexOf('Mac OS') !== -1) return I18N.modelMac || 'Mac Browser';
+                        if (ua.indexOf('Windows') !== -1) return I18N.modelPc || 'PC Browser';
+                        if (ua.indexOf('iPhone') !== -1) return I18N.modelIphone || 'iPhone Browser';
+                        if (ua.indexOf('iPad') !== -1) return I18N.modelIpad || 'iPad Browser';
+                        if (ua.indexOf('Android') !== -1) return I18N.modelAndroid || 'Android Browser';
+                        return I18N.modelWeb || 'Web Browser';
+                    }
+
+                    function switchSendTab(tab) {
+                        var tabBtnFile = document.getElementById('tabBtnFile');
+                        var tabBtnText = document.getElementById('tabBtnText');
+                        var filePanel = document.getElementById('fileSendPanel');
+                        var textPanel = document.getElementById('textSendPanel');
+                        if (tab === 'file') {
+                            tabBtnFile.classList.add('active');
+                            tabBtnText.classList.remove('active');
+                            filePanel.style.display = 'block';
+                            textPanel.style.display = 'none';
+                        } else {
+                            tabBtnFile.classList.remove('active');
+                            tabBtnText.classList.add('active');
+                            filePanel.style.display = 'none';
+                            textPanel.style.display = 'block';
+                            var txtInput = document.getElementById('sendTextInput');
+                            if (txtInput) txtInput.focus();
+                        }
+                    }
+
+                    function cancelUpload() {
+                        if (currentXhr) {
+                            try { currentXhr.abort(); } catch(e) {}
+                            currentXhr = null;
+                        }
+                        isUploading = false;
+                        var statusBox = document.getElementById('uploadStatusBox');
+                        var statusTitle = document.getElementById('uploadStatusTitle');
+                        var detailText = document.getElementById('uploadDetail');
+                        var speedText = document.getElementById('uploadSpeed');
+                        if (statusTitle) {
+                            statusTitle.innerText = I18N.transferCanceled || '传输已取消';
+                            statusTitle.style.color = 'var(--text-sub)';
+                        }
+                        if (detailText) detailText.innerText = '';
+                        if (speedText) speedText.innerText = '';
+                        showToast(I18N.transferCanceled || '传输已取消');
+                        setTimeout(function() {
+                            if (!isUploading && statusBox) statusBox.style.display = 'none';
+                        }, 2000);
+                    }
+
+                    function sendTextToPhone() {
+                        if (isUploading) return;
+                        var txtInput = document.getElementById('sendTextInput');
+                        var content = txtInput ? txtInput.value : '';
+                        if (!content || !content.trim()) {
+                            showToast(I18N.emptyTextWarning || '请输入要发送的内容');
+                            return;
+                        }
+
+                        var text = content.trim();
+                        var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                        var fId = 'web-t-' + Date.now();
+                        var safeName = text.substring(0, 18).replace(/[\r\n\t\/\\:*?"<>|]/g, '_') + '.txt';
+
+                        var filesMap = {};
+                        filesMap[fId] = {
+                            id: fId,
+                            fileName: safeName,
+                            size: blob.size,
+                            fileType: 'text/plain',
+                            preview: text
+                        };
+                        var fileBlobs = {};
+                        fileBlobs[fId] = blob;
+
+                        var statusBox = document.getElementById('uploadStatusBox');
+                        var statusTitle = document.getElementById('uploadStatusTitle');
+                        var statusPercent = document.getElementById('uploadStatusPercent');
+                        var progressBar = document.getElementById('uploadProgressBar');
+                        var detailText = document.getElementById('uploadDetail');
+                        var countText = document.getElementById('uploadCount');
+                        var speedText = document.getElementById('uploadSpeed');
+
+                        isUploading = true;
+                        statusBox.style.display = 'block';
+                        statusTitle.innerText = I18N.waitingConfirm;
+                        statusTitle.style.color = 'var(--text-main)';
+                        statusPercent.innerText = '0%';
+                        progressBar.style.width = '0%';
+                        detailText.innerText = I18N.tapAccept;
+                        countText.innerText = '1/1';
+                        if (speedText) speedText.innerText = '';
+
+                        var reqBody = {
+                            info: {
+                                alias: I18N.webAlias,
+                                version: '2.1',
+                                deviceModel: getBrowserModel(),
+                                deviceType: 'web',
+                                fingerprint: getFingerprint(),
+                                port: 0,
+                                protocol: location.protocol.replace(':', ''),
+                                download: false
+                            },
+                            files: filesMap
+                        };
+
+                        executePrepare(reqBody, fileBlobs, 1, true, function() {
+                            if (txtInput) txtInput.value = '';
+                        });
+                    }
+
+                    var textInputEl = document.getElementById('sendTextInput');
+                    if (textInputEl) {
+                        textInputEl.addEventListener('keydown', function(e) {
+                            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                                e.preventDefault();
+                                sendTextToPhone();
+                            }
+                        });
+                    }
+
+                    function openPreview(url, name, mime) {
+                        var modal = document.getElementById('previewModal');
+                        var title = document.getElementById('previewModalTitle');
+                        var body = document.getElementById('previewModalBody');
+                        var downloadBtn = document.getElementById('previewDownloadBtn');
+
+                        title.innerText = name;
+                        downloadBtn.href = url;
+                        downloadBtn.download = name;
+                        body.innerHTML = '';
+
+                        var lowerMime = (mime || '').toLowerCase();
+                        var lowerName = (name || '').toLowerCase();
+
+                        if (lowerMime.indexOf('image/') === 0 || lowerName.match(/\.(png|jpe?g|webp|gif|bmp|svg)$/)) {
+                            var img = document.createElement('img');
+                            img.className = 'preview-media';
+                            img.src = url;
+                            img.alt = name;
+                            body.appendChild(img);
+                        } else if (lowerMime.indexOf('video/') === 0 || lowerName.match(/\.(mp4|webm|mov|mkv)$/)) {
+                            var vid = document.createElement('video');
+                            vid.className = 'preview-media';
+                            vid.src = url;
+                            vid.controls = true;
+                            vid.autoplay = true;
+                            vid.playsInline = true;
+                            body.appendChild(vid);
+                        } else if (lowerMime.indexOf('audio/') === 0 || lowerName.match(/\.(mp3|wav|ogg|flac|m4a|aac)$/)) {
+                            var aud = document.createElement('audio');
+                            aud.style.width = '100%';
+                            aud.src = url;
+                            aud.controls = true;
+                            aud.autoplay = true;
+                            body.appendChild(aud);
+                        } else {
+                            var pre = document.createElement('pre');
+                            pre.className = 'preview-text-box';
+                            pre.innerText = 'Loading...';
+                            body.appendChild(pre);
+
+                            fetch(url).then(function(res) {
+                                if (!res.ok) throw new Error('HTTP ' + res.status);
+                                return res.text();
+                            }).then(function(text) {
+                                pre.innerText = text;
+                            }).catch(function(err) {
+                                pre.innerText = 'Failed to load text preview: ' + err.message;
+                            });
+                        }
+
+                        modal.classList.add('active');
+                    }
+
+                    function closePreview() {
+                        var modal = document.getElementById('previewModal');
+                        var body = document.getElementById('previewModalBody');
+                        if (body) {
+                            var media = body.querySelectorAll('video, audio');
+                            for (var i = 0; i < media.length; i++) {
+                                try { media[i].pause(); } catch(e) {}
+                            }
+                            body.innerHTML = '';
+                        }
+                        if (modal) modal.classList.remove('active');
+                    }
+
+                    window.addEventListener('keydown', function(e) {
+                        if (e.key === 'Escape') closePreview();
+                    });
+
+                    window.addEventListener('paste', function(e) {
+                        if (!e.clipboardData) return;
+                        var items = e.clipboardData.items;
+                        var imageFiles = [];
+                        if (items) {
+                            for (var i = 0; i < items.length; i++) {
+                                if (items[i].type && items[i].type.indexOf('image/') !== -1) {
+                                    var f = items[i].getAsFile();
+                                    if (f) {
+                                        var ext = (f.type.split('/')[1] || 'png').replace('+xml', '');
+                                        var pasted = new File([f], 'pasted_image_' + Date.now() + '.' + ext, { type: f.type });
+                                        imageFiles.push(pasted);
+                                    }
+                                }
+                            }
+                        }
+                        if (imageFiles.length > 0) {
+                            e.preventDefault();
+                            showToast(I18N.pastedImageUploading || '检测到剪贴板图片，正在上传...');
+                            switchSendTab('file');
+                            startUpload(imageFiles);
+                            return;
+                        }
+
+                        var text = e.clipboardData.getData('text');
+                        if (text && text.trim() && document.activeElement && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                            switchSendTab('text');
+                            var sendInput = document.getElementById('sendTextInput');
+                            if (sendInput) {
+                                sendInput.value = text;
+                                sendInput.focus();
+                                showToast(I18N.copied || '已粘贴剪贴板内容');
+                            }
+                        }
+                    });
+
                     var dropzone = document.getElementById('uploadDropzone');
                     var fileInput = document.getElementById('fileInput');
                     var statusBox = document.getElementById('uploadStatusBox');
@@ -503,24 +1045,29 @@ internal object WebShareHtmlRenderer {
                     var progressBar = document.getElementById('uploadProgressBar');
                     var detailText = document.getElementById('uploadDetail');
                     var countText = document.getElementById('uploadCount');
+                    var speedText = document.getElementById('uploadSpeed');
                     var overlay = document.getElementById('dragOverlay');
 
-                    dropzone.onclick = function() {
-                        if (!isUploading) fileInput.click();
-                    };
+                    if (dropzone) {
+                        dropzone.onclick = function() {
+                            if (!isUploading && fileInput) fileInput.click();
+                        };
+                    }
 
-                    fileInput.onchange = function() {
-                        if (fileInput.files && fileInput.files.length > 0) {
-                            startUpload(fileInput.files);
-                            fileInput.value = '';
-                        }
-                    };
+                    if (fileInput) {
+                        fileInput.onchange = function() {
+                            if (fileInput.files && fileInput.files.length > 0) {
+                                startUpload(fileInput.files);
+                                fileInput.value = '';
+                            }
+                        };
+                    }
 
                     window.addEventListener('dragenter', function(e) {
                         if (!e.dataTransfer || !e.dataTransfer.types || e.dataTransfer.types.indexOf('Files') === -1) return;
                         e.preventDefault();
                         dragDepth++;
-                        if (!isUploading) overlay.classList.add('active');
+                        if (!isUploading && overlay) overlay.classList.add('active');
                     });
 
                     window.addEventListener('dragover', function(e) {
@@ -533,14 +1080,14 @@ internal object WebShareHtmlRenderer {
                         dragDepth--;
                         if (dragDepth <= 0) {
                             dragDepth = 0;
-                            overlay.classList.remove('active');
+                            if (overlay) overlay.classList.remove('active');
                         }
                     });
 
                     window.addEventListener('drop', function(e) {
                         e.preventDefault();
                         dragDepth = 0;
-                        overlay.classList.remove('active');
+                        if (overlay) overlay.classList.remove('active');
                         if (isUploading) return;
                         var dt = e.dataTransfer;
                         var files = [];
@@ -554,7 +1101,10 @@ internal object WebShareHtmlRenderer {
                         } else if (dt && dt.files) {
                             for (var j = 0; j < dt.files.length; j++) files.push(dt.files[j]);
                         }
-                        if (files.length > 0) startUpload(files);
+                        if (files.length > 0) {
+                            switchSendTab('file');
+                            startUpload(files);
+                        }
                     });
 
                     function startUpload(fileList) {
@@ -566,6 +1116,7 @@ internal object WebShareHtmlRenderer {
                         progressBar.style.width = '0%';
                         detailText.innerText = I18N.tapAccept;
                         countText.innerText = '0/' + fileList.length;
+                        if (speedText) speedText.innerText = '';
 
                         var filesMap = {};
                         var fileBlobs = {};
@@ -585,7 +1136,7 @@ internal object WebShareHtmlRenderer {
                             info: {
                                 alias: I18N.webAlias,
                                 version: '2.1',
-                                deviceModel: navigator.userAgent.indexOf('Mac') !== -1 ? 'Mac Browser' : (navigator.userAgent.indexOf('Windows') !== -1 ? 'PC Browser' : 'Web Client'),
+                                deviceModel: getBrowserModel(),
                                 deviceType: 'web',
                                 fingerprint: getFingerprint(),
                                 port: 0,
@@ -595,26 +1146,30 @@ internal object WebShareHtmlRenderer {
                             files: filesMap
                         };
 
-                        executePrepare(requestBody, fileBlobs, fileList.length, true);
+                        executePrepare(requestBody, fileBlobs, fileList.length, true, null);
                     }
 
-                    function executePrepare(reqBody, fileBlobs, totalCount, isFirst) {
+                    function executePrepare(reqBody, fileBlobs, totalCount, isFirst, onSuccess) {
                         var url = '/api/localsend/v2/prepare-upload';
                         if (currentPin) url += '?pin=' + encodeURIComponent(currentPin);
 
                         var xhr = new XMLHttpRequest();
+                        currentXhr = xhr;
                         xhr.open('POST', url, true);
                         xhr.setRequestHeader('Content-Type', 'application/json');
                         xhr.onload = function() {
+                            currentXhr = null;
                             if (xhr.status === 200) {
                                 try {
                                     var res = JSON.parse(xhr.responseText);
+                                    if (onSuccess) onSuccess();
                                     uploadAllFiles(res.sessionId, res.files, fileBlobs, totalCount);
                                 } catch(e) {
                                     finishError(I18N.parseFailed);
                                 }
                             } else if (xhr.status === 204) {
-                                finishSuccess();
+                                if (onSuccess) onSuccess();
+                                finishSuccess(totalCount);
                             } else if (xhr.status === 401) {
                                 var pinPrompt = prompt(isFirst ? I18N.pinPrompt : I18N.pinRetry);
                                 if (!pinPrompt) {
@@ -622,7 +1177,7 @@ internal object WebShareHtmlRenderer {
                                     return;
                                 }
                                 currentPin = pinPrompt;
-                                executePrepare(reqBody, fileBlobs, totalCount, false);
+                                executePrepare(reqBody, fileBlobs, totalCount, false, onSuccess);
                             } else if (xhr.status === 403) {
                                 finishError(I18N.rejected);
                             } else if (xhr.status === 409) {
@@ -634,9 +1189,25 @@ internal object WebShareHtmlRenderer {
                             }
                         };
                         xhr.onerror = function() {
+                            currentXhr = null;
                             finishError(I18N.networkFailed);
                         };
                         xhr.send(JSON.stringify(reqBody));
+                    }
+
+                    function finishSuccess(totalCount) {
+                        statusTitle.innerText = I18N.uploadComplete;
+                        statusTitle.style.color = 'var(--success)';
+                        statusPercent.innerText = '100%';
+                        progressBar.style.width = '100%';
+                        detailText.innerText = I18N.allSaved;
+                        countText.innerText = totalCount + '/' + totalCount;
+                        if (speedText) speedText.innerText = '';
+                        showToast(I18N.allTransferred);
+                        setTimeout(function() {
+                            isUploading = false;
+                            statusBox.style.display = 'none';
+                        }, 3500);
                     }
 
                     function uploadAllFiles(sessionId, tokens, fileBlobs, totalCount) {
@@ -645,17 +1216,7 @@ internal object WebShareHtmlRenderer {
 
                         function uploadNext(index) {
                             if (index >= fileIds.length) {
-                                statusTitle.innerText = I18N.uploadComplete;
-                                statusTitle.style.color = 'var(--success)';
-                                statusPercent.innerText = '100%';
-                                progressBar.style.width = '100%';
-                                detailText.innerText = I18N.allSaved;
-                                countText.innerText = totalCount + '/' + totalCount;
-                                showToast(I18N.allTransferred);
-                                setTimeout(function() {
-                                    isUploading = false;
-                                    statusBox.style.display = 'none';
-                                }, 3500);
+                                finishSuccess(totalCount);
                                 return;
                             }
 
@@ -670,8 +1231,12 @@ internal object WebShareHtmlRenderer {
                                 '&token=' + encodeURIComponent(token);
 
                             var xhr = new XMLHttpRequest();
+                            currentXhr = xhr;
                             xhr.open('POST', uploadUrl, true);
                             xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+
+                            var lastLoaded = 0;
+                            var lastTime = Date.now();
 
                             xhr.upload.onprogress = function(e) {
                                 if (e.lengthComputable) {
@@ -679,10 +1244,21 @@ internal object WebShareHtmlRenderer {
                                     statusPercent.innerText = percent + '%';
                                     progressBar.style.width = percent + '%';
                                     detailText.innerText = formatSize(e.loaded) + ' / ' + formatSize(e.total);
+
+                                    var now = Date.now();
+                                    var timeDiff = (now - lastTime) / 1000;
+                                    if (timeDiff >= 0.5) {
+                                        var bytesDiff = e.loaded - lastLoaded;
+                                        var speed = bytesDiff / timeDiff;
+                                        if (speedText) speedText.innerText = formatSpeed(speed);
+                                        lastLoaded = e.loaded;
+                                        lastTime = now;
+                                    }
                                 }
                             };
 
                             xhr.onload = function() {
+                                currentXhr = null;
                                 if (xhr.status === 200 || xhr.status === 204) {
                                     completed++;
                                     uploadNext(index + 1);
@@ -692,6 +1268,7 @@ internal object WebShareHtmlRenderer {
                             };
 
                             xhr.onerror = function() {
+                                currentXhr = null;
                                 finishError(I18N.fileInterrupted + ' ' + blob.name);
                             };
 
@@ -703,21 +1280,42 @@ internal object WebShareHtmlRenderer {
 
                     function finishError(msg) {
                         isUploading = false;
+                        currentXhr = null;
                         statusTitle.innerText = I18N.uploadFailed;
                         statusTitle.style.color = 'var(--danger)';
                         detailText.innerText = msg;
+                        if (speedText) speedText.innerText = '';
                         showToast(msg);
                     }
 
+                    function checkShareUpdates() {
+                        if (isUploading) return;
+                        var xhr = new XMLHttpRequest();
+                        var url = '/api/localsend/v2/prepare-download';
+                        if (initialSessionId) url += '?sessionId=' + encodeURIComponent(initialSessionId);
+                        xhr.open('POST', url, true);
+                        xhr.onload = function() {
+                            if (xhr.status === 200) {
+                                try {
+                                    var res = JSON.parse(xhr.responseText);
+                                    var newCount = res.files ? Object.keys(res.files).length : 0;
+                                    if (res.sessionId !== initialSessionId || newCount !== initialFilesCount) {
+                                        var banner = document.getElementById('updateBanner');
+                                        if (banner) banner.style.display = 'flex';
+                                    }
+                                } catch(e) {}
+                            } else if (xhr.status === 404 && initialFilesCount > 0) {
+                                var banner = document.getElementById('updateBanner');
+                                if (banner) banner.style.display = 'flex';
+                            }
+                        };
+                        xhr.send();
+                    }
+                    setInterval(checkShareUpdates, 4000);
+
                     function registerBrowserDevice() {
                         var fp = getFingerprint();
-                        var model = I18N.modelWeb;
-                        var ua = navigator.userAgent;
-                        if (ua.indexOf('Mac') !== -1) model = I18N.modelMac;
-                        else if (ua.indexOf('Windows') !== -1) model = I18N.modelPc;
-                        else if (ua.indexOf('iPhone') !== -1) model = I18N.modelIphone;
-                        else if (ua.indexOf('iPad') !== -1) model = I18N.modelIpad;
-                        else if (ua.indexOf('Android') !== -1) model = I18N.modelAndroid;
+                        var model = getBrowserModel();
 
                         var reqBody = {
                             alias: I18N.webAlias,

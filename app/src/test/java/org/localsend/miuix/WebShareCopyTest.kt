@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.localsend.miuix.network.WebShareHtmlRenderer
 import org.localsend.miuix.webshare.WebShareCopy
 
 class WebShareCopyTest {
@@ -101,10 +102,40 @@ class WebShareCopyTest {
     @Test
     fun jsMapExposesAllLocalizedChromeStrings() {
         val copy = WebShareCopy.Chinese
-        assertEquals(27, copy.jsMap().size)
+        assertEquals(39, copy.jsMap().size)
         assertEquals(copy.copied, copy.jsMap()["copied"])
         assertEquals(copy.pinPrompt, copy.jsMap()["pinPrompt"])
         assertEquals(copy.modelAndroid, copy.jsMap()["modelAndroid"])
+        assertEquals(copy.sendTextTab, copy.jsMap()["sendTextTab"])
+        assertEquals(copy.preview, copy.jsMap()["preview"])
+        assertEquals(copy.cancel, copy.jsMap()["cancel"])
+    }
+
+    @Test
+    fun enhancedWebShareCopyProvidesLocalizedText() {
+        val zh = WebShareCopy.Chinese
+        assertEquals("发送文本", zh.sendTextTab)
+        assertEquals("上传文件", zh.sendFileTab)
+        assertEquals("预览", zh.preview)
+        assertEquals("取消", zh.cancel)
+
+        val en = WebShareCopy.English
+        assertEquals("Send Text", en.sendTextTab)
+        assertEquals("Upload Files", en.sendFileTab)
+        assertEquals("Preview", en.preview)
+        assertEquals("Cancel", en.cancel)
+    }
+
+    @Test
+    fun previewableFileTypesDistinguishMultimediaAndArchives() {
+        assertTrue(WebShareHtmlRenderer.isPreviewable("image/png", "photo.png"))
+        assertTrue(WebShareHtmlRenderer.isPreviewable("video/mp4", "clip.mp4"))
+        assertTrue(WebShareHtmlRenderer.isPreviewable("audio/mpeg", "song.mp3"))
+        assertTrue(WebShareHtmlRenderer.isPreviewable("text/plain", "notes.txt"))
+        assertTrue(WebShareHtmlRenderer.isPreviewable("application/json", "config.json"))
+
+        assertFalse(WebShareHtmlRenderer.isPreviewable("application/zip", "archive.zip"))
+        assertFalse(WebShareHtmlRenderer.isPreviewable("application/vnd.android.package-archive", "app.apk"))
     }
 
     @Test
@@ -123,5 +154,33 @@ class WebShareCopyTest {
         assertTrue(js.contains("\"waitingConfirm\":\"back\\\\slash\""))
         // 原始值不受转义影响
         assertEquals("line1\nline2", copy.jsMap()["copied"])
+    }
+
+    @Test
+    fun htmlRendererGeneratesInteractiveElements() {
+        val session =
+            org.localsend.miuix.model.ShareSession(
+                sessionId = "s1",
+                files =
+                    listOf(
+                        org.localsend.miuix.model.FileItem(
+                            id = "f1",
+                            name = "pic.png",
+                            size = 1024,
+                            mimeType = "image/png",
+                            token = "t1",
+                        ),
+                    ),
+            )
+        val html = WebShareHtmlRenderer.buildWebShareHtml("DeviceA", session, WebShareCopy.Chinese)
+
+        assertTrue(html.contains("previewModal"))
+        assertTrue(html.contains("preview-btn"))
+        assertTrue(html.contains("tabBtnFile"))
+        assertTrue(html.contains("tabBtnText"))
+        assertTrue(html.contains("sendTextInput"))
+        assertTrue(html.contains("sendTextToPhone"))
+        assertTrue(html.contains("updateBanner"))
+        assertTrue(html.contains("cancelUpload"))
     }
 }

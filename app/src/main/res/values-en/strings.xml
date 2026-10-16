@@ -332,6 +332,9 @@
     <string name="webshare_btn_stop_share">Stop Sharing</string>
     <string name="webshare_btn_share_selected">Share Selected (%1$d)</string>
     <string name="webshare_https_warning">HTTPS is on: browsers will warn about the self-signed certificate. Turn HTTPS off temporarily before using Web Share</string>
+    <string name="webshare_network_interface">Network Interface (IP)</string>
+    <string name="webshare_copied_toast">Link copied to clipboard</string>
+    <string name="webshare_btn_share_url">Share Link</string>
 
     <string name="update_dialog_title">New Version Available</string>
     <string name="update_dialog_no_changelog">No detailed changelog provided</string>

@@ -332,6 +332,9 @@
     <string name="webshare_btn_stop_share">停止共享</string>
     <string name="webshare_btn_share_selected">共享已选 %1$d 项</string>
     <string name="webshare_https_warning">已开启 HTTPS：浏览器访问自签名证书链接会提示安全风险，建议临时关闭 HTTPS 后再使用网页快传</string>
+    <string name="webshare_network_interface">选择网络接口 (IP)</string>
+    <string name="webshare_copied_toast">链接已复制到剪贴板</string>
+    <string name="webshare_btn_share_url">分享链接</string>
 
     <string name="update_dialog_title">发现新版本</string>
     <string name="update_dialog_no_changelog">暂无详细更新日志</string>
