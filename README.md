@@ -8,7 +8,7 @@ LocalSend Miuix 是基于 Xiaomi HyperOS 设计风格与 Miuix KMP 现代化组�
 
 ## 核心特性
 
-- **纯正 HyperOS 视觉规范**：基于 Miuix 0.9.4-rc01 组件库深度构建，全链路采用 Miuix 推荐的最佳实践与组件（MiuixTheme、Scaffold、FloatingNavigationBar、Card、SmallTitle、*Preference、OverlayDialog、OverlayBottomSheet、LinearProgressIndicator 等）。
+- **纯正 HyperOS 视觉规范**：基于 Miuix 0.9.4 组件库深度构建，全链路采用 Miuix 推荐的最佳实践与组件（MiuixTheme、Scaffold、FloatingNavigationBar、Card、SmallTitle、*Preference、OverlayDialog、OverlayBottomSheet、LinearProgressIndicator 等）。
 - **悬浮底栏主导航**：采用 HyperOS 标志性的 `FloatingNavigationBar` 作为应用底栏入口，支持 Badge 动态徽标指示未处理的传入传输请求。
 - **全协议兼容**：
   - **UDP 多播与广播发现**：监听与宣告多播地址 `224.0.0.167:53317` 及广播地址 `255.255.255.255:53317`，秒级识别局域网活跃设备。

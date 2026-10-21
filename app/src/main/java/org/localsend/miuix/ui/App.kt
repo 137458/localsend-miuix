@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -30,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -47,12 +49,13 @@ import org.localsend.miuix.ui.component.AddContentBottomSheet
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.AppPickerBottomSheet
 import org.localsend.miuix.ui.component.IncomingTransferDialog
-import org.localsend.miuix.ui.component.LiquidGlassBottomBar
+import org.localsend.miuix.ui.component.IosLiquidGlassNavigationBar
 import org.localsend.miuix.ui.component.PortDialog
 import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
 import org.localsend.miuix.ui.component.UpdateDialog
 import org.localsend.miuix.ui.navigation.AppRoute
+import org.localsend.miuix.ui.navigation.LocalTabGesturePosition
 import org.localsend.miuix.ui.screen.HistoryScreen
 import org.localsend.miuix.ui.screen.ReceiveScreen
 import org.localsend.miuix.ui.screen.SendScreen
@@ -115,6 +118,37 @@ fun App(manager: LocalSendManager) {
     LaunchedEffect(pagerState.currentPage) {
         if (pagerState.currentPage != settings.lastSelectedTabIndex) {
             manager.updateSettings { it.copy(lastSelectedTabIndex = pagerState.currentPage) }
+        }
+    }
+
+    // 点击驱动的滚动期间不回传手势位置，底栏滑块保持 spring 动画手感
+    var programmaticScroll by remember { mutableStateOf(false) }
+    val tabGesturePosition = remember { mutableStateOf<Float?>(null) }
+
+    // 手势翻页全程回传连续位置：底栏滑块逐帧跟手（松手落位后回写 null，滑块切回 spring 值）
+    LaunchedEffect(pagerState) {
+        snapshotFlow {
+            if (pagerState.isScrollInProgress && !programmaticScroll) {
+                pagerState.currentPage + pagerState.currentPageOffsetFraction
+            } else {
+                null
+            }
+        }.collect { position -> tabGesturePosition.value = position }
+    }
+
+    // 底栏与侧栏点击统一走程序化滚动，避免手势位置回传打断滑块 spring 动画
+    val selectTab: (Int) -> Unit = { index ->
+        scope.launch {
+            programmaticScroll = true
+            try {
+                if (kotlin.math.abs(pagerState.currentPage - index) > 1) {
+                    pagerState.scrollToPage(index)
+                } else {
+                    pagerState.animateScrollToPage(index)
+                }
+            } finally {
+                programmaticScroll = false
+            }
         }
     }
 
@@ -356,30 +390,33 @@ fun App(manager: LocalSendManager) {
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .padding(bottom = 12.dp + navBarBottomPadding),
+                                        .padding(
+                                            bottom =
+                                                if (navBarBottomPadding != 0.dp) {
+                                                    8.dp + navBarBottomPadding
+                                                } else {
+                                                    20.dp
+                                                },
+                                        ),
                                 contentAlignment = Alignment.BottomCenter,
                             ) {
-                                LiquidGlassBottomBar(
-                                    items = navigationItems,
-                                    selectedIndex = { pagerState.currentPage },
-                                    onSelected = { index ->
-                                        scope.launch {
-                                            if (kotlin.math.abs(pagerState.currentPage - index) > 1) {
-                                                pagerState.scrollToPage(index)
+                                CompositionLocalProvider(
+                                    LocalTabGesturePosition provides tabGesturePosition,
+                                ) {
+                                    IosLiquidGlassNavigationBar(
+                                        items = navigationItems,
+                                        selectedIndex = pagerState.currentPage,
+                                        onItemClick = selectTab,
+                                        backdrop = backdrop,
+                                        badge = { index ->
+                                            if (index == 0 && pendingIncomingSession != null) {
+                                                { Badge { Text("1") } }
                                             } else {
-                                                pagerState.animateScrollToPage(index)
+                                                null
                                             }
-                                        }
-                                    },
-                                    backdrop = backdrop,
-                                    badge = { index ->
-                                        if (index == 0 && pendingIncomingSession != null) {
-                                            { Badge { Text("1") } }
-                                        } else {
-                                            null
-                                        }
-                                    },
-                                )
+                                        },
+                                    )
+                                }
                             }
                         }
                     },
@@ -398,15 +435,7 @@ fun App(manager: LocalSendManager) {
                                 navigationItems.forEachIndexed { index, item ->
                                     NavigationRailItem(
                                         selected = pagerState.currentPage == index,
-                                        onClick = {
-                                            scope.launch {
-                                                if (kotlin.math.abs(pagerState.currentPage - index) > 1) {
-                                                    pagerState.scrollToPage(index)
-                                                } else {
-                                                    pagerState.animateScrollToPage(index)
-                                                }
-                                            }
-                                        },
+                                        onClick = { selectTab(index) },
                                         icon = item.icon,
                                         label = item.label,
                                     )
