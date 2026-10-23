@@ -461,7 +461,7 @@ object TransferNotifier {
         val source = pickFileSource(apk.path, (apk.mediaStoreUri ?: apk.uri)?.toString()) ?: return null
         val intent =
             when (source) {
-                is InstallSource.DiskFile -> InstallHelper.buildInstallIntent(context, File(source.path))
+                is InstallSource.DiskFile -> InstallHelper.buildInstallIntent(context, File(source.path)) ?: return null
                 is InstallSource.ContentUri -> InstallHelper.buildInstallIntent(context, Uri.parse(source.uriString))
             }
         return activityPendingIntent(context, sessionNotifId(session) + 1, intent)

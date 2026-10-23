@@ -35,6 +35,22 @@ import java.net.InetSocketAddress
 import java.net.MulticastSocket
 import java.util.concurrent.atomic.AtomicInteger
 
+/**
+ * 监听端 staleness 判定：绑定组地址或超时与当前设置不一致即需重建 socket。
+ * 当前组地址非法时返回 false（不触发重建风暴，等待合法值再切换）。
+ */
+internal fun isListenerStale(
+    boundGroup: InetAddress,
+    boundTimeoutSeconds: Int,
+    currentGroup: String,
+    currentTimeoutSeconds: Int,
+): Boolean =
+    try {
+        InetAddress.getByName(currentGroup) != boundGroup || currentTimeoutSeconds != boundTimeoutSeconds
+    } catch (e: Exception) {
+        false
+    }
+
 class DiscoveryService(
     private val context: Context,
     private val scope: CoroutineScope,
@@ -132,16 +148,20 @@ class DiscoveryService(
                     var socket: MulticastSocket? = null
                     try {
                         val group = InetAddress.getByName(getMulticastGroup())
+                        val timeoutSeconds = getDiscoveryTimeoutSeconds()
                         socket =
                             MulticastSocket(null).apply {
                                 reuseAddress = true
                                 bind(InetSocketAddress(NetworkConstants.DEFAULT_PORT))
                                 joinGroup(group)
-                                soTimeout = getDiscoveryTimeoutSeconds() * 1000
+                                soTimeout = timeoutSeconds * 1000
                             }
 
                         val buffer = ByteArray(65535)
                         while (isActive) {
+                            // 组地址或超时设置变更后重建 socket：周期广播每轮即时读新值，
+                            // 监听端滞留旧组会出现“广播发新组、监听留旧组”的单向发现
+                            if (isListenerStale(group, timeoutSeconds, getMulticastGroup(), getDiscoveryTimeoutSeconds())) break
                             try {
                                 val packet = DatagramPacket(buffer, buffer.size)
                                 socket.receive(packet)

@@ -38,14 +38,17 @@ object InstallHelper {
     /** 从文件名列表中选出第一个 apk 条目（无则 null）。 */
     fun firstApkName(fileNames: List<String>): String? = fileNames.firstOrNull { isApk(it) }
 
-    /** 以 FileProvider URI 构造安装意图（apk 落盘为真实文件时使用）。 */
+    /** 以 FileProvider URI 构造安装意图（apk 落盘为真实文件时使用）；路径未被 file_paths 覆盖等映射失败返回 null。 */
     fun buildInstallIntent(
         context: Context,
         file: File,
-    ): Intent {
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        return buildInstallIntent(context, uri)
-    }
+    ): Intent? =
+        try {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            buildInstallIntent(context, uri)
+        } catch (e: Exception) {
+            null
+        }
 
     /** 以既有 content uri 构造安装意图（MediaStore/SAF 落盘时使用）。 */
     fun buildInstallIntent(

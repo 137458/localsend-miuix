@@ -47,6 +47,18 @@ class LocalSendClient(
                 422,
             )
 
+        /** 为尚无哈希的条目补算 sha256（已有值跳过，null 视为未算）；握手前与添加文件预热共用。 */
+        internal fun fillMissingSha256(
+            files: List<FileItem>,
+            compute: (FileItem) -> String?,
+        ) {
+            for (fileItem in files) {
+                if (fileItem.expectedSha256 == null) {
+                    fileItem.expectedSha256 = compute(fileItem)
+                }
+            }
+        }
+
         fun buildPrepareUploadUrl(
             baseUrl: String,
             targetPin: String?,
@@ -72,12 +84,8 @@ class LocalSendClient(
         withContext(Dispatchers.IO) {
             try {
                 // 发送方按协议为每个待传文件流式计算 sha256（字段可选，但缺失即令接收端放弃完整性校验）；
-                // 沿用既有 Dispatchers.IO 上下文，固定缓冲逐块更新，避免整文件载入内存
-                for (fileItem in files) {
-                    if (fileItem.expectedSha256 == null) {
-                        fileItem.expectedSha256 = computeSha256(fileItem)
-                    }
-                }
+                // 多数条目已在添加文件时后台预热完成，此处仅补算剩余项，避免大文件阻塞握手
+                fillMissingSha256(files) { computeSha256(it) }
                 val localDevice = getLocalDevice()
                 val filesMap = files.associate { it.id to it.toDto() }
                 val requestDto =
@@ -461,6 +469,12 @@ class LocalSendClient(
                 Log.w(TAG, "cancelUpload failed: ${e.message}")
                 Result.failure(e)
             }
+        }
+
+    /** 添加待发文件时后台预热 sha256，握手时直接复用，避免大文件在握手前同步哈希造成卡顿。 */
+    suspend fun precomputeSha256(files: List<FileItem>) =
+        withContext(Dispatchers.IO) {
+            fillMissingSha256(files) { computeSha256(it) }
         }
 
     /** 打开文件/URI/文本对应的输入流，供上传与哈希计算共用；不持有则返回 null。 */

@@ -404,7 +404,7 @@ private fun launchApkInstall(
 ) {
     val intent =
         when (val source = pickFileSource(path, uriString)) {
-            is InstallSource.DiskFile -> InstallHelper.buildInstallIntent(context, File(source.path))
+            is InstallSource.DiskFile -> InstallHelper.buildInstallIntent(context, File(source.path)) ?: return
             is InstallSource.ContentUri -> InstallHelper.buildInstallIntent(context, Uri.parse(source.uriString))
             null -> return
         }

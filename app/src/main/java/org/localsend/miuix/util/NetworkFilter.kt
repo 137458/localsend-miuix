@@ -37,8 +37,8 @@ object NetworkFilter {
             return filtered.ifEmpty { interfaces }
         }
         val whitelisted = filtered.filter { matchesAny(it, whitelistEntries) }
-        // 白名单把接口全部滤空时同样回退为不过滤
-        return whitelisted.ifEmpty { interfaces }
+        // 白名单把接口全部滤空时回退为“仅应用黑名单”的结果：防自锁回退不得连黑名单剔除一起丢弃
+        return whitelisted.ifEmpty { filtered }
     }
 
     /** 条目按逗号/空白切分，忽略大小写与首尾空白。 */

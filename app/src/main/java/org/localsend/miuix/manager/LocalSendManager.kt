@@ -333,6 +333,8 @@ class LocalSendManager(
 
     fun addFiles(files: List<FileItem>) {
         _selectedFiles.update { it + files }
+        // 后台预热 sha256：多数文件在握手前已算完，避免 prepareUpload 同步哈希阻塞握手
+        scope.launch { client.precomputeSha256(files) }
     }
 
     fun removeFile(id: String) {

@@ -64,6 +64,12 @@ class NetworkFilterTest {
     }
 
     @Test
+    fun whitelistFallbackStillAppliesBlacklist() {
+        // 白名单无命中回退时不得丢弃黑名单剔除结果（“黑名单永远剔除”优先于防自锁回退）
+        assertEquals(listOf(wlan0, eth0), NetworkFilter.selectInterfaces(all, "nonexistent9", "eth1"))
+    }
+
+    @Test
     fun entriesAndNamesTolerateCaseAndWhitespace() {
         // 条目大小写 + 首尾空白，接口名大写
         val upper = ifInfo("WLAN0", "192.168.1.5")

@@ -26,6 +26,9 @@ class SettingsValidatorsTest {
         assertFalse(SettingsValidators.isValidMulticastGroup("256.0.0.1"))
         assertFalse(SettingsValidators.isValidMulticastGroup("fe80::1"))
         assertFalse(SettingsValidators.isValidMulticastGroup("ffxy::1"))
+        // 旧正则校验会放行 “ff:”，存入后 InetAddress.getByName 抛异常导致监听线程反复失败
+        assertFalse(SettingsValidators.isValidMulticastGroup("ff:"))
+        assertFalse(SettingsValidators.isValidMulticastGroup("ff02::zz"))
     }
 
     @Test

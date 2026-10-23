@@ -1,5 +1,8 @@
 package org.localsend.miuix.util
 
+import java.net.Inet6Address
+import java.net.InetAddress
+
 /** 设置页高级网络选项的纯函数校验，供 UI 弹窗与单元测试复用。 */
 object SettingsValidators {
     // IPv4 组播：首字节 224-239（224.0.0.0/4），其余字节 0-255
@@ -17,9 +20,15 @@ object SettingsValidators {
     }
 
     private fun isIpv6Multicast(value: String): Boolean {
-        if (!value.startsWith("ff", ignoreCase = true)) return false
         if (!value.contains(':')) return false
-        return value.drop(2).all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' }
+        // 先做字符级预检：避免把主机名交给 InetAddress 触发阻塞式 DNS 解析
+        if (!value.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' }) return false
+        return try {
+            val address = InetAddress.getByName(value)
+            address is Inet6Address && address.isMulticastAddress
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /** 发现超时：整数且在 1-30 秒之间，非法输入返回 null。 */
