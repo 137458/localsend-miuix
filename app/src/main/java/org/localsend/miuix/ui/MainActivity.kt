@@ -1,5 +1,6 @@
 package org.localsend.miuix.ui
 
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -12,8 +13,10 @@ import androidx.navigationevent.NavigationEventDispatcher
 import androidx.navigationevent.NavigationEventDispatcherOwner
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import org.localsend.miuix.R
+import org.localsend.miuix.core.PreferenceKeys
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.notification.TransferNotifier
+import org.localsend.miuix.util.AppLanguage
 
 class MainActivity :
     ComponentActivity(),
@@ -31,6 +34,16 @@ class MainActivity :
         ) {
             TransferNotifier.ensure(applicationContext)
         }
+
+    // 应用内语言切换：attachBaseContext 阶段 manager 尚未初始化，直接读 SharedPreferences
+    override fun attachBaseContext(newBase: Context) {
+        val language =
+            newBase
+                .getSharedPreferences(PreferenceKeys.PREF_NAME, Context.MODE_PRIVATE)
+                .getString(PreferenceKeys.KEY_LANGUAGE, AppLanguage.SETTING_SYSTEM)
+                ?: AppLanguage.SETTING_SYSTEM
+        super.attachBaseContext(AppLanguage.wrap(newBase, language))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

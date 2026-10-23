@@ -447,4 +447,44 @@
     <string name="msg_cannot_open_public_download">Unable to open the file in the public Downloads folder</string>
     <string name="msg_cannot_access_custom_dir">Unable to access the custom save folder</string>
     <string name="msg_cannot_create_custom_file">Unable to create a file in the custom save folder</string>
+
+    <!-- Settings: language and appearance -->
+    <string name="settings_pref_language_title">App language</string>
+    <string name="language_system">Follow system</string>
+    <string name="language_zh">中文</string>
+    <string name="language_en">English</string>
+    <string name="settings_pref_theme_color_title">Theme color</string>
+    <string name="theme_color_dynamic">Dynamic color</string>
+    <string name="theme_color_blue">Blue</string>
+    <string name="theme_color_purple">Purple</string>
+    <string name="theme_color_cyan">Cyan</string>
+    <string name="theme_color_green">Green</string>
+    <string name="theme_color_orange">Orange</string>
+    <string name="theme_color_red">Red</string>
+
+    <!-- Settings: transfer finish -->
+    <string name="settings_pref_auto_finish_title">Auto-collapse finished transfers</string>
+    <string name="settings_pref_auto_finish_summary">Hide finished sessions automatically to keep the list clean</string>
+
+    <!-- Settings: quick save and web share -->
+    <string name="receive_pref_quick_save_from_favorites_title">Favorites only</string>
+    <string name="receive_pref_quick_save_from_favorites_summary">With Quick Save on, auto-accept transfers from favorite devices only</string>
+    <string name="settings_pref_web_share_auto_accept_title">Web Share auto-accept</string>
+    <string name="settings_pref_web_share_auto_accept_summary">Accept uploads sent from the browser without confirmation</string>
+
+    <!-- Settings: advanced network -->
+    <string name="settings_section_advanced_network">Advanced network</string>
+    <string name="settings_pref_network_whitelist_title">Network whitelist</string>
+    <string name="settings_pref_network_whitelist_summary">Comma-separated interface names or IP prefixes allowed for discovery</string>
+    <string name="settings_pref_network_blacklist_title">Network blacklist</string>
+    <string name="settings_pref_network_blacklist_summary">Comma-separated interface names or IP prefixes to exclude</string>
+    <string name="settings_pref_multicast_group_title">Multicast group</string>
+    <string name="settings_pref_discovery_timeout_title">Discovery timeout (s)</string>
+    <string name="toast_invalid_multicast_group">Invalid multicast group</string>
+    <string name="toast_invalid_discovery_timeout">Timeout must be 1-30 seconds</string>
+
+    <!-- APK install -->
+    <string name="btn_install_apk">Install</string>
+    <string name="toast_install_permission_needed">Permission to install unknown apps is required</string>
+    <string name="notif_action_install">Install</string>
 </resources>

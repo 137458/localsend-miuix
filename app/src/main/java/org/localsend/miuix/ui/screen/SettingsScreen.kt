@@ -1,16 +1,20 @@
 package org.localsend.miuix.ui.screen
 
+import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -22,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import org.localsend.miuix.R
@@ -30,24 +35,37 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.notification.TransferNotifier
+import org.localsend.miuix.ui.MainActivity
 import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.CertFingerprintDialog
 import org.localsend.miuix.ui.component.DialogButtonRow
 import org.localsend.miuix.ui.component.PinDialog
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
+import org.localsend.miuix.util.AppLanguage
+import org.localsend.miuix.util.SettingsValidators
+import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
+
+/** 高级网络选项中正在编辑的字段，null 表示无编辑弹窗。 */
+private enum class AdvancedNetworkField {
+    WHITELIST,
+    BLACKLIST,
+    MULTICAST_GROUP,
+    DISCOVERY_TIMEOUT,
+}
 
 @Composable
 fun SettingsScreen(
@@ -67,6 +85,7 @@ fun SettingsScreen(
     var showPinDialog by remember { mutableStateOf(false) }
     var showCertDialog by remember { mutableStateOf(false) }
     var showRegenerateConfirm by remember { mutableStateOf(false) }
+    var editingAdvancedField by remember { mutableStateOf<AdvancedNetworkField?>(null) }
     var isNotificationEnabled by remember { mutableStateOf(TransferNotifier.isNotificationsEnabled(context)) }
 
     LifecycleResumeEffect(Unit) {
@@ -82,6 +101,29 @@ fun SettingsScreen(
             stringResource(R.string.theme_monet_system),
             stringResource(R.string.theme_monet_light),
             stringResource(R.string.theme_monet_dark),
+        )
+
+    val languageSettings =
+        remember {
+            listOf(AppLanguage.SETTING_SYSTEM, AppLanguage.SETTING_ZH, AppLanguage.SETTING_EN)
+        }
+    val languageOptions =
+        listOf(
+            stringResource(R.string.language_system),
+            stringResource(R.string.language_zh),
+            stringResource(R.string.language_en),
+        )
+    val currentLanguageIndex = languageSettings.indexOf(settings.language).coerceAtLeast(0)
+
+    val themeColorOptions =
+        listOf(
+            stringResource(R.string.theme_color_dynamic),
+            stringResource(R.string.theme_color_blue),
+            stringResource(R.string.theme_color_purple),
+            stringResource(R.string.theme_color_cyan),
+            stringResource(R.string.theme_color_green),
+            stringResource(R.string.theme_color_orange),
+            stringResource(R.string.theme_color_red),
         )
 
     val supportedDeviceTypes =
@@ -151,6 +193,17 @@ fun SettingsScreen(
                             onClick = onOpenRenameDialog,
                         )
                         WindowDropdownPreference(
+                            title = stringResource(R.string.settings_pref_language_title),
+                            items = languageOptions,
+                            selectedIndex = currentLanguageIndex,
+                            onSelectedIndexChange = { index ->
+                                val newLanguage = languageSettings.getOrElse(index) { AppLanguage.SETTING_SYSTEM }
+                                manager.updateSettings { it.copy(language = newLanguage) }
+                                // 语言偏好已持久化，重建后 attachBaseContext 会重新读取并包装 Context
+                                (context as? MainActivity)?.recreate()
+                            },
+                        )
+                        WindowDropdownPreference(
                             title = stringResource(R.string.settings_pref_device_type_title),
                             items = deviceTypeOptions,
                             selectedIndex = currentDeviceTypeIndex,
@@ -167,12 +220,28 @@ fun SettingsScreen(
                                 manager.updateSettings { it.copy(themeModeIndex = index) }
                             },
                         )
+                        WindowDropdownPreference(
+                            title = stringResource(R.string.settings_pref_theme_color_title),
+                            items = themeColorOptions,
+                            selectedIndex = settings.themeColorIndex.coerceIn(0, themeColorOptions.lastIndex),
+                            onSelectedIndexChange = { index ->
+                                manager.updateSettings { it.copy(themeColorIndex = index) }
+                            },
+                        )
                         SwitchPreference(
                             title = stringResource(R.string.settings_pref_vibrate_title),
                             summary = stringResource(R.string.settings_pref_vibrate_summary),
                             checked = settings.vibrateOnComplete,
                             onCheckedChange = { checked ->
                                 manager.updateSettings { it.copy(vibrateOnComplete = checked) }
+                            },
+                        )
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_pref_auto_finish_title),
+                            summary = stringResource(R.string.settings_pref_auto_finish_summary),
+                            checked = settings.autoFinish,
+                            onCheckedChange = { checked ->
+                                manager.updateSettings { it.copy(autoFinish = checked) }
                             },
                         )
                         ArrowPreference(
@@ -216,6 +285,14 @@ fun SettingsScreen(
                             },
                         )
                         SwitchPreference(
+                            title = stringResource(R.string.receive_pref_quick_save_from_favorites_title),
+                            summary = stringResource(R.string.receive_pref_quick_save_from_favorites_summary),
+                            checked = settings.quickSaveFromFavorites,
+                            onCheckedChange = { checked ->
+                                manager.updateSettings { it.copy(quickSaveFromFavorites = checked) }
+                            },
+                        )
+                        SwitchPreference(
                             title = stringResource(R.string.receive_pref_auto_copy_title),
                             summary = stringResource(R.string.settings_pref_auto_copy_desc),
                             checked = settings.autoCopyText,
@@ -237,6 +314,14 @@ fun SettingsScreen(
                             checked = settings.autoCategorizeMedia,
                             onCheckedChange = { checked ->
                                 manager.updateSettings { it.copy(autoCategorizeMedia = checked) }
+                            },
+                        )
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_pref_web_share_auto_accept_title),
+                            summary = stringResource(R.string.settings_pref_web_share_auto_accept_summary),
+                            checked = settings.webShareAutoAccept,
+                            onCheckedChange = { checked ->
+                                manager.updateSettings { it.copy(webShareAutoAccept = checked) }
                             },
                         )
                         SwitchPreference(
@@ -283,6 +368,30 @@ fun SettingsScreen(
                             summary = if (settings.useHttps) stringResource(R.string.settings_pref_cert_fp_enabled) else stringResource(R.string.settings_pref_cert_fp_disabled),
                             enabled = settings.useHttps,
                             onClick = { if (settings.useHttps) showCertDialog = true },
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    SmallTitle(text = stringResource(R.string.settings_section_advanced_network))
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_pref_network_whitelist_title),
+                            summary = settings.networkWhitelist.ifEmpty { "—" },
+                            onClick = { editingAdvancedField = AdvancedNetworkField.WHITELIST },
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_pref_network_blacklist_title),
+                            summary = settings.networkBlacklist.ifEmpty { "—" },
+                            onClick = { editingAdvancedField = AdvancedNetworkField.BLACKLIST },
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_pref_multicast_group_title),
+                            summary = settings.multicastGroup,
+                            onClick = { editingAdvancedField = AdvancedNetworkField.MULTICAST_GROUP },
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_pref_discovery_timeout_title),
+                            summary = settings.discoveryTimeout.toString(),
+                            onClick = { editingAdvancedField = AdvancedNetworkField.DISCOVERY_TIMEOUT },
                         )
                     }
                 }
@@ -371,6 +480,133 @@ fun SettingsScreen(
                             contentColor = MiuixTheme.colorScheme.onError,
                         ),
                 )
+            }
+        }
+    }
+
+    when (editingAdvancedField) {
+        AdvancedNetworkField.WHITELIST ->
+            AdvancedNetworkEditDialog(
+                show = true,
+                title = stringResource(R.string.settings_pref_network_whitelist_title),
+                initialValue = settings.networkWhitelist,
+                keyboardType = KeyboardType.Ascii,
+                invalidToastRes = null,
+                validate = { true },
+                onDismissRequest = { editingAdvancedField = null },
+                onSave = { value ->
+                    manager.updateSettings { it.copy(networkWhitelist = value) }
+                },
+            )
+        AdvancedNetworkField.BLACKLIST ->
+            AdvancedNetworkEditDialog(
+                show = true,
+                title = stringResource(R.string.settings_pref_network_blacklist_title),
+                initialValue = settings.networkBlacklist,
+                keyboardType = KeyboardType.Ascii,
+                invalidToastRes = null,
+                validate = { true },
+                onDismissRequest = { editingAdvancedField = null },
+                onSave = { value ->
+                    manager.updateSettings { it.copy(networkBlacklist = value) }
+                },
+            )
+        AdvancedNetworkField.MULTICAST_GROUP ->
+            AdvancedNetworkEditDialog(
+                show = true,
+                title = stringResource(R.string.settings_pref_multicast_group_title),
+                initialValue = settings.multicastGroup,
+                keyboardType = KeyboardType.Ascii,
+                invalidToastRes = R.string.toast_invalid_multicast_group,
+                validate = { SettingsValidators.isValidMulticastGroup(it) },
+                onDismissRequest = { editingAdvancedField = null },
+                onSave = { value ->
+                    manager.updateSettings { it.copy(multicastGroup = value) }
+                },
+            )
+        AdvancedNetworkField.DISCOVERY_TIMEOUT ->
+            AdvancedNetworkEditDialog(
+                show = true,
+                title = stringResource(R.string.settings_pref_discovery_timeout_title),
+                initialValue = settings.discoveryTimeout.toString(),
+                keyboardType = KeyboardType.Number,
+                invalidToastRes = R.string.toast_invalid_discovery_timeout,
+                validate = { SettingsValidators.parseDiscoveryTimeout(it) != null },
+                onDismissRequest = { editingAdvancedField = null },
+                onSave = { value ->
+                    val timeout = SettingsValidators.parseDiscoveryTimeout(value)
+                    if (timeout != null) {
+                        manager.updateSettings { it.copy(discoveryTimeout = timeout) }
+                    }
+                },
+            )
+        null -> {}
+    }
+}
+
+/** 高级网络选项的文本编辑弹窗，复用 PortDialog 的 WindowDialog+TextField+双按钮模式。 */
+@Composable
+private fun AdvancedNetworkEditDialog(
+    show: Boolean,
+    title: String,
+    initialValue: String,
+    keyboardType: KeyboardType,
+    @StringRes invalidToastRes: Int?,
+    validate: (String) -> Boolean,
+    onDismissRequest: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    var value by remember(show, initialValue) { mutableStateOf(initialValue) }
+
+    WindowDialog(
+        show = show,
+        title = title,
+        onDismissRequest = onDismissRequest,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+        ) {
+            TextField(
+                value = value,
+                onValueChange = { newValue -> if (newValue.length <= 200) value = newValue },
+                label = title,
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Button(
+                    onClick = onDismissRequest,
+                    colors = ButtonDefaults.buttonColors(),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(stringResource(R.string.btn_cancel))
+                }
+                Button(
+                    onClick = {
+                        if (validate(value)) {
+                            onSave(value)
+                            onDismissRequest()
+                        } else if (invalidToastRes != null) {
+                            Toast.makeText(context, invalidToastRes, Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(stringResource(R.string.btn_confirm))
+                }
             }
         }
     }

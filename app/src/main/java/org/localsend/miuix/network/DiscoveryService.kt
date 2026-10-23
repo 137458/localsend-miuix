@@ -7,6 +7,7 @@ import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -39,6 +40,10 @@ class DiscoveryService(
     private val scope: CoroutineScope,
     private val getLocalDevice: () -> Device,
     private val onDeviceDiscovered: (Device) -> Unit,
+    private val getMulticastGroup: () -> String = { NetworkConstants.DEFAULT_MULTICAST_IP },
+    private val getDiscoveryTimeoutSeconds: () -> Int = { NetworkConstants.DEFAULT_DISCOVERY_TIMEOUT_SECONDS },
+    private val getNetworkWhitelist: () -> String = { "" },
+    private val getNetworkBlacklist: () -> String = { "" },
 ) {
     private val json = AppJson.default
     private val scanDispatcher = Dispatchers.IO.limitedParallelism(32)
@@ -126,13 +131,13 @@ class DiscoveryService(
                 while (isActive) {
                     var socket: MulticastSocket? = null
                     try {
-                        val group = InetAddress.getByName(NetworkConstants.DEFAULT_MULTICAST_IP)
+                        val group = InetAddress.getByName(getMulticastGroup())
                         socket =
                             MulticastSocket(null).apply {
                                 reuseAddress = true
                                 bind(InetSocketAddress(NetworkConstants.DEFAULT_PORT))
                                 joinGroup(group)
-                                soTimeout = 3000
+                                soTimeout = getDiscoveryTimeoutSeconds() * 1000
                             }
 
                         val buffer = ByteArray(65535)
@@ -145,6 +150,7 @@ class DiscoveryService(
 
                                 // Ignore our own broadcast
                                 val localDevice = getLocalDevice()
+                                // 自检不过滤：本机包可能经任意接口回来，套用白/黑名单会误判为自己
                                 if (NetworkUtils.getLocalIpAddresses().contains(senderIp)) {
                                     continue
                                 }
@@ -202,8 +208,8 @@ class DiscoveryService(
                 val dto = localDevice.toDto(announce = true)
                 val payload = json.encodeToString(DeviceDto.serializer(), dto).toByteArray(Charsets.UTF_8)
 
-                val multicastGroup = InetAddress.getByName(NetworkConstants.DEFAULT_MULTICAST_IP)
-                val broadcasts = NetworkUtils.getBroadcastAddresses()
+                val multicastGroup = InetAddress.getByName(getMulticastGroup())
+                val broadcasts = NetworkUtils.getBroadcastAddresses(getNetworkWhitelist(), getNetworkBlacklist())
 
                 DatagramSocket().use { socket ->
                     socket.broadcast = true
@@ -255,9 +261,9 @@ class DiscoveryService(
         scanJob?.cancel()
         scanJob =
             scope.launch(scanDispatcher) {
-                val baseIps = NetworkUtils.getSubnetBaseIps()
+                val baseIps = NetworkUtils.getSubnetBaseIps(getNetworkWhitelist(), getNetworkBlacklist())
                 if (baseIps.isEmpty()) return@launch
-                val localIps = NetworkUtils.getLocalIpAddresses()
+                val localIps = NetworkUtils.getLocalIpAddresses(getNetworkWhitelist(), getNetworkBlacklist())
                 val localDevice = getLocalDevice()
                 val total = baseIps.size * 254
                 val current = AtomicInteger(0)
@@ -276,7 +282,13 @@ class DiscoveryService(
                                             if (found) break
                                             try {
                                                 val url = "$proto://$targetIp:${NetworkConstants.DEFAULT_PORT}$route"
-                                                val response = httpClient.get(url)
+                                                val response =
+                                                    httpClient.get(url) {
+                                                        timeout {
+                                                            // 逐目标扫描超时 = discoveryTimeout 秒（高级网络选项）
+                                                            requestTimeoutMillis = getDiscoveryTimeoutSeconds() * 1000L
+                                                        }
+                                                    }
                                                 val dto = response.body<DeviceDto>()
                                                 if (dto.fingerprint != localDevice.fingerprint) {
                                                     val device = Device.fromDto(dto, targetIp)

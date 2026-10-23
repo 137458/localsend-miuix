@@ -61,6 +61,7 @@ import org.localsend.miuix.ui.screen.ReceiveScreen
 import org.localsend.miuix.ui.screen.SendScreen
 import org.localsend.miuix.ui.screen.SettingsScreen
 import org.localsend.miuix.ui.screen.UpdateScreen
+import org.localsend.miuix.util.themePaletteForIndex
 import top.yukonga.miuix.kmp.basic.Badge
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.NavigationRail
@@ -107,7 +108,22 @@ fun App(manager: LocalSendManager) {
                 else -> ColorSchemeMode.System
             }
         }
-    val themeController = remember(colorSchemeMode) { ThemeController(colorSchemeMode) }
+    // 主题色板（themeColorIndex）：0=动态取色走默认构造；1..6=固定色板，
+    // 浅/深色配色经 lightColors/darkColors 生效，seed 经 keyColor 让 Monet 模式命中同一取色管线
+    val themePalette = remember(settings.themeColorIndex) { themePaletteForIndex(settings.themeColorIndex) }
+    val themeController =
+        remember(colorSchemeMode, themePalette) {
+            when (themePalette) {
+                null -> ThemeController(colorSchemeMode)
+                else ->
+                    ThemeController(
+                        colorSchemeMode = colorSchemeMode,
+                        lightColors = themePalette.lightColors,
+                        darkColors = themePalette.darkColors,
+                        keyColor = themePalette.seed,
+                    )
+            }
+        }
 
     // 2. Horizontal Pager State（支持进程重建时恢复离开时的页面）
     val pagerState =

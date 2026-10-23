@@ -27,6 +27,15 @@ object PreferenceKeys {
     const val KEY_WIDE_SCREEN_NAVIGATION_RAIL = "wide_screen_navigation_rail"
     const val KEY_SAVE_TEXT_AS_FILE = "save_text_as_file"
     const val KEY_AUTO_CATEGORIZE_MEDIA = "auto_categorize_media"
+    const val KEY_LANGUAGE = "language"
+    const val KEY_QUICK_SAVE_FROM_FAVORITES = "quick_save_from_favorites"
+    const val KEY_WEB_SHARE_AUTO_ACCEPT = "web_share_auto_accept"
+    const val KEY_AUTO_FINISH = "auto_finish"
+    const val KEY_THEME_COLOR_INDEX = "theme_color_index"
+    const val KEY_NETWORK_WHITELIST = "network_whitelist"
+    const val KEY_NETWORK_BLACKLIST = "network_blacklist"
+    const val KEY_MULTICAST_GROUP = "multicast_group"
+    const val KEY_DISCOVERY_TIMEOUT = "discovery_timeout"
 }
 
 object ExternalLinks {
@@ -70,6 +79,7 @@ object AppActions {
 object NetworkConstants {
     const val DEFAULT_MULTICAST_IP = "224.0.0.167"
     const val DEFAULT_PORT = 53317
+    const val DEFAULT_DISCOVERY_TIMEOUT_SECONDS = 5
     const val PROTOCOL_VERSION = "2.1"
     const val MULTICAST_LOCK_TAG = "LocalSendMiuixMulticastLock"
     const val WAKE_LOCK_TAG = "LocalSend:TransferWakeLock"

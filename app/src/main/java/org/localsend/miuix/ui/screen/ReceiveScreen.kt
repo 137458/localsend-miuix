@@ -158,6 +158,14 @@ fun ReceiveScreen(
                             },
                         )
                         SwitchPreference(
+                            title = stringResource(R.string.receive_pref_quick_save_from_favorites_title),
+                            summary = stringResource(R.string.receive_pref_quick_save_from_favorites_summary),
+                            checked = settings.quickSaveFromFavorites,
+                            onCheckedChange = { checked ->
+                                manager.updateSettings { it.copy(quickSaveFromFavorites = checked) }
+                            },
+                        )
+                        SwitchPreference(
                             title = stringResource(R.string.receive_pref_auto_copy_title),
                             summary = stringResource(R.string.receive_pref_auto_copy_summary),
                             checked = settings.autoCopyText,

@@ -10,18 +10,28 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.FileProvider
 import org.localsend.miuix.R
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.ui.MainActivity
+import org.localsend.miuix.util.InstallHelper
+import org.localsend.miuix.util.InstallSource
+import org.localsend.miuix.util.OpenableFile
+import org.localsend.miuix.util.pickFileSource
+import org.localsend.miuix.util.pickOpenableFile
+import java.io.File
 
 /**
  * 传输通知管理器。用于在后台或快速保存自动接收时，向用户提示传输进度与结果，
  * 并接入 HyperOS 焦点通知与原生 Android 16+ Live Updates 胶囊显示。
  */
 object TransferNotifier {
+    private const val TAG = "TransferNotifier"
+
     const val CHANNEL_RECEIVE = "localsend_receive"
     const val CHANNEL_RECEIVE_REQUEST = "localsend_receive_request"
     const val CHANNEL_SEND = "localsend_send"
@@ -377,9 +387,95 @@ object TransferNotifier {
                 .setContentText(content)
                 .setSmallIcon(resultIcon)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setContentIntent(appPendingIntent(context))
+                .setContentIntent(resultContentIntent(context, session))
                 .setOngoing(false)
                 .setAutoCancel(true)
+        // 接收完成且含 apk：追加“安装”直达动作；无 apk 或来源不可访问时不添加
+        if (session.status == TransferStatus.Completed && session.isIncoming && !session.isTextMessage) {
+            installActionPendingIntent(context, session)?.let {
+                builder.addAction(R.drawable.ic_stat_accept, context.getString(R.string.notif_action_install), it)
+            }
+        }
         nm.notify(notifId, builder.build())
     }
+
+    /** 完成接收通知的点击意图：直达第一个可访问文件；非接收完成或均不可达时回退拉起 App。 */
+    private fun resultContentIntent(
+        context: Context,
+        session: TransferSession,
+    ): PendingIntent {
+        val fallback = appPendingIntent(context)
+        if (session.status != TransferStatus.Completed || !session.isIncoming || session.isTextMessage) return fallback
+        val pick =
+            pickOpenableFile(
+                session.files.map {
+                    OpenableFile(
+                        name = it.name,
+                        path = it.path,
+                        uriString = (it.mediaStoreUri ?: it.uri)?.toString(),
+                        mimeType = it.mimeType,
+                    )
+                },
+            ) ?: return fallback
+        val intent =
+            when (val source = pick.source) {
+                is InstallSource.DiskFile -> openDiskFileIntent(context, source.path, pick.file.mimeType)
+                is InstallSource.ContentUri -> openContentIntent(source.uriString, pick.file.mimeType)
+            } ?: return fallback
+        return activityPendingIntent(context, sessionNotifId(session), intent)
+    }
+
+    /** 磁盘文件经 FileProvider 共享打开；路径未被 file_paths 覆盖等映射失败时返回 null。 */
+    private fun openDiskFileIntent(
+        context: Context,
+        path: String,
+        mimeType: String,
+    ): Intent? =
+        try {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(path))
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "openDiskFileIntent: cannot share '$path' via FileProvider: ${e.message}")
+            null
+        }
+
+    /** content uri 直达打开（MediaStore/SAF 既有 ACTION_VIEW 模式）。 */
+    private fun openContentIntent(
+        uriString: String,
+        mimeType: String,
+    ): Intent =
+        Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(Uri.parse(uriString), mimeType)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+    /** 接收完成含 apk 时构造“安装”动作的 PendingIntent；无 apk 或来源不可访问时返回 null。 */
+    private fun installActionPendingIntent(
+        context: Context,
+        session: TransferSession,
+    ): PendingIntent? {
+        val apk = session.files.firstOrNull { InstallHelper.isApk(it.name) } ?: return null
+        val source = pickFileSource(apk.path, (apk.mediaStoreUri ?: apk.uri)?.toString()) ?: return null
+        val intent =
+            when (source) {
+                is InstallSource.DiskFile -> InstallHelper.buildInstallIntent(context, File(source.path))
+                is InstallSource.ContentUri -> InstallHelper.buildInstallIntent(context, Uri.parse(source.uriString))
+            }
+        return activityPendingIntent(context, sessionNotifId(session) + 1, intent)
+    }
+
+    private fun activityPendingIntent(
+        context: Context,
+        requestCode: Int,
+        intent: Intent,
+    ): PendingIntent =
+        PendingIntent.getActivity(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0),
+        )
 }

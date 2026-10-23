@@ -58,6 +58,7 @@ import org.localsend.miuix.network.TargetPinRequiredException
 import org.localsend.miuix.network.TlsStore
 import org.localsend.miuix.notification.TransferNotifier
 import org.localsend.miuix.transfer.TransferOutcome
+import org.localsend.miuix.util.AutoFinishPolicy
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -77,7 +78,13 @@ class LocalSendManager(
     private val json = AppJson.default
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val started = AtomicBoolean(false)
-    private val deviceDirectory = DeviceDirectory()
+    private val deviceDirectory =
+        DeviceDirectory(
+            primaryIp = {
+                // 同网段优选依据的本机 IP 与发现层共用白/黑名单过滤（惰性求值）
+                filteredLocalIps().firstOrNull { it != "127.0.0.1" }
+            },
+        )
     private val canceledSessionIds = ConcurrentHashMap.newKeySet<String>()
     private val remoteSessionIds = ConcurrentHashMap<String, String>()
 
@@ -185,6 +192,10 @@ class LocalSendManager(
             onDeviceDiscovered = { device ->
                 upsertDevice(device)
             },
+            getMulticastGroup = { _settings.value.multicastGroup },
+            getDiscoveryTimeoutSeconds = { _settings.value.discoveryTimeout },
+            getNetworkWhitelist = { _settings.value.networkWhitelist },
+            getNetworkBlacklist = { _settings.value.networkBlacklist },
         )
 
     private val targetDevicePins = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -205,6 +216,9 @@ class LocalSendManager(
             getPort = { _settings.value.port },
             getLocalDevice = { getLocalDevice() },
             isQuickSave = { _settings.value.quickSave },
+            isQuickSaveFavoritesOnly = { _settings.value.quickSaveFromFavorites },
+            isFavoriteDevice = { device -> isFavorite(device) },
+            isWebShareAutoAccept = { _settings.value.webShareAutoAccept },
             getSaveTarget = { getSaveTarget() },
             getPin = { _settings.value.pin },
             getUseHttps = { _settings.value.useHttps },
@@ -296,8 +310,11 @@ class LocalSendManager(
         }
     }
 
+    /** 本机参与发现与被发现所用的 IP 列表，已按高级网络选项白/黑名单过滤。 */
+    private fun filteredLocalIps(): List<String> = NetworkUtils.getLocalIpAddresses(_settings.value.networkWhitelist, _settings.value.networkBlacklist)
+
     fun getLocalDevice(): Device {
-        val primaryIp = NetworkUtils.getLocalIpAddresses().firstOrNull() ?: "127.0.0.1"
+        val primaryIp = filteredLocalIps().firstOrNull() ?: "127.0.0.1"
         val useHttps = _settings.value.useHttps
         return Device(
             alias = _settings.value.alias,
@@ -778,8 +795,15 @@ class LocalSendManager(
                     addHistory(historyItem)
                 }
 
-                // 终结状态保留片刻，以便用户在设备 Card 内看清结果；失败与取消保留更久，便于读完错误原因
-                delay(if (session.status == TransferStatus.Completed) 2000L else 4000L)
+                // 终结状态保留片刻，以便用户在设备 Card 内看清结果；失败与取消保留更久，便于读完错误原因。
+                // 开启 autoFinish 时完成的会话跳过展示期直接收起
+                if (!AutoFinishPolicy.shouldAutoDismiss(
+                        finished = session.status == TransferStatus.Completed,
+                        autoFinish = _settings.value.autoFinish,
+                    )
+                ) {
+                    delay(if (session.status == TransferStatus.Completed) 2000L else 4000L)
+                }
                 _activeSessions.update { list -> list.filterNot { it.sessionId == session.sessionId } }
                 syncForegroundServiceState(_activeSessions.value.size)
             } else {

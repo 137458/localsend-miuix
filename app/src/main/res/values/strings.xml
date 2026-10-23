@@ -447,4 +447,44 @@
     <string name="msg_cannot_open_public_download">无法打开公共下载目录中的文件</string>
     <string name="msg_cannot_access_custom_dir">无法访问自定义保存目录</string>
     <string name="msg_cannot_create_custom_file">无法在自定义保存目录中创建文件</string>
+
+    <!-- 设置：语言与外观 -->
+    <string name="settings_pref_language_title">应用语言</string>
+    <string name="language_system">跟随系统</string>
+    <string name="language_zh">中文</string>
+    <string name="language_en">English</string>
+    <string name="settings_pref_theme_color_title">主题色</string>
+    <string name="theme_color_dynamic">动态取色</string>
+    <string name="theme_color_blue">蓝</string>
+    <string name="theme_color_purple">紫</string>
+    <string name="theme_color_cyan">青</string>
+    <string name="theme_color_green">绿</string>
+    <string name="theme_color_orange">橙</string>
+    <string name="theme_color_red">红</string>
+
+    <!-- 设置：传输收尾 -->
+    <string name="settings_pref_auto_finish_title">传输完成后自动收起</string>
+    <string name="settings_pref_auto_finish_summary">传输完成后自动隐藏会话，保持界面清爽</string>
+
+    <!-- 设置：快速保存与网页传输 -->
+    <string name="receive_pref_quick_save_from_favorites_title">仅自动接收收藏设备</string>
+    <string name="receive_pref_quick_save_from_favorites_summary">开启快速保存时，仅自动接受已收藏设备的传输</string>
+    <string name="settings_pref_web_share_auto_accept_title">网页传输自动接受</string>
+    <string name="settings_pref_web_share_auto_accept_summary">浏览器回传文件时无需在手机端再次确认</string>
+
+    <!-- 设置：高级网络选项 -->
+    <string name="settings_section_advanced_network">高级网络选项</string>
+    <string name="settings_pref_network_whitelist_title">网络白名单</string>
+    <string name="settings_pref_network_whitelist_summary">仅匹配的网卡或 IP 前缀参与发现，逗号分隔</string>
+    <string name="settings_pref_network_blacklist_title">网络黑名单</string>
+    <string name="settings_pref_network_blacklist_summary">排除匹配的网卡或 IP 前缀，逗号分隔</string>
+    <string name="settings_pref_multicast_group_title">组播地址</string>
+    <string name="settings_pref_discovery_timeout_title">发现超时（秒）</string>
+    <string name="toast_invalid_multicast_group">组播地址无效</string>
+    <string name="toast_invalid_discovery_timeout">超时需在 1-30 秒之间</string>
+
+    <!-- 安装 APK -->
+    <string name="btn_install_apk">安装</string>
+    <string name="toast_install_permission_needed">需要允许安装未知应用权限</string>
+    <string name="notif_action_install">安装</string>
 </resources>

@@ -1,5 +1,7 @@
 package org.localsend.miuix.network
 
+import org.localsend.miuix.util.IfInfo
+import org.localsend.miuix.util.NetworkFilter
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
@@ -31,10 +33,14 @@ object NetworkUtils {
             p1[2] == p2[2]
     }
 
-    fun getLocalIpAddresses(): List<String> {
+    fun getLocalIpAddresses(
+        whitelist: String = "",
+        blacklist: String = "",
+    ): List<String> {
         val wifiAddresses = mutableListOf<String>()
         val hotspotAddresses = mutableListOf<String>()
         val otherLanAddresses = mutableListOf<String>()
+        val perInterface = mutableListOf<IfInfo>()
 
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
@@ -56,27 +62,32 @@ object NetworkUtils {
                     continue
                 }
 
-                val isWifi = name.startsWith("wlan") || name.startsWith("eth") || name.startsWith("en")
-                val isHotspot = name.startsWith("ap") || name.startsWith("softap")
-                val isTethering = name.startsWith("rndis") || name.startsWith("usb")
-
+                val ips = mutableListOf<String>()
                 val addrs = intf.inetAddresses?.toList().orEmpty()
                 for (addr in addrs) {
                     if (!addr.isLoopbackAddress && addr is Inet4Address) {
                         val host = addr.hostAddress ?: continue
                         if (host.startsWith("127.") || !isPrivateIpv4(host)) continue
-
-                        when {
-                            isWifi -> wifiAddresses.add(host)
-                            isHotspot -> hotspotAddresses.add(host)
-                            isTethering -> otherLanAddresses.add(host)
-                            else -> otherLanAddresses.add(host)
-                        }
+                        ips.add(host)
                     }
                 }
+                if (ips.isNotEmpty()) perInterface.add(IfInfo(intf.name, ips))
             }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+
+        for (iface in NetworkFilter.selectInterfaces(perInterface, whitelist, blacklist)) {
+            val name = iface.name.lowercase()
+            val isWifi = name.startsWith("wlan") || name.startsWith("eth") || name.startsWith("en")
+            val isHotspot = name.startsWith("ap") || name.startsWith("softap")
+            for (host in iface.addresses) {
+                when {
+                    isWifi -> wifiAddresses.add(host)
+                    isHotspot -> hotspotAddresses.add(host)
+                    else -> otherLanAddresses.add(host)
+                }
+            }
         }
 
         val all = wifiAddresses + hotspotAddresses + otherLanAddresses
@@ -85,8 +96,12 @@ object NetworkUtils {
 
     fun getPrimaryIp(): String? = getLocalIpAddresses().firstOrNull { it != "127.0.0.1" }
 
-    fun getBroadcastAddresses(): List<String> {
+    fun getBroadcastAddresses(
+        whitelist: String = "",
+        blacklist: String = "",
+    ): List<String> {
         val broadcasts = mutableListOf<String>()
+        val perInterface = mutableListOf<IfInfo>()
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
             for (intf in interfaces) {
@@ -94,18 +109,27 @@ object NetworkUtils {
                 val name = intf.name.lowercase()
                 if (name.startsWith("rmnet") || name.startsWith("ccmni") || name.startsWith("tun")) continue
 
+                val ifaceBroadcasts = mutableListOf<String>()
                 for (ia in intf.interfaceAddresses.orEmpty()) {
                     val broadcast = ia.broadcast
                     if (broadcast != null && broadcast is Inet4Address) {
                         val host = broadcast.hostAddress
-                        if (!host.isNullOrEmpty() && !broadcasts.contains(host)) {
-                            broadcasts.add(host)
+                        if (!host.isNullOrEmpty()) {
+                            ifaceBroadcasts.add(host)
                         }
                     }
                 }
+                if (ifaceBroadcasts.isNotEmpty()) perInterface.add(IfInfo(intf.name, ifaceBroadcasts))
             }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+        for (iface in NetworkFilter.selectInterfaces(perInterface, whitelist, blacklist)) {
+            for (host in iface.addresses) {
+                if (!broadcasts.contains(host)) {
+                    broadcasts.add(host)
+                }
+            }
         }
         if (!broadcasts.contains("255.255.255.255")) {
             broadcasts.add("255.255.255.255")
@@ -113,8 +137,11 @@ object NetworkUtils {
         return broadcasts
     }
 
-    fun getSubnetBaseIps(): List<String> {
-        val ips = getLocalIpAddresses()
+    fun getSubnetBaseIps(
+        whitelist: String = "",
+        blacklist: String = "",
+    ): List<String> {
+        val ips = getLocalIpAddresses(whitelist, blacklist)
         val bases = mutableListOf<String>()
         for (ip in ips) {
             if (ip == "127.0.0.1" || !isPrivateIpv4(ip)) continue

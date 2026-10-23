@@ -48,6 +48,7 @@ import org.localsend.miuix.model.ShareSession
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.transfer.TransferOutcome
+import org.localsend.miuix.util.AcceptPolicy
 import org.localsend.miuix.webshare.WebShareCopy
 import java.io.File
 import java.io.InputStream
@@ -73,6 +74,9 @@ class LocalSendServer(
     private val getPort: () -> Int,
     private val getLocalDevice: () -> Device,
     private val isQuickSave: () -> Boolean,
+    private val isQuickSaveFavoritesOnly: () -> Boolean,
+    private val isFavoriteDevice: (Device) -> Boolean,
+    private val isWebShareAutoAccept: () -> Boolean,
     private val getSaveTarget: () -> SaveTarget,
     private val getPin: () -> String?,
     private val getUseHttps: () -> Boolean,
@@ -588,7 +592,13 @@ class LocalSendServer(
                 onSessionUpdated(session)
 
                 val approval =
-                    if (isQuickSave()) {
+                    if (AcceptPolicy.shouldAutoAcceptWebShare(isWebShareAutoAccept(), senderDevice.deviceType) ||
+                        AcceptPolicy.shouldAutoAccept(
+                            quickSave = isQuickSave(),
+                            favoritesOnly = isQuickSaveFavoritesOnly(),
+                            isFavorite = isFavoriteDevice(senderDevice),
+                        )
+                    ) {
                         IncomingDecision.AcceptAll
                     } else {
                         onIncomingRequest(session)

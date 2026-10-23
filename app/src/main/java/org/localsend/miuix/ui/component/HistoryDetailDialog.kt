@@ -1,5 +1,6 @@
 package org.localsend.miuix.ui.component
 
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -50,7 +51,10 @@ import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.HistoryFileEntry
 import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.util.InstallHelper
+import org.localsend.miuix.util.InstallSource
 import org.localsend.miuix.util.ThumbnailHelper
+import org.localsend.miuix.util.pickFileSource
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -58,6 +62,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -327,6 +332,16 @@ fun HistoryDetailDialog(
                                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                     )
                                 }
+                                // apk 条目提供“安装”直达按钮，失败以提示代替崩溃
+                                if (InstallHelper.isApk(file.name)) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Button(
+                                        onClick = { launchApkInstall(context, file.path, file.uriString) },
+                                        colors = ButtonDefaults.buttonColorsPrimary(),
+                                    ) {
+                                        Text(stringResource(R.string.btn_install_apk))
+                                    }
+                                }
                             }
                         }
                     }
@@ -375,6 +390,32 @@ fun HistoryDetailDialog(
                 }
             }
         }
+    }
+}
+
+/**
+ * 触发 apk 安装：优先真实磁盘文件（FileProvider），否则退回 content uri。
+ * 失败一律以 Toast 提示，不允许应用崩溃。
+ */
+private fun launchApkInstall(
+    context: Context,
+    path: String?,
+    uriString: String?,
+) {
+    val intent =
+        when (val source = pickFileSource(path, uriString)) {
+            is InstallSource.DiskFile -> InstallHelper.buildInstallIntent(context, File(source.path))
+            is InstallSource.ContentUri -> InstallHelper.buildInstallIntent(context, Uri.parse(source.uriString))
+            null -> return
+        }
+    try {
+        context.startActivity(intent)
+    } catch (e: SecurityException) {
+        Toast.makeText(context, context.getString(R.string.toast_install_permission_needed), Toast.LENGTH_SHORT).show()
+    } catch (e: ActivityNotFoundException) {
+        Toast.makeText(context, context.getString(R.string.toast_install_permission_needed), Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        Toast.makeText(context, context.getString(R.string.toast_cannot_open_file), Toast.LENGTH_SHORT).show()
     }
 }
 

@@ -13,13 +13,13 @@ import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.PrepareUploadRequestDto
 import org.localsend.miuix.model.PrepareUploadResponseDto
+import org.localsend.miuix.util.Sha256
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
-import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
 
 class TargetPinRequiredException(
@@ -71,11 +71,10 @@ class LocalSendClient(
     ): Result<HandshakeResult> =
         withContext(Dispatchers.IO) {
             try {
-                // 发送方按规范计算小文本文件的 sha256（协议中为可选字段）；
-                // 多文件或大文件跳过全盘预读，消除握手前数十秒卡顿并避免闪存双重读盘与发热
-                val maxSha256PrecomputeBytes = 2 * 1024 * 1024L
+                // 发送方按协议为每个待传文件流式计算 sha256（字段可选，但缺失即令接收端放弃完整性校验）；
+                // 沿用既有 Dispatchers.IO 上下文，固定缓冲逐块更新，避免整文件载入内存
                 for (fileItem in files) {
-                    if (fileItem.expectedSha256 == null && ((files.size <= 3 && fileItem.size in 1..maxSha256PrecomputeBytes) || fileItem.textContent != null)) {
+                    if (fileItem.expectedSha256 == null) {
                         fileItem.expectedSha256 = computeSha256(fileItem)
                     }
                 }
@@ -481,20 +480,12 @@ class LocalSendClient(
         }
     }
 
-    private fun computeSha256(fileItem: FileItem): String? {
-        return try {
-            val input = openSourceStream(fileItem)?.buffered(128 * 1024) ?: return null
-            val digest = MessageDigest.getInstance("SHA-256")
-            val buffer = ByteArray(128 * 1024)
-            input.use {
-                var read: Int
-                while (it.read(buffer).also { r -> read = r } != -1) {
-                    digest.update(buffer, 0, read)
-                }
-            }
-            digest.digest().joinToString("") { "%02x".format(it) }
+    /** 计算文件/URI/文本内容的 sha256；数据源不可读时返回 null（协议中该字段可选）。 */
+    private fun computeSha256(fileItem: FileItem): String? =
+        try {
+            openSourceStream(fileItem)?.let { Sha256.hexDigest(it) }
         } catch (e: Exception) {
+            Log.w(TAG, "computeSha256: failed for '${fileItem.name}': ${e.message}")
             null
         }
-    }
 }
