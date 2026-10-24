@@ -115,17 +115,6 @@ fun SettingsScreen(
         )
     val currentLanguageIndex = languageSettings.indexOf(settings.language).coerceAtLeast(0)
 
-    val themeColorOptions =
-        listOf(
-            stringResource(R.string.theme_color_dynamic),
-            stringResource(R.string.theme_color_blue),
-            stringResource(R.string.theme_color_purple),
-            stringResource(R.string.theme_color_cyan),
-            stringResource(R.string.theme_color_green),
-            stringResource(R.string.theme_color_orange),
-            stringResource(R.string.theme_color_red),
-        )
-
     val supportedDeviceTypes =
         remember {
             listOf(
@@ -218,14 +207,6 @@ fun SettingsScreen(
                             selectedIndex = settings.themeModeIndex,
                             onSelectedIndexChange = { index ->
                                 manager.updateSettings { it.copy(themeModeIndex = index) }
-                            },
-                        )
-                        WindowDropdownPreference(
-                            title = stringResource(R.string.settings_pref_theme_color_title),
-                            items = themeColorOptions,
-                            selectedIndex = settings.themeColorIndex.coerceIn(0, themeColorOptions.lastIndex),
-                            onSelectedIndexChange = { index ->
-                                manager.updateSettings { it.copy(themeColorIndex = index) }
                             },
                         )
                         SwitchPreference(

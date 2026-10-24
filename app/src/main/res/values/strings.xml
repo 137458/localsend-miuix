@@ -453,14 +453,6 @@
     <string name="language_system">跟随系统</string>
     <string name="language_zh">中文</string>
     <string name="language_en">English</string>
-    <string name="settings_pref_theme_color_title">主题色</string>
-    <string name="theme_color_dynamic">动态取色</string>
-    <string name="theme_color_blue">蓝</string>
-    <string name="theme_color_purple">紫</string>
-    <string name="theme_color_cyan">青</string>
-    <string name="theme_color_green">绿</string>
-    <string name="theme_color_orange">橙</string>
-    <string name="theme_color_red">红</string>
 
     <!-- 设置：传输收尾 -->
     <string name="settings_pref_auto_finish_title">传输完成后自动收起</string>

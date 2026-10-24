@@ -31,7 +31,6 @@ object PreferenceKeys {
     const val KEY_QUICK_SAVE_FROM_FAVORITES = "quick_save_from_favorites"
     const val KEY_WEB_SHARE_AUTO_ACCEPT = "web_share_auto_accept"
     const val KEY_AUTO_FINISH = "auto_finish"
-    const val KEY_THEME_COLOR_INDEX = "theme_color_index"
     const val KEY_NETWORK_WHITELIST = "network_whitelist"
     const val KEY_NETWORK_BLACKLIST = "network_blacklist"
     const val KEY_MULTICAST_GROUP = "multicast_group"

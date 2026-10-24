@@ -103,7 +103,6 @@ class SettingsMappingTest {
         assertEquals(false, settings.quickSaveFromFavorites)
         assertEquals(false, settings.webShareAutoAccept)
         assertEquals(false, settings.autoFinish)
-        assertEquals(0, settings.themeColorIndex)
         assertEquals("", settings.networkWhitelist)
         assertEquals("", settings.networkBlacklist)
         assertEquals(5, settings.discoveryTimeout)
@@ -119,7 +118,6 @@ class SettingsMappingTest {
                 quickSaveFromFavorites = true,
                 webShareAutoAccept = true,
                 autoFinish = true,
-                themeColorIndex = 4,
                 networkWhitelist = "wlan0,192.168.",
                 networkBlacklist = "eth1",
                 discoveryTimeout = 12,
@@ -131,7 +129,6 @@ class SettingsMappingTest {
         assertEquals(true, loaded.quickSaveFromFavorites)
         assertEquals(true, loaded.webShareAutoAccept)
         assertEquals(true, loaded.autoFinish)
-        assertEquals(4, loaded.themeColorIndex)
         assertEquals("wlan0,192.168.", loaded.networkWhitelist)
         assertEquals("eth1", loaded.networkBlacklist)
         assertEquals(12, loaded.discoveryTimeout)
