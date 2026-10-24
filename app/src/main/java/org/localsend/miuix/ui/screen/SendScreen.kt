@@ -23,22 +23,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,7 +43,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.Device
@@ -64,6 +56,7 @@ import org.localsend.miuix.ui.component.InlineTransferProgress
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import org.localsend.miuix.util.ThumbnailHelper
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -77,6 +70,14 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.AddFolder
+import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.extended.ExpandLess
+import top.yukonga.miuix.kmp.icon.extended.ExpandMore
+import top.yukonga.miuix.kmp.icon.extended.Folder
+import top.yukonga.miuix.kmp.icon.extended.Image
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -147,8 +148,25 @@ fun SendScreen(
             }
         }
 
-    val coroutineScope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            manager.refreshDevices()
+            manager.scanSubnet()
+            delay(8000)
+            if (isRefreshing) {
+                isRefreshing = false
+            }
+        }
+    }
+
+    LaunchedEffect(isScanning) {
+        if (!isScanning && isRefreshing) {
+            isRefreshing = false
+        }
+    }
+
     var previewingIndex by remember { mutableIntStateOf(-1) }
     var isFileListExpanded by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
@@ -200,13 +218,7 @@ fun SendScreen(
             PullToRefresh(
                 isRefreshing = isRefreshing,
                 onRefresh = {
-                    coroutineScope.launch {
-                        isRefreshing = true
-                        manager.refreshDevices()
-                        manager.scanSubnet()
-                        delay(1000)
-                        isRefreshing = false
-                    }
+                    isRefreshing = true
                 },
                 pullToRefreshState = pullToRefreshState,
                 contentPadding = PaddingValues(top = innerPadding.calculateTopPadding()),
@@ -234,9 +246,9 @@ fun SendScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                 ) {
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_files), icon = Icons.Default.Folder, onClick = onPickFiles)
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_folder), icon = Icons.Default.FolderOpen, onClick = onPickFolder)
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_media), icon = Icons.Default.Image, onClick = onPickMedia)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_files), icon = MiuixIcons.Folder, onClick = onPickFiles)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_folder), icon = MiuixIcons.AddFolder, onClick = onPickFolder)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_media), icon = MiuixIcons.Image, onClick = onPickMedia)
                                 }
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Row(
@@ -384,7 +396,7 @@ fun SendScreen(
                                                     onClick = { manager.removeFile(file.id) },
                                                 ) {
                                                     Icon(
-                                                        imageVector = Icons.Default.Delete,
+                                                        imageVector = MiuixIcons.Delete,
                                                         contentDescription = stringResource(R.string.btn_delete),
                                                         tint = MiuixTheme.colorScheme.error,
                                                     )
@@ -412,7 +424,7 @@ fun SendScreen(
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Icon(
-                                                imageVector = if (isFileListExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                imageVector = if (isFileListExpanded) MiuixIcons.ExpandLess else MiuixIcons.ExpandMore,
                                                 contentDescription = if (isFileListExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                                                 tint = if (isFileListExpanded) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.primary,
                                                 modifier = Modifier.size(16.dp),
@@ -446,7 +458,7 @@ fun SendScreen(
                                         endActions = {
                                             IconButton(onClick = { manager.clearTargetResendDevice() }) {
                                                 Icon(
-                                                    imageVector = Icons.Default.Close,
+                                                    imageVector = MiuixIcons.Close,
                                                     contentDescription = stringResource(R.string.btn_cancel),
                                                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                                 )
@@ -581,7 +593,7 @@ fun SendScreen(
                             items(nonNearbySessions, key = { it.sessionId }) { session ->
                                 Card(modifier = Modifier.fillMaxWidth()) {
                                     Column(modifier = Modifier.fillMaxWidth()) {
-                                        ArrowPreference(
+                                        BasicComponent(
                                             title = session.device.alias,
                                             summary = "${session.device.ip}:${session.device.port} • ${session.device.deviceModel ?: session.device.deviceType.value}",
                                             startAction = {
@@ -592,7 +604,6 @@ fun SendScreen(
                                                     modifier = Modifier.size(24.dp),
                                                 )
                                             },
-                                            onClick = {},
                                         )
                                         InlineTransferProgress(
                                             session = session,

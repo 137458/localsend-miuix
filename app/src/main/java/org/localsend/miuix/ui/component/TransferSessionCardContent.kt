@@ -23,14 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Upload
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -52,6 +44,12 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.icon.extended.Copy
+import top.yukonga.miuix.kmp.icon.extended.ExpandLess
+import top.yukonga.miuix.kmp.icon.extended.ExpandMore
+import top.yukonga.miuix.kmp.icon.extended.Messages
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -82,7 +80,7 @@ internal fun TextMessageCardContent(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Chat,
+                    imageVector = MiuixIcons.Messages,
                     contentDescription = null,
                     tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
@@ -127,7 +125,7 @@ internal fun TextMessageCardContent(
                 }
                 IconButton(onClick = onCancel) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = MiuixIcons.Close,
                         contentDescription = stringResource(R.string.action_cancel_transfer),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
@@ -214,7 +212,7 @@ internal fun TextMessageCardContent(
                 colors = if (detectedUrl != null) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary(),
             ) {
                 Icon(
-                    imageVector = Icons.Default.ContentCopy,
+                    imageVector = MiuixIcons.Copy,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
                 )
@@ -275,7 +273,7 @@ internal fun FileTransferCardContent(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = if (session.isIncoming) Icons.Default.Download else Icons.Default.Upload,
+                    imageVector = if (session.isIncoming) AppIcons.Receive else AppIcons.Send,
                     contentDescription = null,
                     tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
@@ -321,7 +319,7 @@ internal fun FileTransferCardContent(
                 }
                 IconButton(onClick = onCancel) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = MiuixIcons.Close,
                         contentDescription = stringResource(R.string.action_cancel_transfer),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
@@ -449,7 +447,7 @@ internal fun FileTransferCardContent(
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             Icon(
-                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                imageVector = if (isExpanded) MiuixIcons.ExpandLess else MiuixIcons.ExpandMore,
                 contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                 tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.size(18.dp),

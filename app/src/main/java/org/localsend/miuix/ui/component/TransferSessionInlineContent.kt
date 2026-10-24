@@ -22,14 +22,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.HourglassEmpty
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Upload
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -48,6 +43,11 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.icon.extended.ExpandLess
+import top.yukonga.miuix.kmp.icon.extended.ExpandMore
+import top.yukonga.miuix.kmp.icon.extended.Messages
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -67,7 +67,7 @@ internal fun InlineTextMessageProgress(
             modifier = Modifier.weight(1f),
         ) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.Chat,
+                imageVector = MiuixIcons.Messages,
                 contentDescription = null,
                 tint = MiuixTheme.colorScheme.primary,
                 modifier = Modifier.size(18.dp),
@@ -98,7 +98,7 @@ internal fun InlineTextMessageProgress(
         if (session.status == TransferStatus.InProgress || session.status == TransferStatus.WaitingApproval) {
             IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
                 Icon(
-                    imageVector = Icons.Default.Close,
+                    imageVector = MiuixIcons.Close,
                     contentDescription = stringResource(R.string.action_cancel_transfer),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.size(16.dp),
@@ -182,14 +182,14 @@ internal fun InlineFileTransferProgress(
                     )
                 TransferStatus.InProgress ->
                     Icon(
-                        imageVector = Icons.Default.Upload,
+                        imageVector = AppIcons.Send,
                         contentDescription = null,
                         tint = MiuixTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp),
                     )
                 TransferStatus.Canceled ->
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = MiuixIcons.Close,
                         contentDescription = null,
                         tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         modifier = Modifier.size(16.dp),
@@ -238,7 +238,7 @@ internal fun InlineFileTransferProgress(
                 }
                 IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = MiuixIcons.Close,
                         contentDescription = stringResource(R.string.action_cancel_transfer),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         modifier = Modifier.size(16.dp),
@@ -325,7 +325,7 @@ internal fun InlineFileTransferProgress(
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             Icon(
-                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                imageVector = if (isExpanded) MiuixIcons.ExpandLess else MiuixIcons.ExpandMore,
                 contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
                 tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.size(16.dp),

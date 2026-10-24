@@ -6,7 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -384,11 +383,7 @@ fun App(manager: LocalSendManager) {
             manager.consumeRequestedTab()
         }
 
-        // 全局拦截系统返回键与返回手势，当处于二级页面时优先返回主界面
-        BackHandler(enabled = backStack.size > 1) {
-            backStack.removeLastOrNull()
-        }
-
+        // 二级页面返回手势及预测返回由 NavDisplay(onBack) 原生接管驱动
         NavDisplay(
             backStack = backStack,
             onBack = { backStack.removeLastOrNull() },

@@ -28,10 +28,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,6 +56,10 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Forward
+import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 
@@ -113,7 +113,7 @@ fun FileThumbnail(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Default.PlayArrow,
+                        imageVector = MiuixIcons.Play,
                         contentDescription = stringResource(R.string.preview_video_tag),
                         tint = Color.White,
                         modifier = Modifier.size(14.dp),
@@ -177,7 +177,7 @@ fun FilePreviewDialog(
                             enabled = safeIndex > 0,
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                imageVector = MiuixIcons.Back,
                                 contentDescription = stringResource(R.string.preview_action_prev),
                                 tint = if (safeIndex > 0) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.35f),
                             )
@@ -192,7 +192,7 @@ fun FilePreviewDialog(
                             enabled = safeIndex < files.size - 1,
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                imageVector = MiuixIcons.Forward,
                                 contentDescription = stringResource(R.string.preview_action_next),
                                 tint = if (safeIndex < files.size - 1) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.35f),
                             )
@@ -279,7 +279,7 @@ fun FilePreviewDialog(
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
-                                imageVector = Icons.Default.PlayArrow,
+                                imageVector = MiuixIcons.Play,
                                 contentDescription = stringResource(R.string.preview_video_content_desc),
                                 tint = Color.White,
                                 modifier = Modifier.size(28.dp),

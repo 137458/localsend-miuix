@@ -18,12 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -59,6 +53,10 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.extended.Messages
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -89,14 +87,14 @@ fun HistoryScreen(
                     color = if (backdrop != null) Color.Transparent else colorScheme.surface,
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                            Icon(imageVector = MiuixIcons.Back, contentDescription = stringResource(R.string.action_back))
                         }
                     },
                     actions = {
                         if (history.isNotEmpty()) {
                             IconButton(onClick = { showClearConfirmDialog = true }) {
                                 Icon(
-                                    imageVector = Icons.Default.Delete,
+                                    imageVector = MiuixIcons.Delete,
                                     contentDescription = stringResource(R.string.history_dialog_clear_title),
                                     tint = MiuixTheme.colorScheme.error,
                                 )
@@ -269,11 +267,11 @@ private fun HistoryItemCard(
             Icon(
                 imageVector =
                     if (item.isTextMessage) {
-                        Icons.Default.ChatBubbleOutline
+                        MiuixIcons.Messages
                     } else if (item.isIncoming) {
-                        Icons.Default.Download
+                        AppIcons.Receive
                     } else {
-                        Icons.AutoMirrored.Filled.Send
+                        AppIcons.Send
                     },
                 contentDescription = null,
                 tint = primary,
