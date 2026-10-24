@@ -59,6 +59,18 @@ object InstallHelper {
             setDataAndType(uri, APK_MIME_TYPE)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
+
+    /** 从路径/content 串构造安装意图：优先真实磁盘文件（FileProvider 映射失败返回 null），来源均不可达亦返回 null。 */
+    fun buildInstallIntent(
+        context: Context,
+        path: String?,
+        uriString: String?,
+    ): Intent? =
+        when (val source = pickFileSource(path, uriString)) {
+            is InstallSource.DiskFile -> buildInstallIntent(context, File(source.path))
+            is InstallSource.ContentUri -> buildInstallIntent(context, Uri.parse(source.uriString))
+            null -> null
+        }
 }
 
 /** 判定单个条目的可访问来源：磁盘文件需真实存在，否则退回 content uri；均不可达返回 null。 */

@@ -9,8 +9,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
@@ -21,7 +24,6 @@ import org.localsend.miuix.ui.MainActivity
 import org.localsend.miuix.util.InstallHelper
 import org.localsend.miuix.util.InstallSource
 import org.localsend.miuix.util.OpenableFile
-import org.localsend.miuix.util.pickFileSource
 import org.localsend.miuix.util.pickOpenableFile
 import java.io.File
 
@@ -452,17 +454,19 @@ object TransferNotifier {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
-    /** 接收完成含 apk 时构造“安装”动作的 PendingIntent；无 apk 或来源不可访问时返回 null。 */
+    /** 接收完成含 apk 时构造“安装”动作的 PendingIntent；无 apk 或来源不可访问时提示后返回 null。 */
     private fun installActionPendingIntent(
         context: Context,
         session: TransferSession,
     ): PendingIntent? {
         val apk = session.files.firstOrNull { InstallHelper.isApk(it.name) } ?: return null
-        val source = pickFileSource(apk.path, (apk.mediaStoreUri ?: apk.uri)?.toString()) ?: return null
         val intent =
-            when (source) {
-                is InstallSource.DiskFile -> InstallHelper.buildInstallIntent(context, File(source.path)) ?: return null
-                is InstallSource.ContentUri -> InstallHelper.buildInstallIntent(context, Uri.parse(source.uriString))
+            InstallHelper.buildInstallIntent(context, apk.path, (apk.mediaStoreUri ?: apk.uri)?.toString()) ?: run {
+                // 通知构造运行在 IO 线程，Toast 需切到主线程
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(context, context.getString(R.string.toast_install_source_unavailable), Toast.LENGTH_SHORT).show()
+                }
+                return null
             }
         return activityPendingIntent(context, sessionNotifId(session) + 1, intent)
     }

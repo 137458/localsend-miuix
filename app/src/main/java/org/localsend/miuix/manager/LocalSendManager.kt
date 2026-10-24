@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -331,10 +332,25 @@ class LocalSendManager(
         )
     }
 
+    /** 后台 SHA-256 预热任务句柄，发送前等待其完成，避免握手路径同步计算大文件哈希。 */
+    private val sha256WarmupJobs = mutableListOf<Job>()
+
     fun addFiles(files: List<FileItem>) {
         _selectedFiles.update { it + files }
         // 后台预热 sha256：多数文件在握手前已算完，避免 prepareUpload 同步哈希阻塞握手
-        scope.launch { client.precomputeSha256(files) }
+        val warmupJob = scope.launch { client.precomputeSha256(files) }
+        synchronized(sha256WarmupJobs) { sha256WarmupJobs += warmupJob }
+    }
+
+    /** 等待全部预热任务结束；等待期间新加入的预热任务留给下一次发送。 */
+    private suspend fun awaitSha256Warmup() {
+        val pending =
+            synchronized(sha256WarmupJobs) {
+                val snapshot = sha256WarmupJobs.toList()
+                sha256WarmupJobs.clear()
+                snapshot
+            }
+        pending.joinAll()
     }
 
     fun removeFile(id: String) {
@@ -501,6 +517,8 @@ class LocalSendManager(
                 }
                 val deviceKey = targetDevice.fingerprint.ifEmpty { targetDevice.ip }
                 var currentPin = targetDevicePins[deviceKey]
+                // 先等预热完成再握手：prepareUpload 内仅补算预热未覆盖的剩余项
+                awaitSha256Warmup()
                 var prepResult = client.prepareUpload(targetDevice, filesToSend, targetPin = currentPin)
                 if (prepResult.isFailure && prepResult.exceptionOrNull() is TargetPinRequiredException) {
                     val deferred = CompletableDeferred<String?>()

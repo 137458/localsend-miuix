@@ -52,9 +52,7 @@ import org.localsend.miuix.model.HistoryFileEntry
 import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.util.InstallHelper
-import org.localsend.miuix.util.InstallSource
 import org.localsend.miuix.util.ThumbnailHelper
-import org.localsend.miuix.util.pickFileSource
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -62,7 +60,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -403,10 +400,9 @@ private fun launchApkInstall(
     uriString: String?,
 ) {
     val intent =
-        when (val source = pickFileSource(path, uriString)) {
-            is InstallSource.DiskFile -> InstallHelper.buildInstallIntent(context, File(source.path)) ?: return
-            is InstallSource.ContentUri -> InstallHelper.buildInstallIntent(context, Uri.parse(source.uriString))
-            null -> return
+        InstallHelper.buildInstallIntent(context, path, uriString) ?: run {
+            Toast.makeText(context, context.getString(R.string.toast_install_source_unavailable), Toast.LENGTH_SHORT).show()
+            return
         }
     try {
         context.startActivity(intent)

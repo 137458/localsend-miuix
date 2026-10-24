@@ -470,7 +470,7 @@
     <string name="receive_pref_quick_save_from_favorites_title">Favorites only</string>
     <string name="receive_pref_quick_save_from_favorites_summary">With Quick Save on, auto-accept transfers from favorite devices only</string>
     <string name="settings_pref_web_share_auto_accept_title">Web Share auto-accept</string>
-    <string name="settings_pref_web_share_auto_accept_summary">Accept uploads sent from the browser without confirmation</string>
+    <string name="settings_pref_web_share_auto_accept_summary">The browser device type is self-reported by the sender and can be spoofed; enabling this auto-accepts their files. Use only on trusted networks</string>
 
     <!-- Settings: advanced network -->
     <string name="settings_section_advanced_network">Advanced network</string>
@@ -486,5 +486,6 @@
     <!-- APK install -->
     <string name="btn_install_apk">Install</string>
     <string name="toast_install_permission_needed">Permission to install unknown apps is required</string>
+    <string name="toast_install_source_unavailable">APK is no longer accessible; install canceled</string>
     <string name="notif_action_install">Install</string>
 </resources>

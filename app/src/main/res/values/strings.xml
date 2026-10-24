@@ -470,7 +470,7 @@
     <string name="receive_pref_quick_save_from_favorites_title">仅自动接收收藏设备</string>
     <string name="receive_pref_quick_save_from_favorites_summary">开启快速保存时，仅自动接受已收藏设备的传输</string>
     <string name="settings_pref_web_share_auto_accept_title">网页传输自动接受</string>
-    <string name="settings_pref_web_share_auto_accept_summary">浏览器回传文件时无需在手机端再次确认</string>
+    <string name="settings_pref_web_share_auto_accept_summary">浏览器设备类型由发送方自报、可被伪装，开启后其文件将被自动接收，建议仅在可信网络开启</string>
 
     <!-- 设置：高级网络选项 -->
     <string name="settings_section_advanced_network">高级网络选项</string>
@@ -486,5 +486,6 @@
     <!-- 安装 APK -->
     <string name="btn_install_apk">安装</string>
     <string name="toast_install_permission_needed">需要允许安装未知应用权限</string>
+    <string name="toast_install_source_unavailable">安装包不可访问，无法发起安装</string>
     <string name="notif_action_install">安装</string>
 </resources>

@@ -35,21 +35,33 @@ import java.net.InetSocketAddress
 import java.net.MulticastSocket
 import java.util.concurrent.atomic.AtomicInteger
 
+/** 监听端配置快照：组播组地址 + 发现超时，二者在绑定与设置读取两侧总是结伴出现。 */
+internal data class ListenerConfig(
+    val group: InetAddress,
+    val timeoutSeconds: Int,
+) {
+    companion object {
+        /** 解析当前设置；组地址非法时返回 null（不触发重建，等待合法值再切换）。 */
+        fun parse(
+            group: String,
+            timeoutSeconds: Int,
+        ): ListenerConfig? =
+            try {
+                ListenerConfig(InetAddress.getByName(group), timeoutSeconds)
+            } catch (e: Exception) {
+                null
+            }
+    }
+}
+
 /**
- * 监听端 staleness 判定：绑定组地址或超时与当前设置不一致即需重建 socket。
- * 当前组地址非法时返回 false（不触发重建风暴，等待合法值再切换）。
+ * 监听端 staleness 判定：绑定配置与当前设置不一致即需重建 socket。
+ * 当前组地址非法（解析为 null）时返回 false（不触发重建风暴，等待合法值再切换）。
  */
 internal fun isListenerStale(
-    boundGroup: InetAddress,
-    boundTimeoutSeconds: Int,
-    currentGroup: String,
-    currentTimeoutSeconds: Int,
-): Boolean =
-    try {
-        InetAddress.getByName(currentGroup) != boundGroup || currentTimeoutSeconds != boundTimeoutSeconds
-    } catch (e: Exception) {
-        false
-    }
+    bound: ListenerConfig,
+    current: ListenerConfig?,
+): Boolean = current != null && current != bound
 
 class DiscoveryService(
     private val context: Context,
@@ -147,21 +159,22 @@ class DiscoveryService(
                 while (isActive) {
                     var socket: MulticastSocket? = null
                     try {
-                        val group = InetAddress.getByName(getMulticastGroup())
-                        val timeoutSeconds = getDiscoveryTimeoutSeconds()
+                        val bound =
+                            ListenerConfig.parse(getMulticastGroup(), getDiscoveryTimeoutSeconds())
+                                ?: error("invalid multicast group: ${getMulticastGroup()}")
                         socket =
                             MulticastSocket(null).apply {
                                 reuseAddress = true
                                 bind(InetSocketAddress(NetworkConstants.DEFAULT_PORT))
-                                joinGroup(group)
-                                soTimeout = timeoutSeconds * 1000
+                                joinGroup(bound.group)
+                                soTimeout = bound.timeoutSeconds * 1000
                             }
 
                         val buffer = ByteArray(65535)
                         while (isActive) {
                             // 组地址或超时设置变更后重建 socket：周期广播每轮即时读新值，
                             // 监听端滞留旧组会出现“广播发新组、监听留旧组”的单向发现
-                            if (isListenerStale(group, timeoutSeconds, getMulticastGroup(), getDiscoveryTimeoutSeconds())) break
+                            if (isListenerStale(bound, ListenerConfig.parse(getMulticastGroup(), getDiscoveryTimeoutSeconds()))) break
                             try {
                                 val packet = DatagramPacket(buffer, buffer.size)
                                 socket.receive(packet)
