@@ -596,7 +596,7 @@ class LocalSendManager(
                     if (token == null) {
                         // 若该项为纯文本消息且其内容已在 prepare-upload 握手阶段通过 preview 完整提供，
                         // 且对端未授予 upload token，表明接收方已在对话框中复制/消费该文本且无需上传二进制流
-                        if (fileItem.isTextMessage && !fileItem.textContent.isNullOrEmpty() && fileItem.textContent!!.length <= 2000) {
+                        if (fileItem.inlineTextContent != null) {
                             Log.i(TAG, "Text message '${fileItem.name}' (id=${fileItem.id}) accepted via preview without upload token.")
                             fileItem.status = TransferStatus.Completed
                             fileItem.progress = 1f

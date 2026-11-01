@@ -4,6 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.localsend.miuix.model.FileDto
+import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.network.LocalSendServer
 
 class TextMessageClassificationTest {
@@ -47,6 +48,50 @@ class TextMessageClassificationTest {
                 preview = null,
             )
         assertFalse(LocalSendServer.isInlineTextMessage(dto))
+    }
+
+    @Test
+    fun testLegacyBareTextFileTypeStaysCompatible() {
+        // 旧版客户端发送裸枚举名 "text"，协议规范要求 fileType 为 MIME，但仍需兼容以保证双向互通
+        val message = "legacy text"
+        val dto =
+            FileDto(
+                id = "5",
+                fileName = "message.txt",
+                size = message.toByteArray(Charsets.UTF_8).size.toLong(),
+                fileType = "text",
+                preview = message,
+            )
+        assertTrue(LocalSendServer.isInlineTextMessage(dto))
+    }
+
+    @Test
+    fun testTextSubtypeMimeIsInlineMessage() {
+        val message = "# title"
+        val dto =
+            FileDto(
+                id = "6",
+                fileName = "note.md",
+                size = message.toByteArray(Charsets.UTF_8).size.toLong(),
+                fileType = "text/markdown",
+                preview = message,
+            )
+        assertTrue(LocalSendServer.isInlineTextMessage(dto))
+    }
+
+    @Test
+    fun testSenderDtoIsRecognizedAsInlineMessageByReceiver() {
+        // 端到端契约：本机 toDto() 产出的字段，必须能被本机接收端判定为内联文本消息（与官方 MIME 约定对齐）
+        val message = "跨端互通的纯文本消息"
+        val item =
+            FileItem(
+                id = "7",
+                name = "text_1.txt",
+                size = message.toByteArray(Charsets.UTF_8).size.toLong(),
+                textContent = message,
+                mimeType = "text/plain",
+            )
+        assertTrue(LocalSendServer.isInlineTextMessage(item.toDto()))
     }
 
     @Test

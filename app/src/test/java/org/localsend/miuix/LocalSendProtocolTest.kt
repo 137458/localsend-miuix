@@ -279,7 +279,7 @@ class LocalSendProtocolTest {
 
     @Test
     fun testTextMessageInBatchWithoutTokenHandledAsCompleted() {
-        // 混合传输场景：纯文本消息在 preview 中提供（<= 2000 字符），接收方未索取 token
+        // 混合传输场景：纯文本消息完整内联在 preview 中，接收方未索取 token
         val textContent = "短文本消息"
         val textItem =
             FileItem(
@@ -305,7 +305,7 @@ class LocalSendProtocolTest {
         for (item in files) {
             val token = fileTokens[item.id]
             if (token == null) {
-                if (item.isTextMessage && !item.textContent.isNullOrEmpty() && item.textContent!!.length <= 2000) {
+                if (item.inlineTextContent != null) {
                     item.status = org.localsend.miuix.model.TransferStatus.Completed
                     item.progress = 1f
                     item.bytesTransferred = item.size
@@ -375,7 +375,7 @@ class LocalSendProtocolTest {
                 fileType = "text/plain",
                 preview = null,
             )
-        val isTextMsg = !dto.preview.isNullOrEmpty() && (dto.fileType == "text" || dto.fileType == "text/plain") && dto.size <= org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE
+        val isTextMsg = LocalSendServer.isInlineTextMessage(dto)
         val item =
             FileItem(
                 id = dto.id,

@@ -69,6 +69,9 @@ enum class TransferStatus {
  */
 const val MAX_INLINE_TEXT_SIZE = 512 * 1024L
 
+/** 纯文本消息在协议中的 MIME 类型（官方客户端按 MIME 前缀解码 fileType）。 */
+const val TEXT_MESSAGE_MIME = "text/plain"
+
 data class FileItem(
     val id: String = UUID.randomUUID().toString(),
     var name: String,
@@ -89,15 +92,32 @@ data class FileItem(
     var mediaStoreUri: Uri? = null,
     val isTextMessage: Boolean = textContent != null,
 ) {
-    fun toDto(): FileDto =
-        FileDto(
+    /**
+     * 可完整内联进 prepare-upload `preview` 的文本内容；不满足内联条件时为 null。
+     *
+     * 协议要求 preview 的 UTF-8 字节数与声明的 size 严格一致，接收端据此判定文本消息。
+     * 超过 [MAX_INLINE_TEXT_SIZE] 的文本一律降级为普通文件上传，绝不截断后当作消息发送。
+     */
+    val inlineTextContent: String?
+        get() {
+            if (!isTextMessage) return null
+            val content = textContent ?: return null
+            return content.takeIf { it.toByteArray(Charsets.UTF_8).size <= MAX_INLINE_TEXT_SIZE }
+        }
+
+    fun toDto(): FileDto {
+        val inlineText = inlineTextContent
+        return FileDto(
             id = id,
             fileName = name,
-            size = size,
-            fileType = if (isTextMessage) "text" else mimeType,
+            // 内联文本按真实 UTF-8 字节数声明，保证 preview 字节数与 size 严格一致；超限文本降级为普通文件沿用原 size
+            size = if (inlineText != null) inlineText.toByteArray(Charsets.UTF_8).size.toLong() else size,
+            // 协议 fileType 为 MIME：官方接收端按 MIME 前缀解码，裸枚举名 "text" 会被当成 other 并落盘为文件
+            fileType = if (inlineText != null) TEXT_MESSAGE_MIME else mimeType,
             sha256 = expectedSha256,
-            preview = if (isTextMessage) textContent?.take(2000) else null,
+            preview = inlineText,
         )
+    }
 
     val formattedSize: String
         get() = formatFileSize(size)

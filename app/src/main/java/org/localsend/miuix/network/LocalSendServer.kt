@@ -839,9 +839,10 @@ class LocalSendServer(
          */
         fun isInlineTextMessage(dto: org.localsend.miuix.model.FileDto): Boolean {
             val preview = dto.preview ?: return false
+            // 规范写法为 text/* MIME；裸 "text" 是旧版客户端的枚举名，保留兼容
             val isTextMime =
                 dto.fileType.equals("text", ignoreCase = true) ||
-                    dto.fileType.equals("text/plain", ignoreCase = true)
+                    dto.fileType.startsWith("text/", ignoreCase = true)
             if (!isTextMime) return false
             val previewBytes = preview.toByteArray(Charsets.UTF_8).size.toLong()
             return previewBytes == dto.size && dto.size <= org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE

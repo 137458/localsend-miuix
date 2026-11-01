@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.transfer.RemainingTime
@@ -40,14 +41,67 @@ class TransferModelTest {
     )
 
     @Test
-    fun toDtoMarksTextMessageWithPreview() {
+    fun toDtoEncodesTextMessageAsPlainTextMimeWithFullPreview() {
         val text = FileItem(id = "t1", name = "note.txt", size = 5L, textContent = "hello", mimeType = "text/plain")
         val dto = text.toDto()
-        assertEquals("text", dto.fileType)
+        // 协议 fileType 必须是 MIME：官方接收端 decodeFromMime 只认前缀，裸 "text" 会被当成 other 并落盘为文件
+        assertEquals("text/plain", dto.fileType)
         assertEquals("hello", dto.preview)
+        assertEquals(5L, dto.size)
+    }
 
-        val longText = FileItem(id = "t2", name = "note.txt", size = 2500L, textContent = "x".repeat(2500), mimeType = "text/plain")
-        assertEquals(2000, longText.toDto().preview?.length)
+    @Test
+    fun toDtoKeepsFullTextWithoutPreviewTruncation() {
+        val longText = "x".repeat(5000)
+        val dto =
+            FileItem(id = "t2", name = "note.txt", size = 5000L, textContent = longText, mimeType = "text/plain")
+                .toDto()
+        // preview 必须完整，不得截断：对端把 preview 当整条消息内容
+        assertEquals(longText, dto.preview)
+        assertEquals(5000L, dto.size)
+    }
+
+    @Test
+    fun toDtoCountsInlineTextSizeInUtf8Bytes() {
+        val message = "跨端纯文本消息"
+        val bytes = message.toByteArray(Charsets.UTF_8)
+        // 传入字符数而非字节数的错误 size，toDto 必须以真实 UTF-8 字节数声明，保证 preview 字节数 == size
+        val dto =
+            FileItem(
+                id = "t3",
+                name = "note.txt",
+                size = message.length.toLong(),
+                textContent = message,
+                mimeType = "text/plain",
+            ).toDto()
+        assertEquals(bytes.size.toLong(), dto.size)
+        assertEquals(message, dto.preview)
+    }
+
+    @Test
+    fun toDtoDegradesOversizedTextToRegularFile() {
+        val oversized = "x".repeat((MAX_INLINE_TEXT_SIZE + 1).toInt())
+        val item =
+            FileItem(
+                id = "t4",
+                name = "note.txt",
+                size = oversized.length.toLong(),
+                textContent = oversized,
+                mimeType = "text/plain",
+            )
+        val dto = item.toDto()
+        // 超出内联上限时不得发出被截断的消息，降级为普通 txt 文件走上传
+        assertNull(item.inlineTextContent)
+        assertNull(dto.preview)
+        assertEquals("text/plain", dto.fileType)
+        assertEquals(oversized.length.toLong(), dto.size)
+    }
+
+    @Test
+    fun inlineTextContentOnlyExposesMessageText() {
+        assertNull(FileItem(id = "b1", name = "a.txt").inlineTextContent)
+        assertNull(FileItem(id = "b2", name = "a.txt", isTextMessage = false).inlineTextContent)
+        assertEquals("hi", FileItem(id = "b3", name = "a.txt", textContent = "hi").inlineTextContent)
     }
 
     @Test
