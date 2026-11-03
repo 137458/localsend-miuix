@@ -56,18 +56,14 @@ object ThumbnailHelper {
 
     fun isApk(
         name: String,
-        mimeType: String,
-    ): Boolean {
-        val mime = mimeType.lowercase()
-        val n = name.lowercase()
-        return mime == "application/vnd.android.package-archive" || n.endsWith(".apk")
-    }
+        mimeType: String = "",
+    ): Boolean = InstallHelper.isApk(name, mimeType)
 
     fun isImage(file: FileItem): Boolean = isImage(file.name, file.mimeType)
 
     fun isVideo(file: FileItem): Boolean = isVideo(file.name, file.mimeType)
 
-    fun isApk(file: FileItem): Boolean = isApk(file.name, file.mimeType)
+    fun isApk(file: FileItem): Boolean = InstallHelper.isApk(file.name, file.mimeType)
 
     /**
      * 加载用于列表展示的紧凑缩略图 (约 128x128 像素)。

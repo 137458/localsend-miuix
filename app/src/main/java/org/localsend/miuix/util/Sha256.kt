@@ -4,10 +4,13 @@ import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
 
-/** 流式 SHA-256 摘要工具：固定缓冲区逐块更新，杜绝整文件载入内存。 */
+/** SHA-256 摘要工具：支持内存字节数组、输入流逐块流式更新以及文件摘要。 */
 object Sha256 {
     /** 逐块读取的缓冲区大小；测试需覆盖该边界的 ±1。 */
     const val BUFFER_SIZE = 128 * 1024
+
+    /** 计算内存字节数组的小写十六进制摘要。 */
+    fun hexDigest(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     /** 消费整个输入流并返回小写十六进制摘要；流由本函数负责关闭。 */
     fun hexDigest(input: InputStream): String {

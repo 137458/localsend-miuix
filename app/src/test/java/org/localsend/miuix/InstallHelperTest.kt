@@ -30,6 +30,15 @@ class InstallHelperTest {
     }
 
     @Test
+    fun isApk_supportsMimeTypeCheck() {
+        assertTrue(InstallHelper.isApk("app.bin", InstallHelper.APK_MIME_TYPE))
+        assertTrue(InstallHelper.isApk("app.apk", "application/octet-stream"))
+        assertTrue(InstallHelper.isApk("downloaded_file", "APPLICATION/VND.ANDROID.PACKAGE-ARCHIVE"))
+        assertFalse(InstallHelper.isApk("doc.pdf", "application/pdf"))
+        assertFalse(InstallHelper.isApk("app.zip", null))
+    }
+
+    @Test
     fun isApk_rejectsNonApkNames() {
         assertFalse(InstallHelper.isApk("app.zip"))
         assertFalse(InstallHelper.isApk("app.apk.bak"))

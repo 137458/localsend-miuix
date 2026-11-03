@@ -1,9 +1,8 @@
 package org.localsend.miuix.history
 
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.localsend.miuix.core.AppJson
+import org.localsend.miuix.core.JsonFileStore
 import org.localsend.miuix.model.TransferHistoryItem
 import java.io.File
 
@@ -12,35 +11,21 @@ import java.io.File
  * Corrupt or missing files yield an empty list rather than crashing startup.
  */
 class HistoryStore(
-    private val file: File,
-    private val json: Json = AppJson.default,
+    file: File,
+    json: Json = AppJson.default,
     private val maxItems: Int = DEFAULT_MAX_ITEMS,
 ) {
-    fun load(): List<TransferHistoryItem> {
-        return try {
-            if (!file.exists()) return emptyList()
-            val content = file.readText()
-            if (content.isBlank()) emptyList() else json.decodeFromString(content)
-        } catch (_: Exception) {
-            emptyList()
-        }
-    }
+    private val store =
+        JsonFileStore(
+            file = file,
+            serializer = TransferHistoryItem.serializer(),
+            maxItems = maxItems,
+            json = json,
+        )
 
-    private val writeLock = Any()
+    fun load(): List<TransferHistoryItem> = store.load()
 
-    fun persist(items: List<TransferHistoryItem>) {
-        synchronized(writeLock) {
-            val capped = items.take(maxItems)
-            val parent = file.parentFile ?: return@synchronized
-            if (!parent.exists() && !parent.mkdirs()) return@synchronized
-            val tempFile = File(parent, "${file.name}.tmp")
-            tempFile.writeText(json.encodeToString(capped))
-            if (!tempFile.renameTo(file)) {
-                tempFile.copyTo(file, overwrite = true)
-                tempFile.delete()
-            }
-        }
-    }
+    fun persist(items: List<TransferHistoryItem>) = store.persist(items)
 
     fun add(
         current: List<TransferHistoryItem>,

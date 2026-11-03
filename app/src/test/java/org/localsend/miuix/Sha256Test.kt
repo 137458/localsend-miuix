@@ -84,6 +84,18 @@ class Sha256Test {
     }
 
     @Test
+    fun byteArrayVariant_matchesExpected() {
+        val empty = ByteArray(0)
+        assertEquals(expectedSha256(empty), Sha256.hexDigest(empty))
+
+        val text = "Hello LocalSend".toByteArray()
+        assertEquals(expectedSha256(text), Sha256.hexDigest(text))
+
+        val random = pseudoRandomBytes(1024, seed = 12345L)
+        assertEquals(expectedSha256(random), Sha256.hexDigest(random))
+    }
+
+    @Test
     fun fileVariant_matchesStreamVariant() {
         val data = pseudoRandomBytes(Sha256.BUFFER_SIZE + 5, seed = 99L)
         val file: File = tmp.newFile("sample.bin")

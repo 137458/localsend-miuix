@@ -1,6 +1,6 @@
 package org.localsend.miuix.network
 
-import java.security.MessageDigest
+import org.localsend.miuix.util.Sha256
 import java.security.SecureRandom
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
@@ -147,11 +147,7 @@ object FingerprintTrust {
             .lowercase(Locale.ROOT)
             .trim()
 
-    fun sha256(cert: X509Certificate): String =
-        MessageDigest
-            .getInstance("SHA-256")
-            .digest(cert.encoded)
-            .joinToString("") { "%02x".format(it) }
+    fun sha256(cert: X509Certificate): String = Sha256.hexDigest(cert.encoded)
 
     /** True when [fingerprint] is currently pinned or previously trusted via discovery. */
     fun isAccepted(fingerprint: String): Boolean {

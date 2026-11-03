@@ -1,8 +1,9 @@
 package org.localsend.miuix.discovery
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.localsend.miuix.core.AppJson
+import org.localsend.miuix.core.JsonFileStore
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceType
 import java.io.File
@@ -54,40 +55,21 @@ data class FavoriteDevice(
 }
 
 class FavoriteStore(
-    private val file: File,
+    file: File,
     private val maxItems: Int = DEFAULT_MAX_ITEMS,
-    private val json: Json =
-        Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-            encodeDefaults = true
-        },
+    json: Json = AppJson.default,
 ) {
-    private val writeLock = Any()
+    private val store =
+        JsonFileStore(
+            file = file,
+            serializer = FavoriteDevice.serializer(),
+            maxItems = maxItems,
+            json = json,
+        )
 
-    fun load(): List<FavoriteDevice> {
-        return try {
-            if (!file.exists()) return emptyList()
-            val content = file.readText()
-            if (content.isBlank()) emptyList() else json.decodeFromString(content)
-        } catch (_: Exception) {
-            emptyList()
-        }
-    }
+    fun load(): List<FavoriteDevice> = store.load()
 
-    fun persist(items: List<FavoriteDevice>) {
-        synchronized(writeLock) {
-            val capped = items.take(maxItems)
-            val parent = file.parentFile ?: return@synchronized
-            if (!parent.exists() && !parent.mkdirs()) return@synchronized
-            val tempFile = File(parent, "${file.name}.tmp")
-            tempFile.writeText(json.encodeToString(capped))
-            if (!tempFile.renameTo(file)) {
-                tempFile.copyTo(file, overwrite = true)
-                tempFile.delete()
-            }
-        }
-    }
+    fun persist(items: List<FavoriteDevice>) = store.persist(items)
 
     fun isFavorite(device: Device): Boolean {
         val current = load()

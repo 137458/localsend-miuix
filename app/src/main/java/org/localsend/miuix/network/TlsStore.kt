@@ -12,11 +12,11 @@ import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
+import org.localsend.miuix.util.Sha256
 import java.io.File
 import java.math.BigInteger
 import java.security.KeyPairGenerator
 import java.security.KeyStore
-import java.security.MessageDigest
 import java.security.cert.X509Certificate
 import java.util.Date
 import javax.net.ssl.KeyManager
@@ -184,10 +184,9 @@ object TlsStore {
     fun fingerprint(context: Context? = null): String {
         cachedFingerprint?.let { return it }
         val cert = loadKeyStore(context).getCertificate(KEY_ALIAS)
-        val digest = MessageDigest.getInstance("SHA-256").digest(cert.encoded)
+        val digest = Sha256.hexDigest(cert.encoded)
         return FingerprintTrust
-            .normalize(
-                digest.joinToString("") { "%02x".format(it) },
-            ).also { cachedFingerprint = it }
+            .normalize(digest)
+            .also { cachedFingerprint = it }
     }
 }

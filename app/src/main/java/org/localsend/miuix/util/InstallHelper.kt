@@ -32,8 +32,18 @@ object InstallHelper {
     /** Android 包安装器识别的 APK MIME 类型。 */
     const val APK_MIME_TYPE = "application/vnd.android.package-archive"
 
-    /** 大小写不敏感的 .apk 后缀判定。 */
-    fun isApk(fileName: String): Boolean = fileName.endsWith(".apk", ignoreCase = true)
+    /**
+     * 判断是否为 APK 安装包文件：
+     * 1. 文件名大小写不敏感以 .apk 结尾；
+     * 2. 或 MIME 类型匹配 [APK_MIME_TYPE]。
+     */
+    fun isApk(
+        fileName: String,
+        mimeType: String? = null,
+    ): Boolean {
+        if (fileName.endsWith(".apk", ignoreCase = true)) return true
+        return mimeType != null && mimeType.equals(APK_MIME_TYPE, ignoreCase = true)
+    }
 
     /** 从文件名列表中选出第一个 apk 条目（无则 null）。 */
     fun firstApkName(fileNames: List<String>): String? = fileNames.firstOrNull { isApk(it) }
