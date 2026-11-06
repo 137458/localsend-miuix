@@ -4,13 +4,16 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * 通用 JSON 列表本地文件持久化存储工具。
  *
  * 核心特性：
- * 1. 采用同级临时文件原子替换（.tmp -> renameTo / copyTo 回退），杜绝写入中断导致的数据损坏；
- * 2. 线程安全（持有独立写锁）；
+ * 1. 采用同级临时文件原子替换（Files.move ATOMIC_MOVE -> REPLACE_EXISTING 回退），杜绝写入中断导致的数据损坏；
+ * 2. 线程安全（读写共用同一把锁，避免读到半截写入）；
  * 3. 容错读取（文件不存在、空白或 JSON 损坏时优雅返回空列表）；
  * 4. 支持容量限制自动截断。
  */
@@ -28,12 +31,14 @@ class JsonFileStore<T>(
      * 若文件不存在、内容为空或解析异常，均返回空列表。
      */
     fun load(): List<T> {
-        return try {
-            if (!file.exists()) return emptyList()
-            val text = file.readText()
-            if (text.isBlank()) emptyList() else json.decodeFromString(listSerializer, text)
-        } catch (_: Exception) {
-            emptyList()
+        synchronized(writeLock) {
+            return try {
+                if (!file.exists()) return emptyList()
+                val text = file.readText()
+                if (text.isBlank()) emptyList() else json.decodeFromString(listSerializer, text)
+            } catch (_: Exception) {
+                emptyList()
+            }
         }
     }
 
@@ -47,10 +52,21 @@ class JsonFileStore<T>(
             if (!parent.exists() && !parent.mkdirs()) return@synchronized
             val tempFile = File(parent, "${file.name}.tmp")
             tempFile.writeText(json.encodeToString(listSerializer, capped))
-            if (!tempFile.renameTo(file)) {
+            try {
+                // ATOMIC_MOVE 保证读者只会看到旧文件或新文件，不会看到半截 JSON
+                Files.move(
+                    tempFile.toPath(),
+                    file.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(tempFile.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: Exception) {
+                // 文件系统不支持原子替换时的最后兜底：整文件覆盖后清理临时文件
                 tempFile.copyTo(file, overwrite = true)
-                tempFile.delete()
             }
+            tempFile.delete()
         }
     }
 }

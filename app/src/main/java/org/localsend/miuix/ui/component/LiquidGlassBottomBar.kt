@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -371,11 +373,17 @@ fun LiquidGlassBottomBar(
 
     val combinedBackdrop = backdrop?.let { rememberCombinedBackdrop(it, tabsBackdrop) }
 
-    // 注册点击直驱：组合期把内部弹簧动画器交给外部 holder，点击处同步调用
-    if (directSelector != null) {
-        directSelector.select = { index ->
-            dampedDragAnimation.animateToValue(index.toFloat())
+    // 注册点击直驱：把内部弹簧动画器交给外部 holder。写外部对象属于副作用，
+    // 放到 SideEffect 中执行，并在离开组合时清理，避免组合期写入与悬空引用
+    SideEffect {
+        if (directSelector != null) {
+            directSelector.select = { index ->
+                dampedDragAnimation.animateToValue(index.toFloat())
+            }
         }
+    }
+    DisposableEffect(directSelector) {
+        onDispose { directSelector?.select = null }
     }
 
     Box(

@@ -91,4 +91,38 @@ class JsonFileStoreTest {
         val tmpFile = File(tempFolder.root, "atomic.json.tmp")
         assertFalse(tmpFile.exists())
     }
+
+    @Test
+    fun overwriteLeavesSingleCompleteSnapshot() {
+        val file = File(tempFolder.root, "overwrite.json")
+        val store = JsonFileStore(file, TestItem.serializer())
+        val first = (1..50).map { TestItem("$it", it) }
+        store.persist(first)
+        val second = (51..80).map { TestItem("$it", it) }
+        store.persist(second)
+
+        // 覆盖写后只应存在新快照，且是完整可解析的一组条目（不残留旧内容、不产生半截 JSON）
+        val reloaded = store.load()
+        assertEquals(second, reloaded)
+        assertFalse(File(tempFolder.root, "overwrite.json.tmp").exists())
+
+        // 第二个实例读同一文件也应得到同一份完整快照
+        val other = JsonFileStore(file, TestItem.serializer())
+        assertEquals(second, other.load())
+    }
+
+    @Test
+    fun staleTempFileDoesNotCorruptLoad() {
+        val file = File(tempFolder.root, "stale.json")
+        val store = JsonFileStore(file, TestItem.serializer())
+        store.persist(listOf(TestItem("keep", 1)))
+        // 模拟上次写入中断残留的临时文件：读取只认目标文件，且下次落盘会覆盖掉残留
+        val stale = File(tempFolder.root, "stale.json.tmp")
+        stale.writeText("[{\"id\":\"broken\"")
+
+        assertEquals(listOf(TestItem("keep", 1)), store.load())
+        store.persist(listOf(TestItem("next", 2)))
+        assertEquals(listOf(TestItem("next", 2)), store.load())
+        assertFalse(stale.exists())
+    }
 }
