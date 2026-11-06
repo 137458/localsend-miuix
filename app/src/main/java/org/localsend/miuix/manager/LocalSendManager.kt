@@ -386,6 +386,30 @@ class LocalSendManager(
         }
     }
 
+    /**
+     * 发起扫描并挂起等待结束，供下拉刷新等需要真实完成信号的地方使用。
+     * 扫描协程始终会回调一次完成态（含无可扫描网卡的早退路径），因此不会永久挂起。
+     */
+    suspend fun scanSubnetAwait() {
+        _isScanning.value = true
+        val done = CompletableDeferred<Unit>()
+        val job =
+            discoveryService.scanSubnet { current, total ->
+                if (current >= total) {
+                    _isScanning.value = false
+                    done.complete(Unit)
+                }
+            }
+        // 本轮被新一轮扫描取代（任务被取消）时同样结束等待：否则“由扫描完成驱动”的刷新会永久挂起
+        job.invokeOnCompletion { done.complete(Unit) }
+        done.await()
+    }
+
+    suspend fun refreshDevicesAwait() {
+        discoveryService.sendAnnouncement()
+        scanSubnetAwait()
+    }
+
     private fun upsertDevice(device: Device) {
         synchronized(deviceDirectory) {
             _nearbyDevices.value = deviceDirectory.upsert(device)

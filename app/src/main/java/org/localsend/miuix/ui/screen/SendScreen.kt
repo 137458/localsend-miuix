@@ -42,7 +42,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.Device
@@ -149,22 +148,15 @@ fun SendScreen(
         }
 
     var isRefreshing by remember { mutableStateOf(false) }
+    // 每次下拉自增，允许扫描进行中再次下拉时重启一轮刷新
+    var refreshRequest by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(isRefreshing) {
-        if (isRefreshing) {
-            manager.refreshDevices()
-            manager.scanSubnet()
-            delay(8000)
-            if (isRefreshing) {
-                isRefreshing = false
-            }
-        }
-    }
-
-    LaunchedEffect(isScanning) {
-        if (!isScanning && isRefreshing) {
-            isRefreshing = false
-        }
+    LaunchedEffect(refreshRequest) {
+        if (refreshRequest == 0) return@LaunchedEffect
+        // 由扫描完成信号驱动收起：正常结束、异常与“无可用网卡”早退都会回调完成态，
+        // 不再用固定 8 秒计时器兜底（那会掩盖扫描状态未复位的问题）
+        manager.refreshDevicesAwait()
+        isRefreshing = false
     }
 
     var previewingIndex by remember { mutableIntStateOf(-1) }
@@ -219,6 +211,7 @@ fun SendScreen(
                 isRefreshing = isRefreshing,
                 onRefresh = {
                     isRefreshing = true
+                    refreshRequest++
                 },
                 pullToRefreshState = pullToRefreshState,
                 contentPadding = PaddingValues(top = innerPadding.calculateTopPadding()),
