@@ -56,16 +56,18 @@ class NetworkFilterTest {
     }
 
     @Test
-    fun fullyFilteredResultFallsBackToUnfiltered() {
-        // 黑名单剔除全部接口时回退为不过滤，防止用户把自己锁死
-        assertEquals(all, NetworkFilter.selectInterfaces(all, "", "wlan0,eth0,eth1"))
-        // 白名单一个都匹配不上时同样回退
-        assertEquals(all, NetworkFilter.selectInterfaces(all, "nonexistent9", ""))
+    fun blacklistRemovingEveryInterfaceStaysStrict() {
+        // 黑名单命中全部接口时必须严格生效（返回空），不得回退为“不过滤”把被排除的接口放回
+        assertEquals(emptyList<IfInfo>(), NetworkFilter.selectInterfaces(all, "", "wlan0,eth0,eth1"))
+        // 只配一个覆盖全部接口的黑名单前缀时同样严格生效
+        assertEquals(emptyList<IfInfo>(), NetworkFilter.selectInterfaces(all, "", "wlan0,eth0,172.16.0.3"))
     }
 
     @Test
-    fun whitelistFallbackStillAppliesBlacklist() {
-        // 白名单无命中回退时不得丢弃黑名单剔除结果（“黑名单永远剔除”优先于防自锁回退）
+    fun whitelistWithoutMatchFallsBackButKeepsBlacklist() {
+        // 白名单一个都匹配不上时回退为不过滤
+        assertEquals(all, NetworkFilter.selectInterfaces(all, "nonexistent9", ""))
+        // 回退仅限于“白名单配错”，黑名单剔除结果必须保留
         assertEquals(listOf(wlan0, eth0), NetworkFilter.selectInterfaces(all, "nonexistent9", "eth1"))
     }
 

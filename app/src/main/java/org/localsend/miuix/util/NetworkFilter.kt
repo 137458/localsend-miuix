@@ -14,9 +14,9 @@ data class IfInfo(
  *
  * 语义：
  * - 白名单为空 = 全部允许；非空 = 仅命中的接口参与。
- * - 黑名单永远剔除命中项（黑名单优先于白名单）。
- * - 过滤后结果为空时回退为不过滤：防止用户把所有网卡配错后把自己彻底锁死，
- *   此时“不过滤”比“断网式静默失败”更安全。
+ * - 黑名单永远剔除命中项（黑名单优先于白名单），回退时也不得把黑名单剔除的接口重新放回。
+ * - 白名单单独把接口滤空时回退为“仅应用黑名单”的结果：白名单多为选填偏好，
+ *   配错不应把用户彻底锁死；黑名单则表示明确的排除意图，必须严格生效。
  *
  * 匹配规则：
  * - 名单条目按逗号/空白切分，忽略条目与接口名的大小写及首尾空白。
@@ -33,8 +33,8 @@ object NetworkFilter {
         val filtered = interfaces.filter { !matchesAny(it, blacklistEntries) }
         val whitelistEntries = parseEntries(whitelist)
         if (whitelistEntries.isEmpty()) {
-            // 白名单未配置：黑名单过滤结果（可能已回退）即为最终结果
-            return filtered.ifEmpty { interfaces }
+            // 白名单未配置：黑名单结果即最终结果；即使被滤空也不回退，黑名单必须严格生效
+            return filtered
         }
         val whitelisted = filtered.filter { matchesAny(it, whitelistEntries) }
         // 白名单把接口全部滤空时回退为“仅应用黑名单”的结果：防自锁回退不得连黑名单剔除一起丢弃
