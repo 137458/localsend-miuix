@@ -43,4 +43,18 @@ class ScanProgressReporterTest {
 
         assertEquals(listOf(2 to 8, 8 to 8), events)
     }
+
+    @Test
+    fun abandonedRoundStaysSilent() {
+        // 被新一轮扫描取代的旧轮次：退出时既不能回吐进度，也不能把新一轮的“扫描中”状态复位
+        val events = mutableListOf<Pair<Int, Int>>()
+        val reporter = ScanProgressReporter { current, total -> events.add(current to total) }
+
+        reporter.report(1, 4)
+        reporter.abandon()
+        reporter.report(2, 4)
+        reporter.finish(4)
+
+        assertEquals(listOf(1 to 4), events)
+    }
 }

@@ -99,6 +99,11 @@ internal class ScanProgressReporter(
         if (!finished.compareAndSet(false, true)) return
         onProgress?.invoke(total, total)
     }
+
+    /** 放弃本轮回调：被新一轮扫描取代时使用，既不回吐进度也不复位调用方状态。 */
+    fun abandon() {
+        finished.set(true)
+    }
 }
 
 /**
@@ -125,6 +130,9 @@ class DiscoveryService(
     private var multicastJob: Job? = null
     private var periodicBroadcastJob: Job? = null
     private var scanJob: Job? = null
+
+    /** 当前扫描轮次的上报器；新一轮扫描开始前先使其失效，避免旧轮次复位新一轮状态。 */
+    private var scanReporter: ScanProgressReporter? = null
     private var multicastLock: WifiManager.MulticastLock? = null
 
     /** 当前在用的监听 socket：停止/重建前主动关闭，唤醒阻塞中的 receive，避免等空闲超时。 */
@@ -366,10 +374,13 @@ class DiscoveryService(
 
     /** 发起子网扫描并返回该轮任务；被新一轮扫描取代时返回的 Job 以取消态完成。 */
     fun scanSubnet(onScanProgress: ((current: Int, total: Int) -> Unit)? = null): Job {
+        // 先让上一轮的上报器失效再取消：被取代的扫描不能在退出时把新一轮的“扫描中”状态踩掉
+        scanReporter?.abandon()
         scanJob?.cancel()
+        val reporter = ScanProgressReporter(onScanProgress)
+        scanReporter = reporter
         val job =
             scope.launch(scanDispatcher) {
-                val reporter = ScanProgressReporter(onScanProgress)
                 var total = 0
                 try {
                     val baseIps = NetworkUtils.getSubnetBaseIps(getNetworkWhitelist(), getNetworkBlacklist())
@@ -421,8 +432,9 @@ class DiscoveryService(
                         }
                     deferreds.awaitAll()
                 } finally {
-                    // 正常结束/早退/异常统一收口；被新扫描取代时不复位，避免把新一轮状态踩掉
-                    if (isActive) reporter.finish(total)
+                    // 正常结束/早退/自身异常统一上报完成态，复位调用方扫描状态；
+                    // 被新一轮扫描取代的旧任务其上报器已 abandon，此处 finish 为空操作，不会踩掉新状态
+                    reporter.finish(total)
                 }
             }
         scanJob = job
