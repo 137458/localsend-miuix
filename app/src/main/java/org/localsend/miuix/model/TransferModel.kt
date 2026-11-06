@@ -83,6 +83,8 @@ data class FileItem(
     val token: String? = null,
     // 发送方在 prepare-upload 中声明的 sha256（可选）；接收方写入后校验，不匹配则回 422
     var expectedSha256: String? = null,
+    // 声明上述摘要时源文件的 (长度, 修改时间) 指纹；发送前指纹不一致即重算，保证声明值与上传内容同源
+    var sha256SourceStamp: String? = null,
     var status: TransferStatus = TransferStatus.WaitingApproval,
     var progress: Float = 0f,
     var bytesTransferred: Long = 0L,

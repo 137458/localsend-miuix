@@ -47,15 +47,60 @@ class LocalSendClient(
                 422,
             )
 
-        /** 为尚无哈希的条目补算 sha256（已有值跳过，null 视为未算）；握手前与添加文件预热共用。 */
+        /** 声明 sha256 的单份文件大小门槛：超过即不声明，避免握手前的整文件预读。 */
+        const val SHA256_PREFILL_MAX_BYTES = 2L * 1024 * 1024
+
+        /** 声明 sha256 的条目数量门槛：文件更多时逐份预读会显著拖慢握手。 */
+        const val SHA256_PREFILL_MAX_FILES = 3
+
+        /**
+         * 是否要为该条目声明 sha256：内联文本内容恒定，始终声明；普通文件仅在
+         * “待发文件数 ≤ 3 且单份 ≤ 2 MB”时声明。超出门槛的条目留空（协议字段可选），
+         * 既不阻塞握手，也不会用早期快照摘要去校验后续被改写的字节。
+         */
+        internal fun shouldDeclareSha256(
+            files: List<FileItem>,
+            fileItem: FileItem,
+        ): Boolean =
+            fileItem.textContent != null ||
+                (files.size <= SHA256_PREFILL_MAX_FILES && fileItem.size in 1..SHA256_PREFILL_MAX_BYTES)
+
+        /** 源文件指纹中记录的字节数；解析失败按 0 处理（视为未超出门槛）。 */
+        private fun stampLength(stamp: String): Long = stamp.substringBefore(':').toLongOrNull() ?: 0L
+
+        /**
+         * 为合格条目补算 sha256；已有摘要但源文件指纹已变化时重算，保证声明值与上传内容同源。
+         * [shouldCancel] 在每份文件前求值，便于取消传输或文件被移出待发列表时尽快退出。
+         */
         internal fun fillMissingSha256(
             files: List<FileItem>,
+            shouldCancel: () -> Boolean = { false },
+            sourceStamp: (FileItem) -> String? = { null },
             compute: (FileItem) -> String?,
         ) {
             for (fileItem in files) {
-                if (fileItem.expectedSha256 == null) {
-                    fileItem.expectedSha256 = compute(fileItem)
+                if (shouldCancel()) return
+                val stamp = sourceStamp(fileItem)
+                if (!shouldDeclareSha256(files, fileItem)) {
+                    // 超出门槛的条目不再补算（避免握手前整文件预读）。
+                    // 但若此处已有更早批次预热出的声明，且源文件指纹已变，必须撤销：
+                    // 否则过期摘要会随握手发给对端，触发 422 让整份文件作废。
+                    if (fileItem.expectedSha256 != null && stamp != null && stamp != fileItem.sha256SourceStamp) {
+                        fileItem.expectedSha256 = null
+                        fileItem.sha256SourceStamp = null
+                    }
+                    continue
                 }
+                // 文本/URI 无指纹来源视为内容恒定；已有摘要且指纹未变时复用，避免重复读盘
+                if (fileItem.expectedSha256 != null && (stamp == null || stamp == fileItem.sha256SourceStamp)) continue
+                if (stamp != null && stampLength(stamp) > SHA256_PREFILL_MAX_BYTES) {
+                    // 添加后被追加写入、已超出声明门槛：撤销过期声明，避免陈旧摘要触发接收端 422
+                    fileItem.expectedSha256 = null
+                    fileItem.sha256SourceStamp = null
+                    continue
+                }
+                fileItem.expectedSha256 = compute(fileItem)
+                fileItem.sha256SourceStamp = stamp
             }
         }
 
@@ -80,12 +125,13 @@ class LocalSendClient(
         targetDevice: Device,
         files: List<FileItem>,
         targetPin: String? = null,
+        shouldCancel: () -> Boolean = { false },
     ): Result<HandshakeResult> =
         withContext(Dispatchers.IO) {
             try {
-                // 发送方按协议为每个待传文件流式计算 sha256（字段可选，但缺失即令接收端放弃完整性校验）；
-                // 多数条目已在添加文件时后台预热完成，此处仅补算剩余项，避免大文件阻塞握手
-                fillMissingSha256(files)
+                // 发送方按协议为每个待传文件计算 sha256（字段可选，缺失即令接收端放弃完整性校验）；
+                // 仅对 ≤3 份、单份 ≤2 MB 的条目声明，且指纹变化时重算，杜绝握手前的整文件预读与陈旧摘要
+                fillMissingSha256(files, shouldCancel)
                 val localDevice = getLocalDevice()
                 val filesMap = files.associate { it.id to it.toDto() }
                 val requestDto =
@@ -471,14 +517,32 @@ class LocalSendClient(
             }
         }
 
-    /** 添加待发文件时后台预热 sha256，握手时直接复用，避免大文件在握手前同步哈希造成卡顿。 */
-    suspend fun precomputeSha256(files: List<FileItem>) = fillMissingSha256(files)
+    /** 添加待发文件时后台预热 sha256；仅覆盖可声明门槛内的条目，实际声明值仍以发送前指纹校验为准。 */
+    suspend fun precomputeSha256(
+        files: List<FileItem>,
+        shouldCancel: () -> Boolean = { false },
+    ) = fillMissingSha256(files, shouldCancel)
 
     /** 补算缺失哈希的实例入口：统一握手与预热两条路径，compute 固定为本地实现。 */
-    private suspend fun fillMissingSha256(files: List<FileItem>) =
-        withContext(Dispatchers.IO) {
-            LocalSendClient.fillMissingSha256(files) { computeSha256(it) }
-        }
+    private suspend fun fillMissingSha256(
+        files: List<FileItem>,
+        shouldCancel: () -> Boolean = { false },
+    ) = withContext(Dispatchers.IO) {
+        LocalSendClient.fillMissingSha256(
+            files = files,
+            compute = { computeSha256(it) },
+            shouldCancel = shouldCancel,
+            sourceStamp = { sourceStamp(it) },
+        )
+    }
+
+    /** 源文件 (长度, 修改时间) 指纹；仅本地路径可读，URI 与文本返回 null（视为内容恒定）。 */
+    private fun sourceStamp(fileItem: FileItem): String? {
+        val path = fileItem.path ?: return null
+        val file = File(path)
+        if (!file.isFile) return null
+        return "${file.length()}:${file.lastModified()}"
+    }
 
     /** 打开文件/URI/文本对应的输入流，供上传与哈希计算共用；不持有则返回 null。 */
     private fun openSourceStream(fileItem: FileItem): InputStream? {

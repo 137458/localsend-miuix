@@ -23,10 +23,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.decodeFromString
@@ -332,32 +333,42 @@ class LocalSendManager(
         )
     }
 
-    /** 后台 SHA-256 预热任务句柄，发送前等待其完成，避免握手路径同步计算大文件哈希。 */
-    private val sha256WarmupJobs = mutableListOf<Job>()
+    /** 预热并发上限：同时最多两份，避免连续添加文件时堆积大量并发整文件读取。 */
+    private val sha256WarmupPermits = Semaphore(2)
+
+    /** 每份待发文件至多一条预热任务，便于移出待发列表时精确取消。 */
+    private val sha256WarmupJobs = ConcurrentHashMap<String, Job>()
 
     fun addFiles(files: List<FileItem>) {
         _selectedFiles.update { it + files }
-        // 后台预热 sha256：多数文件在握手前已算完，避免 prepareUpload 同步哈希阻塞握手
-        val warmupJob = scope.launch { client.precomputeSha256(files) }
-        synchronized(sha256WarmupJobs) { sha256WarmupJobs += warmupJob }
+        // 后台预热 sha256：只对可声明门槛内的条目排队（≤3 份且单份 ≤2 MB），大文件永不预读
+        val selected = _selectedFiles.value
+        files.forEach { fileItem ->
+            if (!LocalSendClient.shouldDeclareSha256(selected, fileItem)) return@forEach
+            sha256WarmupJobs.remove(fileItem.id)?.cancel()
+            val job =
+                scope.launch {
+                    sha256WarmupPermits.withPermit {
+                        client.precomputeSha256(listOf(fileItem)) { !isFileSelected(fileItem.id) }
+                    }
+                }
+            // 完成后从表中移除，避免已结束的任务对象长期堆积
+            job.invokeOnCompletion { sha256WarmupJobs.remove(fileItem.id, job) }
+            sha256WarmupJobs[fileItem.id] = job
+        }
     }
 
-    /** 等待全部预热任务结束；等待期间新加入的预热任务留给下一次发送。 */
-    private suspend fun awaitSha256Warmup() {
-        val pending =
-            synchronized(sha256WarmupJobs) {
-                val snapshot = sha256WarmupJobs.toList()
-                sha256WarmupJobs.clear()
-                snapshot
-            }
-        pending.joinAll()
-    }
+    /** 文件仍在待发列表中；预热据此在文件被移出后立即停止补算。 */
+    private fun isFileSelected(id: String): Boolean = _selectedFiles.value.any { it.id == id }
 
     fun removeFile(id: String) {
+        sha256WarmupJobs.remove(id)?.cancel()
         _selectedFiles.update { it.filterNot { item -> item.id == id } }
     }
 
     fun clearFiles() {
+        sha256WarmupJobs.values.forEach { it.cancel() }
+        sha256WarmupJobs.clear()
         _selectedFiles.value = emptyList()
     }
 
@@ -517,9 +528,15 @@ class LocalSendManager(
                 }
                 val deviceKey = targetDevice.fingerprint.ifEmpty { targetDevice.ip }
                 var currentPin = targetDevicePins[deviceKey]
-                // 先等预热完成再握手：prepareUpload 内仅补算预热未覆盖的剩余项
-                awaitSha256Warmup()
-                var prepResult = client.prepareUpload(targetDevice, filesToSend, targetPin = currentPin)
+                // 握手不再等待预热：只有门槛内（≤3 份、单份 ≤2 MB）的条目会声明 sha256，
+                // prepareUpload 内即时补算，大文件不会被整文件预读
+                var prepResult =
+                    client.prepareUpload(
+                        targetDevice,
+                        filesToSend,
+                        targetPin = currentPin,
+                        shouldCancel = { canceledSessionIds.contains(sessionId) },
+                    )
                 if (prepResult.isFailure && prepResult.exceptionOrNull() is TargetPinRequiredException) {
                     val deferred = CompletableDeferred<String?>()
                     _pendingTargetPinPrompt.value =
@@ -538,7 +555,13 @@ class LocalSendManager(
                     val enteredPin = deferred.await()
                     if (!enteredPin.isNullOrBlank()) {
                         targetDevicePins[deviceKey] = enteredPin
-                        prepResult = client.prepareUpload(targetDevice, filesToSend, targetPin = enteredPin)
+                        prepResult =
+                            client.prepareUpload(
+                                targetDevice,
+                                filesToSend,
+                                targetPin = enteredPin,
+                                shouldCancel = { canceledSessionIds.contains(sessionId) },
+                            )
                     }
                 }
                 if (prepResult.isFailure) {
