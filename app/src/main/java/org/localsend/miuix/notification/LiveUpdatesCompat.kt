@@ -122,8 +122,10 @@ object LiveUpdatesCompat {
                             ).build(),
                     )
 
-            // 提升型 ongoing 从 API 36.1 才提供；36.0 设备直接调用会 NoSuchMethodError
-            if (Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1) {
+            // 提升型 ongoing 从 API 36.1 才提供；36.0 设备直接调用会 NoSuchMethodError。
+            // 该字段同样自 API 36 存在，因此只在 SDK_INT >= 36 的块内读取
+            val promotedOngoing = Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1
+            if (promotedOngoing) {
                 nativeBuilder.setRequestPromotedOngoing(true)
             }
 
@@ -156,7 +158,11 @@ object LiveUpdatesCompat {
             }
 
             val notification = nativeBuilder.build()
-            notification.flags = notification.flags or Notification.FLAG_ONGOING_EVENT or Notification.FLAG_PROMOTED_ONGOING
+            // 未请求提升时不能再打提升标记，否则 36.0 上的通知会被系统按提升型处理
+            notification.flags =
+                notification.flags or
+                Notification.FLAG_ONGOING_EVENT or
+                (if (promotedOngoing) Notification.FLAG_PROMOTED_ONGOING else 0)
             return notification
         }
 

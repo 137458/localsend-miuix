@@ -129,22 +129,31 @@ fun SendScreen(
             }
         }
     val totalSelectedSize = remember(selectedFiles) { selectedFiles.sumOf { it.size } }
-    val categoryBreakdown =
+    // 只在这里算计数；文案用 stringResource 在组合期读取，切换系统语言后标签才会跟着刷新
+    val categoryCounts =
         remember(selectedFiles) {
-            val images = selectedFiles.count { ThumbnailHelper.isImage(it) }
-            val videos = selectedFiles.count { ThumbnailHelper.isVideo(it) }
-            val audios = selectedFiles.count { it.mimeType.startsWith("audio/") }
-            val texts = selectedFiles.count { it.isTextMessage }
-            val apks = selectedFiles.count { ThumbnailHelper.isApk(it) }
-            val others = selectedFiles.size - (images + videos + audios + texts + apks)
-            buildList {
-                if (images > 0) add(context.getString(R.string.send_cat_images_count, images))
-                if (videos > 0) add(context.getString(R.string.send_cat_videos_count, videos))
-                if (audios > 0) add(context.getString(R.string.send_cat_audios_count, audios))
-                if (texts > 0) add(context.getString(R.string.send_cat_texts_count, texts))
-                if (apks > 0) add(context.getString(R.string.send_cat_apks_count, apks))
-                if (others > 0) add(context.getString(R.string.send_cat_others_count, others))
-            }
+            intArrayOf(
+                selectedFiles.count { ThumbnailHelper.isImage(it) },
+                selectedFiles.count { ThumbnailHelper.isVideo(it) },
+                selectedFiles.count { it.mimeType.startsWith("audio/") },
+                selectedFiles.count { it.isTextMessage },
+                selectedFiles.count { ThumbnailHelper.isApk(it) },
+            ).let { counts -> counts + (selectedFiles.size - counts.sum()) }
+        }
+    val imagesLabel = stringResource(R.string.send_cat_images_count, categoryCounts[0])
+    val videosLabel = stringResource(R.string.send_cat_videos_count, categoryCounts[1])
+    val audiosLabel = stringResource(R.string.send_cat_audios_count, categoryCounts[2])
+    val textsLabel = stringResource(R.string.send_cat_texts_count, categoryCounts[3])
+    val apksLabel = stringResource(R.string.send_cat_apks_count, categoryCounts[4])
+    val othersLabel = stringResource(R.string.send_cat_others_count, categoryCounts[5])
+    val categoryBreakdown =
+        buildList {
+            if (categoryCounts[0] > 0) add(imagesLabel)
+            if (categoryCounts[1] > 0) add(videosLabel)
+            if (categoryCounts[2] > 0) add(audiosLabel)
+            if (categoryCounts[3] > 0) add(textsLabel)
+            if (categoryCounts[4] > 0) add(apksLabel)
+            if (categoryCounts[5] > 0) add(othersLabel)
         }
 
     var isRefreshing by remember { mutableStateOf(false) }
