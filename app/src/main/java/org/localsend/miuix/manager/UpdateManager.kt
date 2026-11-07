@@ -3,7 +3,6 @@ package org.localsend.miuix.manager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
@@ -138,23 +137,16 @@ class UpdateManager(
         apkFile: File,
     ) {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (!context.packageManager.canRequestPackageInstalls()) {
-                    val settingsIntent =
-                        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                            data = Uri.parse("package:${context.packageName}")
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                    context.startActivity(settingsIntent)
-                    return
-                }
+            if (!context.packageManager.canRequestPackageInstalls()) {
+                val settingsIntent =
+                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                context.startActivity(settingsIntent)
+                return
             }
-            val uri =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
-                } else {
-                    Uri.fromFile(apkFile)
-                }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
 
             val intent =
                 Intent(Intent.ACTION_VIEW).apply {

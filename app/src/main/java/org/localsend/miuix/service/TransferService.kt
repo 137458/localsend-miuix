@@ -98,12 +98,7 @@ class TransferService : Service() {
     private fun stopForegroundService() {
         releaseLocks()
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                @Suppress("DEPRECATION")
-                stopForeground(true)
-            }
+            stopForeground(STOP_FOREGROUND_REMOVE)
         } catch (ignored: Exception) {
         }
         stopSelf()
@@ -129,11 +124,7 @@ class TransferService : Service() {
                         action = ACTION_START
                         putExtra(EXTRA_SESSION_COUNT, sessionCount)
                     }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
-                    context.startService(intent)
-                }
+                context.startForegroundService(intent)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
