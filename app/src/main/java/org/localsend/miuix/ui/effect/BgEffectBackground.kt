@@ -2,7 +2,6 @@ package org.localsend.miuix.ui.effect
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Spacer
@@ -38,7 +37,8 @@ fun BgEffectBackground(
         val surface = MiuixTheme.colorScheme.surface
         val isTablet = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
         val deviceType = if (isTablet) DeviceType.PAD else DeviceType.PHONE
-        val isDarkTheme = isSystemInDarkTheme()
+        // 跟随实际渲染的主题：应用内可强制浅色/深色/Monet，与系统明暗无关
+        val isDarkTheme = isDarkSurface(surface)
         val painter = remember(isOs3Effect) { BgEffectPainter(isOs3Effect) }
 
         val preset =
