@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.Dispatchers
@@ -153,9 +154,9 @@ fun App(manager: LocalSendManager) {
     }
 
     // 3. Navigation Items（接收在第 0 页，发送在第 1 页，设置在第 2 页）
-    val tabReceive = context.getString(R.string.nav_tab_receive)
-    val tabSend = context.getString(R.string.nav_tab_send)
-    val tabSettings = context.getString(R.string.nav_tab_settings)
+    val tabReceive = stringResource(R.string.nav_tab_receive)
+    val tabSend = stringResource(R.string.nav_tab_send)
+    val tabSettings = stringResource(R.string.nav_tab_settings)
     val navigationItems =
         remember(tabReceive, tabSend, tabSettings) {
             listOf(

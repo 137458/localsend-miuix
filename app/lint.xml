@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Compose 1.7.6 未提供 LocalResources；Toast/回调里只能用 LocalContext 读取资源。
+         保留该检查但降级为警告，避免大面积误伤阻断构建 -->
+    <issue
+        id="LocalContextGetResourceValueCall"
+        severity="warning" />
+</lint>

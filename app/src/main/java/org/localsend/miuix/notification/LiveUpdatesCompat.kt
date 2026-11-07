@@ -111,7 +111,6 @@ object LiveUpdatesCompat {
                     .setVisibility(Notification.VISIBILITY_PUBLIC)
                     .setContentIntent(contentIntent)
                     .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
-                    .setRequestPromotedOngoing(true)
                     .setShortCriticalText(chipSpeedEta)
                     .addAction(
                         Notification.Action
@@ -122,6 +121,11 @@ object LiveUpdatesCompat {
                                 cancelIntent,
                             ).build(),
                     )
+
+            // 提升型 ongoing 从 API 36.1 才提供；36.0 设备直接调用会 NoSuchMethodError
+            if (Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1) {
+                nativeBuilder.setRequestPromotedOngoing(true)
+            }
 
             getLargeIcon(context)?.let {
                 nativeBuilder.setLargeIcon(
