@@ -55,7 +55,6 @@
     <string name="toast_history_item_deleted">已删除该条记录</string>
     <string name="toast_latest_version">已是最新版本 (v%1$s)</string>
     <string name="toast_check_update_failed">检查更新失败: %1$s</string>
-    <string name="toast_download_apk_failed">下载失败: %1$s</string>
     <string name="enumeration_separator">、</string>
 
     <!-- 接收主页面 -->

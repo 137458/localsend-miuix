@@ -22,7 +22,6 @@ object PreferenceKeys {
     const val KEY_RECENT_MANUAL_IPS = "recent_manual_ips"
     const val KEY_AUTO_CHECK_UPDATE = "auto_check_update"
     const val KEY_IGNORED_VERSION = "ignored_version"
-    const val KEY_PROMPTED_UPDATE_VERSION = "prompted_update_version"
     const val KEY_IS_OS3_EFFECT = "is_os3_effect"
     const val KEY_WIDE_SCREEN_NAVIGATION_RAIL = "wide_screen_navigation_rail"
     const val KEY_SAVE_TEXT_AS_FILE = "save_text_as_file"

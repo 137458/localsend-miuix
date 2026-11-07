@@ -60,6 +60,7 @@ import org.localsend.miuix.ui.screen.ReceiveScreen
 import org.localsend.miuix.ui.screen.SendScreen
 import org.localsend.miuix.ui.screen.SettingsScreen
 import org.localsend.miuix.ui.screen.UpdateScreen
+import org.localsend.miuix.updates.UpdatePrompt
 import top.yukonga.miuix.kmp.basic.Badge
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.NavigationRail
@@ -180,19 +181,23 @@ fun App(manager: LocalSendManager) {
     val updateManager = remember { UpdateManager(context) }
     var availableUpdate by remember { mutableStateOf<UpdateCheckResult?>(null) }
     var showUpdateDialog by remember { mutableStateOf(false) }
+    val downloaderState = manager.updates.downloader.state
+    val updateDownloadState by downloaderState.collectAsState()
 
     LaunchedEffect(Unit) {
         if (!settings.autoCheckUpdate) return@LaunchedEffect
         scope.launch(Dispatchers.IO) {
             val result = updateManager.checkForUpdate()
             result.onSuccess { info ->
-                // 同一版本只在首次发现时自动弹窗，避免每次冷启动都打断用户；忽略过的版本不再提示
-                val isNewlyPrompted =
-                    info.hasUpdate &&
-                        info.latestVersion != settings.ignoredVersion &&
-                        info.latestVersion != settings.promptedUpdateVersion
-                if (isNewlyPrompted) {
-                    manager.updateSettings { it.copy(promptedUpdateVersion = info.latestVersion) }
+                // 同一版本只在本次进程内提示一次；「稍后」不落盘，忽略过的版本不再提示
+                val shouldPrompt =
+                    UpdatePrompt.shouldNotify(
+                        latestVersion = info.latestVersion,
+                        ignoredVersion = settings.ignoredVersion,
+                        promptedVersion = manager.updates.promptedVersion,
+                    )
+                if (info.hasUpdate && shouldPrompt) {
+                    manager.updates.promptedVersion = info.latestVersion
                     availableUpdate = info
                     showUpdateDialog = true
                 }
@@ -633,12 +638,24 @@ fun App(manager: LocalSendManager) {
             UpdateDialog(
                 show = showUpdateDialog,
                 releaseInfo = availableUpdate!!,
+                downloadState = updateDownloadState,
                 onDismiss = { showUpdateDialog = false },
-                onUpdate = { url ->
-                    updateManager.openInBrowser(context, url)
+                onDownload = {
+                    availableUpdate?.let { release ->
+                        val apk = release.apk
+                        if (apk != null) {
+                            manager.updates.downloader.start(apk)
+                        } else {
+                            updateManager.openInBrowser(context, release.releaseUrl)
+                        }
+                    }
                 },
+                onInstall = { file -> updateManager.installApk(context, file) },
+                onCancelDownload = { manager.updates.downloader.cancel() },
+                onOpenBrowser = { url -> updateManager.openInBrowser(context, url) },
                 onIgnore = { ver ->
-                    manager.updateSettings { it.copy(ignoredVersion = ver) }
+                    val next = UpdatePrompt.toggleIgnored(settings.ignoredVersion, ver)
+                    manager.updateSettings { it.copy(ignoredVersion = next) }
                     showUpdateDialog = false
                 },
             )

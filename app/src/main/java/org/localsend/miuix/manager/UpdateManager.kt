@@ -16,9 +16,7 @@ import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -26,10 +24,9 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.localsend.miuix.BuildConfig
 import org.localsend.miuix.R
+import org.localsend.miuix.updates.UpdateAsset
+import org.localsend.miuix.updates.UpdatePrompt
 import java.io.File
-import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 
 @Serializable
 data class GithubAsset(
@@ -37,6 +34,8 @@ data class GithubAsset(
     @SerialName("browser_download_url") val browserDownloadUrl: String,
     val size: Long = 0L,
     @SerialName("content_type") val contentType: String = "",
+    // GitHub Release API 在 2025 年后为资产提供 "sha256:<hex>" 摘要；缺失时跳过校验
+    val digest: String? = null,
 )
 
 @Serializable
@@ -56,28 +55,9 @@ data class UpdateCheckResult(
     val changelog: String,
     val publishedAt: String,
     val releaseUrl: String,
-    val downloadUrl: String?,
-    val apkSize: Long,
+    val apk: UpdateAsset?,
     val hasUpdate: Boolean,
 )
-
-sealed interface UpdateDownloadState {
-    object Idle : UpdateDownloadState
-
-    data class Downloading(
-        val progress: Float,
-        val downloadedBytes: Long,
-        val totalBytes: Long,
-    ) : UpdateDownloadState
-
-    data class Completed(
-        val file: File,
-    ) : UpdateDownloadState
-
-    data class Error(
-        val message: String,
-    ) : UpdateDownloadState
-}
 
 class UpdateManager(
     private val context: Context,
@@ -120,111 +100,35 @@ class UpdateManager(
                 val bodyText = response.bodyAsText()
                 val release = json.decodeFromString<GithubRelease>(bodyText)
 
-                val remoteVersion =
-                    release.tagName
-                        .trim()
-                        .removePrefix("v")
-                        .removePrefix("V")
-                val currentVersion =
-                    BuildConfig.VERSION_NAME
-                        .trim()
-                        .removePrefix("v")
-                        .removePrefix("V")
+                val remoteVersion = UpdatePrompt.normalized(release.tagName)
+                val currentVersion = UpdatePrompt.normalized(BuildConfig.VERSION_NAME)
 
                 val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
-                val downloadUrl = apkAsset?.browserDownloadUrl
-                val apkSize = apkAsset?.size ?: 0L
+                val apk =
+                    apkAsset?.let {
+                        UpdateAsset(
+                            name = it.name,
+                            size = it.size,
+                            downloadUrl = it.browserDownloadUrl,
+                            digest = it.digest,
+                        )
+                    }
 
-                val hasUpdate = compareVersions(remoteVersion, currentVersion) > 0
+                val hasUpdate = UpdatePrompt.compare(remoteVersion, currentVersion) > 0
 
                 Result.success(
                     UpdateCheckResult(
-                        currentVersion = "v$currentVersion",
-                        latestVersion = "v$remoteVersion",
+                        currentVersion = currentVersion,
+                        latestVersion = remoteVersion,
                         releaseTitle = release.name ?: release.tagName,
                         changelog = release.body.orEmpty(),
                         publishedAt = release.publishedAt?.take(10).orEmpty(),
                         releaseUrl = release.htmlUrl ?: "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases",
-                        downloadUrl = downloadUrl,
-                        apkSize = apkSize,
+                        apk = apk,
                         hasUpdate = hasUpdate,
                     ),
                 )
             } catch (e: Exception) {
-                Result.failure(e)
-            }
-        }
-
-    /**
-     * 版本号比较：v1 > v2 返回 1，v1 < v2 返回 -1，相等返回 0
-     */
-    fun compareVersions(
-        v1: String,
-        v2: String,
-    ): Int {
-        val parts1 = v1.split(".", "-", "_").mapNotNull { it.toIntOrNull() }
-        val parts2 = v2.split(".", "-", "_").mapNotNull { it.toIntOrNull() }
-        val maxLen = maxOf(parts1.size, parts2.size)
-
-        for (i in 0 until maxLen) {
-            val num1 = parts1.getOrElse(i) { 0 }
-            val num2 = parts2.getOrElse(i) { 0 }
-            if (num1 != num2) {
-                return num1.compareTo(num2)
-            }
-        }
-        return 0
-    }
-
-    suspend fun downloadApk(
-        downloadUrl: String,
-        onProgress: (progress: Float, downloadedBytes: Long, totalBytes: Long) -> Unit,
-    ): Result<File> =
-        withContext(Dispatchers.IO) {
-            var apkFile: File? = null
-            try {
-                val cacheDir = context.externalCacheDir ?: context.cacheDir
-                val targetFile = File(cacheDir, "localsend-update.apk")
-                apkFile = targetFile
-                if (targetFile.exists()) targetFile.delete()
-
-                val url = URL(downloadUrl)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.setRequestProperty("User-Agent", "LocalSend-Miuix-App")
-                connection.instanceFollowRedirects = true
-                connection.connectTimeout = 15000
-                connection.readTimeout = 30000
-                connection.connect()
-
-                val totalBytes =
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        connection.contentLengthLong.takeIf { it > 0 } ?: 0L
-                    } else {
-                        connection.contentLength.toLong().takeIf { it > 0 } ?: 0L
-                    }
-                var downloadedBytes = 0L
-
-                connection.inputStream.use { input ->
-                    FileOutputStream(targetFile).use { output ->
-                        val buffer = ByteArray(64 * 1024)
-                        var read: Int
-                        while (input.read(buffer).also { read = it } != -1) {
-                            ensureActive()
-                            output.write(buffer, 0, read)
-                            downloadedBytes += read
-                            val progress = if (totalBytes > 0) (downloadedBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
-                            onProgress(progress, downloadedBytes, totalBytes)
-                        }
-                        output.flush()
-                    }
-                }
-
-                Result.success(targetFile)
-            } catch (e: CancellationException) {
-                apkFile?.delete()
-                throw e
-            } catch (e: Exception) {
-                apkFile?.delete()
                 Result.failure(e)
             }
         }

@@ -47,7 +47,6 @@ internal fun loadSettings(
         lastSelectedTabIndex = prefs.getInt(PreferenceKeys.KEY_LAST_TAB, 0),
         autoCheckUpdate = prefs.getBoolean(PreferenceKeys.KEY_AUTO_CHECK_UPDATE, true),
         ignoredVersion = prefs.getString(PreferenceKeys.KEY_IGNORED_VERSION, null),
-        promptedUpdateVersion = prefs.getString(PreferenceKeys.KEY_PROMPTED_UPDATE_VERSION, null),
         isOs3Effect = prefs.getBoolean(PreferenceKeys.KEY_IS_OS3_EFFECT, true),
         wideScreenNavigationRail = prefs.getBoolean(PreferenceKeys.KEY_WIDE_SCREEN_NAVIGATION_RAIL, false),
         saveTextAsFile = prefs.getBoolean(PreferenceKeys.KEY_SAVE_TEXT_AS_FILE, false),
@@ -85,7 +84,6 @@ internal fun persistSettingsTo(
         .putInt(PreferenceKeys.KEY_LAST_TAB, s.lastSelectedTabIndex)
         .putBoolean(PreferenceKeys.KEY_AUTO_CHECK_UPDATE, s.autoCheckUpdate)
         .putString(PreferenceKeys.KEY_IGNORED_VERSION, s.ignoredVersion)
-        .putString(PreferenceKeys.KEY_PROMPTED_UPDATE_VERSION, s.promptedUpdateVersion)
         .putBoolean(PreferenceKeys.KEY_IS_OS3_EFFECT, s.isOs3Effect)
         .putBoolean(PreferenceKeys.KEY_WIDE_SCREEN_NAVIGATION_RAIL, s.wideScreenNavigationRail)
         .putBoolean(PreferenceKeys.KEY_SAVE_TEXT_AS_FILE, s.saveTextAsFile)

@@ -61,6 +61,7 @@ import org.localsend.miuix.network.TargetPinRequiredException
 import org.localsend.miuix.network.TlsStore
 import org.localsend.miuix.notification.TransferNotifier
 import org.localsend.miuix.transfer.TransferOutcome
+import org.localsend.miuix.updates.UpdateDomain
 import org.localsend.miuix.util.AutoFinishPolicy
 import java.io.File
 import java.net.HttpURLConnection
@@ -103,6 +104,9 @@ class LocalSendManager(
 
     private val _settings = MutableStateFlow(loadSettings(prefs, initialAlias, defaultDownloadPath))
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    // 进程级更新域：下载状态跨弹窗/更新页共享，prompted 仅存内存
+    val updates = UpdateDomain(context, scope)
 
     private val favoriteStore = FavoriteStore(File(context.filesDir, FavoriteStore.FILENAME))
     private val _favoriteDevices = MutableStateFlow<List<FavoriteDevice>>(favoriteStore.load())

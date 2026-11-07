@@ -3,9 +3,7 @@ package org.localsend.miuix.ui.component
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,205 +14,128 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.UpdateCheckResult
-import org.localsend.miuix.manager.UpdateManager
-import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.updates.UpdateDownloadState
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 import java.io.File
 
 /**
- * 官方 Miuix / HyperOS 规范版本更新弹窗。
- * 提供版本信息概览、Markdown 更新日志呈现、应用内流式下载及实时速率显示、取消与后台下载控制、
- * 失败智能重试与浏览器降级、以及下载后直接拉起系统安装功能。
+ * 整合版更新弹窗：一行版本跃迁摘要 + 可折叠说明 + 纵向主次动作。
+ *
+ * - 关闭弹窗不取消下载，状态由进程级单例持有，更新页可继续看到进度。
+ * - 说明区是弹窗内唯一的滚动容器，限高 240dp，上下 40dp 羽化。
  */
 @Composable
 fun UpdateDialog(
     show: Boolean,
     releaseInfo: UpdateCheckResult,
+    downloadState: UpdateDownloadState,
     onDismiss: () -> Unit,
-    onUpdate: (url: String) -> Unit,
+    onDownload: () -> Unit,
+    onInstall: (File) -> Unit,
+    onCancelDownload: () -> Unit,
+    onOpenBrowser: (String) -> Unit,
     onIgnore: ((version: String) -> Unit)? = null,
 ) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val updateManager = remember { UpdateManager(context) }
+    var expanded by remember(releaseInfo.latestVersion) { mutableStateOf(false) }
+    val plan =
+        remember(releaseInfo, downloadState, onIgnore) {
+            buildUpdateDialogPlan(releaseInfo, downloadState, canIgnore = onIgnore != null)
+        }
+    val notes =
+        remember(releaseInfo.changelog, expanded) {
+            updateDialogNotesFold(releaseInfo.changelog, expanded)
+        }
+    val scrollState = rememberScrollState()
 
-    var downloadJob by remember { mutableStateOf<Job?>(null) }
-    var isDownloading by remember { mutableStateOf(false) }
-    var downloadProgress by remember { mutableFloatStateOf(0f) }
-    var downloadedBytes by remember { mutableLongStateOf(0L) }
-    var totalBytes by remember { mutableLongStateOf(0L) }
-    var downloadedFile by remember { mutableStateOf<File?>(null) }
-    var downloadError by remember { mutableStateOf<String?>(null) }
-
-    var downloadSpeed by remember { mutableLongStateOf(0L) }
-    var lastSpeedUpdateTime by remember { mutableLongStateOf(0L) }
-    var lastSpeedBytes by remember { mutableLongStateOf(0L) }
-
-    fun cancelDownload() {
-        downloadJob?.cancel()
-        downloadJob = null
-        isDownloading = false
-        downloadProgress = 0f
-        downloadedBytes = 0L
-        downloadSpeed = 0L
-    }
-
-    fun startDownload() {
-        val downloadUrl = releaseInfo.downloadUrl ?: releaseInfo.releaseUrl
-
-        isDownloading = true
-        downloadError = null
-        downloadProgress = 0f
-        downloadedBytes = 0L
-        totalBytes = 0L
-        downloadSpeed = 0L
-        lastSpeedUpdateTime = System.currentTimeMillis()
-        lastSpeedBytes = 0L
-
-        downloadJob =
-            coroutineScope.launch {
-                val result =
-                    updateManager.downloadApk(
-                        downloadUrl = downloadUrl,
-                        onProgress = { progress, downloaded, total ->
-                            downloadProgress = progress
-                            downloadedBytes = downloaded
-                            totalBytes = total
-
-                            val now = System.currentTimeMillis()
-                            val dt = now - lastSpeedUpdateTime
-                            if (dt >= 400L) {
-                                val dBytes = downloaded - lastSpeedBytes
-                                if (dBytes > 0L) {
-                                    val instantSpeed = (dBytes * 1000L) / dt
-                                    downloadSpeed =
-                                        if (downloadSpeed == 0L) {
-                                            instantSpeed
-                                        } else {
-                                            (downloadSpeed * 7 + instantSpeed * 3) / 10
-                                        }
-                                }
-                                lastSpeedUpdateTime = now
-                                lastSpeedBytes = downloaded
-                            }
-                        },
-                    )
-                isDownloading = false
-                downloadJob = null
-                result
-                    .onSuccess { file ->
-                        downloadedFile = file
-                        updateManager.installApk(context, file)
-                    }.onFailure { error ->
-                        if (error !is CancellationException) {
-                            downloadError = error.localizedMessage ?: context.getString(R.string.toast_download_apk_failed, "")
-                        }
-                    }
-            }
+    fun runPrimary() {
+        when (plan.primaryAction) {
+            UpdatePrimaryAction.DOWNLOAD, UpdatePrimaryAction.RETRY -> onDownload()
+            UpdatePrimaryAction.INSTALL -> (downloadState as? UpdateDownloadState.Done)?.let { onInstall(it.file) }
+            UpdatePrimaryAction.OPEN_RELEASE -> onOpenBrowser(releaseInfo.releaseUrl)
+        }
     }
 
     WindowDialog(
         show = show,
         title = stringResource(R.string.update_dialog_title),
-        summary = "${releaseInfo.currentVersion} ➔ ${releaseInfo.latestVersion}",
-        onDismissRequest = {
-            if (!isDownloading) {
-                onDismiss()
-            }
-        },
+        summary = plan.summary,
+        onDismissRequest = onDismiss,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            // 版本与发布元信息横栏
-            Row(
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                        .heightIn(max = UPDATE_NOTES_MAX_HEIGHT_DP.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                        .verticalEdgeFade(
+                            top = scrollState.canScrollBackward,
+                            bottom = scrollState.canScrollForward,
+                            fade = UPDATE_NOTES_FADE_DP.dp,
+                        ).verticalScroll(scrollState)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f))
-                                .padding(horizontal = 8.dp, vertical = 2.dp),
-                    ) {
+                if (plan.showProgress) {
+                    plan.progressDetail?.let {
                         Text(
-                            text = releaseInfo.latestVersion,
-                            style =
-                                MiuixTheme.textStyles.body2.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                ),
-                            color = MiuixTheme.colorScheme.primary,
-                        )
-                    }
-                    if (releaseInfo.apkSize > 0L) {
-                        Text(
-                            text = FileItem.formatFileSize(releaseInfo.apkSize),
+                            text = it,
                             style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                     }
+                    LinearProgressIndicator(progress = plan.progressFraction ?: 0f, modifier = Modifier.fillMaxWidth())
                 }
-                if (releaseInfo.publishedAt.isNotBlank()) {
+
+                if (downloadState is UpdateDownloadState.Failed) {
                     Text(
-                        text = releaseInfo.publishedAt,
-                        style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        text = downloadState.message,
+                        style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                        color = MiuixTheme.colorScheme.error,
                     )
                 }
-            }
 
-            // 更新日志容器卡片
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 72.dp, max = 220.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                        .padding(horizontal = 14.dp, vertical = 12.dp)
-                        .verticalScroll(rememberScrollState()),
-            ) {
-                if (releaseInfo.changelog.isNotBlank()) {
+                if (plan.hasNotes) {
                     MarkdownText(
-                        markdown = releaseInfo.changelog,
+                        markdown = notes.visible,
                         modifier = Modifier.fillMaxWidth(),
                         baseFontSize = 13,
                     )
+                    if (notes.hasMore) {
+                        Text(
+                            text =
+                                if (expanded) {
+                                    "收起说明"
+                                } else {
+                                    "展开全部（还有 ${notes.hiddenLines} 行）"
+                                },
+                            style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                            color = MiuixTheme.colorScheme.primary,
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable { expanded = !expanded }
+                                    .padding(vertical = 2.dp),
+                        )
+                    }
                 } else {
                     Text(
                         text = stringResource(R.string.update_dialog_no_changelog),
@@ -222,195 +143,56 @@ fun UpdateDialog(
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
-            }
 
-            // 动态状态提示区
-            if (isDownloading) {
-                Spacer(modifier = Modifier.height(14.dp))
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
-                            .padding(12.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        val speedText = if (downloadSpeed > 0L) " · ${FileItem.formatSpeed(downloadSpeed)}" else ""
-                        Text(
-                            text = stringResource(R.string.update_dialog_downloading, speedText),
-                            style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
-                            color = MiuixTheme.colorScheme.primary,
-                        )
-                        val percent = if (downloadProgress >= 0f) "${(downloadProgress * 100).toInt()}%" else ""
-                        val sizeText =
-                            if (totalBytes > 0L) {
-                                "${FileItem.formatFileSize(downloadedBytes)} / ${FileItem.formatFileSize(totalBytes)}"
-                            } else {
-                                FileItem.formatFileSize(downloadedBytes)
-                            }
-                        Text(
-                            text = if (percent.isNotEmpty()) "$sizeText ($percent)" else sizeText,
-                            style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LinearProgressIndicator(
-                        progress = downloadProgress,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            } else if (downloadedFile != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.08f))
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                if (plan.showIgnore && onIgnore != null) {
                     Text(
-                        text = stringResource(R.string.update_dialog_ready_install),
+                        text = "忽略此版本",
                         style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
-                        color = MiuixTheme.colorScheme.primary,
-                    )
-                }
-            } else if (downloadError != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MiuixTheme.colorScheme.error.copy(alpha = 0.08f))
-                            .padding(12.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.update_dialog_download_failed, downloadError ?: ""),
-                        style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
-                        color = MiuixTheme.colorScheme.error,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.update_dialog_network_hint),
-                        style = MiuixTheme.textStyles.body2.copy(fontSize = 11.sp),
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { onIgnore(releaseInfo.latestVersion) }
+                                .padding(vertical = 2.dp),
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 底部操作按钮栏
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            Column(
                 modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                when {
-                    isDownloading -> {
-                        Button(
-                            onClick = { cancelDownload() },
-                            colors = ButtonDefaults.buttonColors(),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(stringResource(R.string.update_dialog_btn_cancel_download))
-                        }
-                        Button(
-                            onClick = onDismiss,
-                            colors = ButtonDefaults.buttonColorsPrimary(),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(stringResource(R.string.update_dialog_btn_background_download))
-                        }
-                    }
-                    downloadedFile != null -> {
-                        Button(
-                            onClick = { startDownload() },
-                            colors = ButtonDefaults.buttonColors(),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(stringResource(R.string.update_dialog_btn_redownload))
-                        }
-                        Button(
-                            onClick = {
-                                updateManager.installApk(context, downloadedFile!!)
-                            },
-                            colors = ButtonDefaults.buttonColorsPrimary(),
-                            modifier = Modifier.weight(1.3f),
-                        ) {
-                            Text(stringResource(R.string.update_dialog_btn_install))
-                        }
-                    }
-                    downloadError != null -> {
-                        Button(
-                            onClick = {
-                                val url = releaseInfo.downloadUrl ?: releaseInfo.releaseUrl
-                                updateManager.openInBrowser(context, url)
-                            },
-                            colors = ButtonDefaults.buttonColors(),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(stringResource(R.string.update_dialog_btn_browser))
-                        }
-                        Button(
-                            onClick = { startDownload() },
-                            colors = ButtonDefaults.buttonColorsPrimary(),
-                            modifier = Modifier.weight(1.2f),
-                        ) {
-                            Text(stringResource(R.string.btn_retry))
-                        }
-                    }
-                    else -> {
-                        if (onIgnore != null) {
-                            Button(
-                                onClick = { onIgnore(releaseInfo.latestVersion) },
-                                colors = ButtonDefaults.buttonColors(),
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Text(stringResource(R.string.btn_ignore))
-                            }
-                        }
-                        Button(
-                            onClick = onDismiss,
-                            colors = ButtonDefaults.buttonColors(),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(if (onIgnore != null) stringResource(R.string.btn_cancel) else stringResource(R.string.btn_later))
-                        }
-                        Button(
-                            onClick = { startDownload() },
-                            colors = ButtonDefaults.buttonColorsPrimary(),
-                            modifier = Modifier.weight(1.3f),
-                        ) {
-                            Text(stringResource(R.string.update_dialog_btn_update_now))
-                        }
-                    }
+                Button(
+                    onClick = { runPrimary() },
+                    enabled = plan.primaryEnabled,
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(plan.primaryText)
                 }
+
+                if (plan.showBrowserFallback) {
+                    TextButton(
+                        text = stringResource(R.string.update_dialog_btn_browser),
+                        onClick = { onOpenBrowser(updateBrowserUrl(releaseInfo)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (plan.showCancelDownload) {
+                    TextButton(
+                        text = stringResource(R.string.update_dialog_btn_cancel_download),
+                        onClick = onCancelDownload,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                TextButton(
+                    text = plan.dismissText,
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // 网页端说明链接
-            Text(
-                text = stringResource(R.string.update_dialog_github_release_note),
-                style = MiuixTheme.textStyles.body2.copy(fontSize = 11.sp),
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                textAlign = TextAlign.Center,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable {
-                            updateManager.openInBrowser(context, releaseInfo.releaseUrl)
-                        }.padding(vertical = 4.dp),
-            )
         }
     }
 }

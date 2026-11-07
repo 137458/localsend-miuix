@@ -22,8 +22,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,14 +45,18 @@ import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateCheckResult
 import org.localsend.miuix.manager.UpdateManager
-import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.MarkdownText
 import org.localsend.miuix.ui.component.UpdateDialog
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
+import org.localsend.miuix.ui.component.updateBrowserUrl
+import org.localsend.miuix.ui.component.updateProgressDetail
+import org.localsend.miuix.ui.component.updateProgressFraction
 import org.localsend.miuix.ui.effect.BgEffectBackground
 import org.localsend.miuix.ui.effect.isRuntimeShaderSupported
+import org.localsend.miuix.updates.UpdateDownloadState
+import org.localsend.miuix.updates.UpdatePrompt
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -73,7 +75,7 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.io.File
+import kotlin.math.round
 
 /**
  * 官方 Miuix / HyperOS 视觉规范系统与应用更新页。
@@ -96,11 +98,8 @@ fun UpdateScreen(
     var isChecking by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
 
-    var isDownloading by remember { mutableStateOf(false) }
-    var downloadProgress by remember { mutableFloatStateOf(0f) }
-    var downloadedBytes by remember { mutableLongStateOf(0L) }
-    var totalBytes by remember { mutableLongStateOf(0L) }
-    var downloadedFile by remember { mutableStateOf<File?>(null) }
+    val downloaderState = manager.updates.downloader.state
+    val downloadState by downloaderState.collectAsState()
 
     val hasNew = releaseInfo?.hasUpdate == true
 
@@ -114,8 +113,15 @@ fun UpdateScreen(
                 .onSuccess { info ->
                     releaseInfo = info
                     if (info.hasUpdate) {
-                        if (userInitiated || info.latestVersion != settings.ignoredVersion) {
+                        val shouldNotify =
+                            UpdatePrompt.shouldNotify(
+                                latestVersion = info.latestVersion,
+                                ignoredVersion = settings.ignoredVersion,
+                                promptedVersion = manager.updates.promptedVersion,
+                            )
+                        if (userInitiated || shouldNotify) {
                             showDialog = true
+                            manager.updates.promptedVersion = info.latestVersion
                         }
                     } else if (userInitiated) {
                         Toast.makeText(context, context.getString(R.string.toast_latest_version, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
@@ -126,6 +132,16 @@ fun UpdateScreen(
                         Toast.makeText(context, context.getString(R.string.toast_check_update_failed, message), Toast.LENGTH_SHORT).show()
                     }
                 }
+        }
+    }
+
+    fun startDownload() {
+        val release = releaseInfo ?: return
+        val apk = release.apk
+        if (apk != null) {
+            manager.updates.downloader.start(apk)
+        } else {
+            updateManager.openInBrowser(context, updateBrowserUrl(release))
         }
     }
 
@@ -353,82 +369,103 @@ fun UpdateScreen(
                                         baseFontSize = 14,
                                     )
 
-                                    if (isDownloading) {
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                        ) {
-                                            Text(
-                                                text = stringResource(R.string.update_downloading_hint),
-                                                style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
-                                                color = MiuixTheme.colorScheme.primary,
+                                    when (val state = downloadState) {
+                                        is UpdateDownloadState.Downloading -> {
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.update_downloading_hint),
+                                                    style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
+                                                    color = MiuixTheme.colorScheme.primary,
+                                                )
+                                                Text(
+                                                    text = "${round(updateProgressFraction(state) * 100).toInt()}%",
+                                                    style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
+                                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            LinearProgressIndicator(
+                                                progress = updateProgressFraction(state),
+                                                modifier = Modifier.fillMaxWidth(),
                                             )
-                                            val percent = if (downloadProgress >= 0f) "${(downloadProgress * 100).toInt()}%" else ""
-                                            val sizeText =
-                                                if (totalBytes > 0) {
-                                                    "${FileItem.formatFileSize(downloadedBytes)} / ${FileItem.formatFileSize(totalBytes)}"
-                                                } else {
-                                                    FileItem.formatFileSize(downloadedBytes)
-                                                }
+                                            Spacer(modifier = Modifier.height(6.dp))
                                             Text(
-                                                text = if (percent.isNotEmpty()) "$sizeText ($percent)" else sizeText,
+                                                text = updateProgressDetail(state),
                                                 style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
                                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                             )
                                         }
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        LinearProgressIndicator(
-                                            progress = downloadProgress,
-                                            modifier = Modifier.fillMaxWidth(),
-                                        )
+
+                                        is UpdateDownloadState.Failed -> {
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Text(
+                                                text = state.message,
+                                                style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                                                color = MiuixTheme.colorScheme.error,
+                                            )
+                                        }
+
+                                        else -> Unit
                                     }
 
-                                    Spacer(modifier = Modifier.height(16.dp))
+                                    if (downloadState !is UpdateDownloadState.Downloading) {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                    }
 
-                                    if (downloadedFile != null) {
-                                        TextButton(
-                                            text = stringResource(R.string.update_btn_install_now),
-                                            onClick = {
-                                                updateManager.installApk(context, downloadedFile!!)
-                                            },
-                                            colors = ButtonDefaults.textButtonColorsPrimary(),
-                                            modifier = Modifier.fillMaxWidth(),
-                                        )
-                                    } else if (hasNew && !isDownloading) {
-                                        TextButton(
-                                            text = stringResource(R.string.update_btn_download_now),
-                                            onClick = {
-                                                val url = releaseInfo?.downloadUrl ?: releaseInfo?.releaseUrl
-                                                if (url != null) {
-                                                    isDownloading = true
-                                                    downloadProgress = 0f
-                                                    coroutineScope.launch {
-                                                        val result =
-                                                            updateManager.downloadApk(
-                                                                downloadUrl = url,
-                                                                onProgress = { progress, downloaded, total ->
-                                                                    downloadProgress = progress
-                                                                    downloadedBytes = downloaded
-                                                                    totalBytes = total
-                                                                },
-                                                            )
-                                                        isDownloading = false
-                                                        result
-                                                            .onSuccess { file ->
-                                                                downloadedFile = file
-                                                                updateManager.installApk(context, file)
-                                                            }.onFailure { error ->
-                                                                Toast.makeText(context, context.getString(R.string.toast_download_apk_failed, error.localizedMessage ?: ""), Toast.LENGTH_SHORT).show()
-                                                            }
-                                                    }
-                                                } else {
-                                                    releaseInfo?.releaseUrl?.let { updateManager.openInBrowser(context, it) }
-                                                }
-                                            },
-                                            colors = ButtonDefaults.textButtonColorsPrimary(),
-                                            modifier = Modifier.fillMaxWidth(),
-                                        )
+                                    when (val state = downloadState) {
+                                        is UpdateDownloadState.Downloading -> {
+                                            TextButton(
+                                                text = stringResource(R.string.update_dialog_btn_cancel_download),
+                                                onClick = { manager.updates.downloader.cancel() },
+                                                colors = ButtonDefaults.textButtonColorsPrimary(),
+                                                modifier = Modifier.fillMaxWidth(),
+                                            )
+                                        }
+
+                                        is UpdateDownloadState.Done -> {
+                                            TextButton(
+                                                text = stringResource(R.string.update_btn_install_now),
+                                                onClick = { updateManager.installApk(context, state.file) },
+                                                colors = ButtonDefaults.textButtonColorsPrimary(),
+                                                modifier = Modifier.fillMaxWidth(),
+                                            )
+                                        }
+
+                                        is UpdateDownloadState.Failed -> {
+                                            TextButton(
+                                                text = stringResource(R.string.btn_retry),
+                                                onClick = { startDownload() },
+                                                colors = ButtonDefaults.textButtonColorsPrimary(),
+                                                modifier = Modifier.fillMaxWidth(),
+                                            )
+                                            TextButton(
+                                                text = stringResource(R.string.update_dialog_btn_browser),
+                                                onClick = {
+                                                    releaseInfo?.let { updateManager.openInBrowser(context, updateBrowserUrl(it)) }
+                                                },
+                                                modifier = Modifier.fillMaxWidth(),
+                                            )
+                                        }
+
+                                        UpdateDownloadState.Idle -> {
+                                            if (hasNew) {
+                                                TextButton(
+                                                    text =
+                                                        if (releaseInfo?.apk != null) {
+                                                            stringResource(R.string.update_btn_download_now)
+                                                        } else {
+                                                            "前往 Releases 页面"
+                                                        },
+                                                    onClick = { startDownload() },
+                                                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -460,12 +497,14 @@ fun UpdateScreen(
                                     when {
                                         isChecking -> stringResource(R.string.update_pref_ignore_checking)
                                         !hasNew -> stringResource(R.string.update_pref_ignore_already_latest)
-                                        settings.ignoredVersion == releaseInfo?.latestVersion -> stringResource(R.string.update_pref_ignore_ignored, releaseInfo?.latestVersion ?: "")
+                                        UpdatePrompt.isIgnored(settings.ignoredVersion, releaseInfo?.latestVersion) ->
+                                            stringResource(R.string.update_pref_ignore_ignored, releaseInfo?.latestVersion ?: "")
                                         else -> stringResource(R.string.update_pref_ignore_desc, releaseInfo?.latestVersion ?: "")
                                     },
-                                checked = hasNew && settings.ignoredVersion == releaseInfo?.latestVersion,
-                                onCheckedChange = { checked ->
-                                    manager.updateSettings { it.copy(ignoredVersion = if (checked) releaseInfo?.latestVersion else null) }
+                                checked = hasNew && UpdatePrompt.isIgnored(settings.ignoredVersion, releaseInfo?.latestVersion),
+                                onCheckedChange = {
+                                    val next = UpdatePrompt.toggleIgnored(settings.ignoredVersion, releaseInfo?.latestVersion)
+                                    manager.updateSettings { it.copy(ignoredVersion = next) }
                                 },
                                 enabled = hasNew,
                             )
@@ -525,13 +564,14 @@ fun UpdateScreen(
             UpdateDialog(
                 show = showDialog,
                 releaseInfo = releaseInfo!!,
+                downloadState = downloadState,
                 onDismiss = { showDialog = false },
-                onUpdate = { url ->
-                    showDialog = false
-                    updateManager.openInBrowser(context, url)
-                },
+                onDownload = { startDownload() },
+                onInstall = { file -> updateManager.installApk(context, file) },
+                onCancelDownload = { manager.updates.downloader.cancel() },
+                onOpenBrowser = { url -> updateManager.openInBrowser(context, url) },
                 onIgnore = { ver ->
-                    manager.updateSettings { it.copy(ignoredVersion = ver) }
+                    manager.updateSettings { it.copy(ignoredVersion = UpdatePrompt.toggleIgnored(settings.ignoredVersion, ver)) }
                     showDialog = false
                 },
             )

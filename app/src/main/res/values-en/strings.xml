@@ -55,7 +55,6 @@
     <string name="toast_history_item_deleted">Record deleted</string>
     <string name="toast_latest_version">Already the latest version (v%1$s)</string>
     <string name="toast_check_update_failed">Failed to check for updates: %1$s</string>
-    <string name="toast_download_apk_failed">Download failed: %1$s</string>
     <string name="enumeration_separator">, </string>
 
     <!-- Receive Screen -->

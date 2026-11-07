@@ -16,11 +16,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,7 +52,7 @@ fun MarkdownText(
                 is MarkdownBlock.Heading -> {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = buildAnnotatedContent(block.text),
+                        text = buildAnnotatedContent(block.text, MiuixTheme.colorScheme.primary),
                         style =
                             when (block.level) {
                                 1 ->
@@ -87,7 +92,7 @@ fun MarkdownText(
                                     .background(MiuixTheme.colorScheme.primary),
                         )
                         Text(
-                            text = buildAnnotatedContent(block.text),
+                            text = buildAnnotatedContent(block.text, MiuixTheme.colorScheme.primary),
                             style =
                                 MiuixTheme.textStyles.body2.copy(
                                     fontSize = baseFontSize.sp,
@@ -117,7 +122,7 @@ fun MarkdownText(
                             color = MiuixTheme.colorScheme.primary,
                         )
                         Text(
-                            text = buildAnnotatedContent(block.text),
+                            text = buildAnnotatedContent(block.text, MiuixTheme.colorScheme.primary),
                             style =
                                 MiuixTheme.textStyles.body2.copy(
                                     fontSize = baseFontSize.sp,
@@ -130,7 +135,7 @@ fun MarkdownText(
 
                 is MarkdownBlock.Paragraph -> {
                     Text(
-                        text = buildAnnotatedContent(block.text),
+                        text = buildAnnotatedContent(block.text, MiuixTheme.colorScheme.primary),
                         style =
                             MiuixTheme.textStyles.body2.copy(
                                 fontSize = baseFontSize.sp,
@@ -218,42 +223,40 @@ private fun parseMarkdownBlocks(markdown: String): List<MarkdownBlock> {
     return blocks
 }
 
-private fun buildAnnotatedContent(rawText: String): AnnotatedString =
+private fun buildAnnotatedContent(
+    rawText: String,
+    linkColor: Color,
+): AnnotatedString =
     buildAnnotatedString {
-        var i = 0
-        val len = rawText.length
-
-        while (i < len) {
-            // **加粗**
-            if (rawText.startsWith("**", i)) {
-                val end = rawText.indexOf("**", i + 2)
-                if (end != -1) {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append(rawText.substring(i + 2, end))
-                    }
-                    i = end + 2
-                    continue
-                }
-            }
-
-            // `代码`
-            if (rawText.startsWith("`", i)) {
-                val end = rawText.indexOf("`", i + 1)
-                if (end != -1) {
+        parseNoteInline(rawText).forEach { segment ->
+            when (segment) {
+                is NoteSegment.Plain -> append(segment.text)
+                is NoteSegment.Bold -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(segment.text) }
+                is NoteSegment.Code ->
                     withStyle(
                         SpanStyle(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Medium,
                         ),
                     ) {
-                        append(rawText.substring(i + 1, end))
+                        append(segment.text)
                     }
-                    i = end + 1
-                    continue
-                }
+                is NoteSegment.Link ->
+                    withLink(
+                        LinkAnnotation.Url(
+                            url = segment.url,
+                            styles =
+                                TextLinkStyles(
+                                    style =
+                                        SpanStyle(
+                                            color = linkColor,
+                                            textDecoration = TextDecoration.Underline,
+                                        ),
+                                ),
+                        ),
+                    ) {
+                        append(segment.label)
+                    }
             }
-
-            append(rawText[i])
-            i++
         }
     }
