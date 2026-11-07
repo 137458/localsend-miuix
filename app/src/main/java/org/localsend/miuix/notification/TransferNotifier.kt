@@ -250,7 +250,7 @@ object TransferNotifier {
                 this.action = action
                 putExtra(TransferActionReceiver.EXTRA_SESSION_ID, sessionId)
             }
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         return PendingIntent.getBroadcast(context, sessionId.hashCode(), intent, flags)
     }
 
