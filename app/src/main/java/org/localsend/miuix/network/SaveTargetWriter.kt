@@ -10,6 +10,7 @@ import androidx.documentfile.provider.DocumentFile
 import org.localsend.miuix.R
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.SaveTarget
+import org.localsend.miuix.util.SavePathHelper
 import java.io.OutputStream
 import java.util.concurrent.ConcurrentHashMap
 
@@ -23,10 +24,15 @@ internal class SaveTargetWriter(
     /**
      * 打开文件写入流。默认走公共 Download（MediaStore），用户自定义时走 SAF 目录树。
      * 返回目标流；MediaStore 路径写入完成后需调用 [confirmMediaStoreWrite] 清除 IS_PENDING 标记。
+     *
+     * [deferCommit] 为 true 时用于「流式校验待确认」的文件：SAF 目标先以临时名落盘，
+     * 校验通过后由 [finishDeferredWrite] 重命名为最终名；MediaStore 本身以 IS_PENDING 隐藏，
+     * 因此无需改名，只延迟 clearing pending。
      */
     internal fun openSaveStream(
         fileItem: FileItem,
         target: SaveTarget,
+        deferCommit: Boolean = false,
         getAutoCategorizeMedia: () -> Boolean,
     ): OutputStream =
         when (target) {
@@ -92,9 +98,12 @@ internal class SaveTargetWriter(
                 }
                 val existing = currentDir.listFiles().mapNotNull { it.name }.toHashSet()
                 val uniqueName = uniqueTreeName(pathInfo.fileName, existing)
+                // 待确认的写入使用临时名，避免损坏内容以最终文件名可见；确认后重命名转正
+                val createName = if (deferCommit) "$uniqueName.part-${fileItem.id.take(8)}" else uniqueName
                 val created =
-                    currentDir.createFile(fileItem.mimeType, uniqueName)
+                    currentDir.createFile(fileItem.mimeType, createName)
                         ?: throw IllegalStateException(context.getString(R.string.msg_cannot_create_custom_file))
+                // 记录最终名：确认时按此重命名；删除时以 mediaStoreUri 为准，不依赖此名
                 fileItem.name = if (pathInfo.subDirectory.isNotEmpty()) "${pathInfo.subDirectory}/$uniqueName" else uniqueName
                 fileItem.mediaStoreUri = created.uri
                 context.contentResolver.openOutputStream(created.uri)
@@ -102,14 +111,49 @@ internal class SaveTargetWriter(
             }
         }
 
-    /** MediaStore 写入完成后清除 IS_PENDING，使文件在文件管理器中立即可见。 */
-    internal fun confirmMediaStoreWrite(fileItem: FileItem) {
-        val uri = fileItem.mediaStoreUri ?: return
-        try {
+    /** MediaStore 写入完成后清除 IS_PENDING，使文件在文件管理器中立即可见；返回是否确认成功。 */
+    internal fun confirmMediaStoreWrite(fileItem: FileItem): Boolean {
+        val uri = fileItem.mediaStoreUri ?: return false
+        return try {
             val values = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
-            context.contentResolver.update(uri, values, null, null)
+            context.contentResolver.update(uri, values, null, null) > 0
         } catch (ignored: Exception) {
+            false
         }
+    }
+
+    /** 待确认文件转正：MediaStore 清除 pending；SAF 把临时名重命名为最终名（必要时重新查重重名）。 */
+    internal fun finishDeferredWrite(
+        fileItem: FileItem,
+        target: SaveTarget,
+    ): Boolean =
+        when (target) {
+            is SaveTarget.MediaStoreTarget -> confirmMediaStoreWrite(fileItem)
+            is SaveTarget.UriTarget -> {
+                val uri = fileItem.mediaStoreUri ?: return false
+                val tempDoc = DocumentFile.fromSingleUri(context, uri) ?: return false
+                renameDeferredFile(fileItem, tempDoc)
+            }
+        }
+
+    private fun renameDeferredFile(
+        fileItem: FileItem,
+        tempDoc: DocumentFile,
+    ): Boolean {
+        val parent = tempDoc.parentFile ?: return false
+        val pathInfo = SavePathHelper.resolve(fileItem.name)
+        // 待确认期间目录可能新增文件，转正前重新查重
+        val existing =
+            parent
+                .listFiles()
+                .mapNotNull { it.name }
+                .filter { it != tempDoc.name }
+                .toHashSet()
+        val uniqueName = uniqueTreeName(pathInfo.fileName, existing)
+        if (!tempDoc.renameTo(uniqueName)) return false
+        fileItem.name = if (pathInfo.subDirectory.isNotEmpty()) "${pathInfo.subDirectory}/$uniqueName" else uniqueName
+        fileItem.mediaStoreUri = tempDoc.uri
+        return true
     }
 
     private val allocatedMediaNames = ConcurrentHashMap.newKeySet<String>()

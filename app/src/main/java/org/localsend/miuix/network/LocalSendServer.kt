@@ -1,12 +1,14 @@
 package org.localsend.miuix.network
 
 import android.content.Context
+import android.util.Log
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
@@ -30,6 +32,10 @@ import io.ktor.server.routing.routing
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.localsend.miuix.R
 import org.localsend.miuix.core.AppJson
@@ -95,6 +101,9 @@ class LocalSendServer(
     private val sessionTokens = ConcurrentHashMap<String, MutableMap<String, String>>() // sessionId -> (fileId -> token)
     private val saveTargetWriter = SaveTargetWriter(context)
     private val rateLimiter = RequestRateLimiter()
+    private val pendingUploads = PendingUploads()
+    private val pendingSweepScope = CoroutineScope(Dispatchers.IO)
+    private var pendingSweepJob: Job? = null
 
     /**
      * 清理过期、中断、已完成或处于终端状态的残留接收会话，防止 activeSessions 死锁导致后续传输报 409。
@@ -119,6 +128,8 @@ class LocalSendServer(
             if (isTerminal || isStale || isSameSenderReconnecting) {
                 iterator.remove()
                 sessionTokens.remove(id)
+                // 会话被清理/需要重新连接时不留下未确认的临时文件
+                pendingUploads.discardSession(id)
                 if (session.status == TransferStatus.WaitingApproval || session.status == TransferStatus.InProgress) {
                     session.status = TransferStatus.Canceled
                     session.endTime = now
@@ -253,6 +264,7 @@ class LocalSendServer(
                     retryEx.printStackTrace()
                 }
             }
+            startPendingSweep()
         } finally {
             synchronized(startLock) {
                 isStarting = false
@@ -330,10 +342,42 @@ class LocalSendServer(
             engine = null
             isStarting = false
             boundPort = 0
+            pendingSweepJob?.cancel()
+            pendingSweepJob = null
+            // 服务停止时不留下任何未确认的临时文件
+            pendingUploads.discardAll()
             activeSessions.clear()
             sessionTokens.clear()
             rateLimiter.clear()
             saveTargetWriter.clearAllocatedNames()
+        }
+    }
+
+    /** 定时清理超过保鲜期仍未确认的临时文件，防止发送方崩溃/断网后留下错误内容。 */
+    private fun startPendingSweep() {
+        pendingSweepJob?.cancel()
+        pendingSweepJob =
+            pendingSweepScope.launch {
+                while (isActive) {
+                    delay(15_000L)
+                    expirePendingUploads()
+                }
+            }
+    }
+
+    private fun expirePendingUploads() {
+        val expired = pendingUploads.discardExpired()
+        for (entry in expired) {
+            val session = activeSessions[entry.sessionId] ?: continue
+            val fileItem = session.files.firstOrNull { it.id == entry.fileId } ?: continue
+            Log.w(TAG, "Pending upload expired without confirmation: '${fileItem.name}' (session=${entry.sessionId})")
+            finishUploadFile(
+                session,
+                entry.sessionId,
+                fileItem,
+                TransferStatus.Failed,
+                context.getString(R.string.msg_checksum_confirm_timeout),
+            )
         }
     }
 
@@ -684,8 +728,15 @@ class LocalSendServer(
                 }
 
                 val saveTarget = getSaveTarget()
-                // 发送方通过自定义扩展头请求回报摘要；官方发送端不会发送，行为与原来一致
-                val returnsChecksum = call.request.headers[ChecksumHeaders.REQUEST] == "1"
+                // 发送方通过自定义扩展头请求校验；官方发送端不会发送，行为与原来一致。
+                // "1" = 旧版发送方，只要回报摘要并立即转正；"2" = 新版，暂存待确认后再转正
+                val checksumRequest = call.request.headers[ChecksumHeaders.REQUEST]
+                val requestChecksumDigest =
+                    checksumRequest == ChecksumHeaders.REQUEST_REPORT_ONLY ||
+                        checksumRequest == ChecksumHeaders.REQUEST_DEFERRED
+                val deferredCommit = checksumRequest == ChecksumHeaders.REQUEST_DEFERRED
+                // 同一文件的上传重试先清掉上一轮的待确认临时文件，避免残留（此时新文件尚未写入）
+                if (deferredCommit) pendingUploads.discardForFile(sessionId, fileId)
 
                 fileItem.status = TransferStatus.InProgress
                 fileItem.bytesTransferred = 0L
@@ -694,7 +745,7 @@ class LocalSendServer(
                     val checksum =
                         withContext(Dispatchers.IO) {
                             var digest: MessageDigest? =
-                                if (fileItem.expectedSha256 != null || returnsChecksum) {
+                                if (fileItem.expectedSha256 != null || requestChecksumDigest) {
                                     MessageDigest.getInstance("SHA-256")
                                 } else {
                                     null
@@ -706,7 +757,8 @@ class LocalSendServer(
                                     null
                                 }
 
-                            saveTargetWriter.openSaveStream(fileItem, saveTarget) { getAutoCategorizeMedia() }.buffered(128 * 1024).use { fos ->
+                            // 待确认路径先落在临时位置；官方发送端不请求校验，仍按原逻辑立即转正
+                            saveTargetWriter.openSaveStream(fileItem, saveTarget, deferCommit = deferredCommit) { getAutoCategorizeMedia() }.buffered(128 * 1024).use { fos ->
                                 val channel = call.receiveChannel()
                                 val buffer = ByteArray(128 * 1024)
                                 var lastTime = System.currentTimeMillis()
@@ -755,8 +807,8 @@ class LocalSendServer(
                             if (textBuffer != null && textBuffer.size() > 0) {
                                 fileItem.textContent = textBuffer.toString(Charsets.UTF_8.name())
                             }
-                            // MediaStore 路径：写入完成后清除 IS_PENDING，使文件立即可见
-                            saveTargetWriter.confirmMediaStoreWrite(fileItem)
+                            // MediaStore 路径：写入完成后清除 IS_PENDING，使文件立即可见；待确认路径保留 pending
+                            if (!deferredCommit) saveTargetWriter.confirmMediaStoreWrite(fileItem)
                             digest?.digest()?.let { Sha256.hex(it) }
                         }
 
@@ -768,16 +820,42 @@ class LocalSendServer(
                         return@post
                     }
 
+                    if (deferredCommit) {
+                        // 发送方要求回报摘要：文件暂存未转正，等发送方确认一致后再 commit，否则 reject 或保鲜期清理
+                        val reportedSha256 = checksum ?: error("checksum digest unavailable")
+                        pendingUploads.register(
+                            PendingUploads.Entry(
+                                sessionId = sessionId,
+                                fileId = fileId,
+                                token = token,
+                                createdAt = System.currentTimeMillis(),
+                                commitAction = { saveTargetWriter.finishDeferredWrite(fileItem, saveTarget) },
+                                discardAction = { saveTargetWriter.deleteSavedFile(fileItem, saveTarget) },
+                            ),
+                        )
+                        uploadSuccessHeaders(
+                            httpVersion = call.request.origin.version,
+                            reportedSha256 = reportedSha256,
+                            deferredCommit = true,
+                        ).forEach { (name, value) ->
+                            call.response.header(name, value)
+                        }
+                        call.respond(HttpStatusCode.OK, mapOf("message" to "File uploaded, awaiting checksum confirmation"))
+                        return@post
+                    }
+
                     finishUploadFile(session, sessionId, fileItem, TransferStatus.Completed, null)
 
                     uploadSuccessHeaders(
                         httpVersion = call.request.origin.version,
-                        reportedSha256 = checksum?.takeIf { returnsChecksum },
+                        // 旧版发送方（"1"）只要求回报摘要，仍需在响应头里给出实际摘要
+                        reportedSha256 = checksum.takeIf { requestChecksumDigest },
                     ).forEach { (name, value) ->
                         call.response.header(name, value)
                     }
                     call.respond(HttpStatusCode.OK, mapOf("message" to "File uploaded successfully"))
                 } catch (e: Throwable) {
+                    pendingUploads.discardForFile(sessionId, fileId)
                     saveTargetWriter.deleteSavedFile(fileItem, saveTarget)
                     if (session.status == TransferStatus.Canceled) {
                         finishUploadFile(session, sessionId, fileItem, TransferStatus.Canceled, null)
@@ -806,13 +884,95 @@ class LocalSendServer(
                         onSessionUpdated(session)
                     }
                     sessionTokens.remove(sessionId)
+                    // 取消后不保留任何未确认的临时文件
+                    pendingUploads.discardSession(sessionId)
                 }
                 call.respond(HttpStatusCode.OK, mapOf("message" to "Session cancelled"))
+            }
+
+            // 自定义扩展：发送方确认摘要一致后转正 / 不一致时丢弃临时文件
+            post(LocalSendRoutes.CHECKSUM_COMMIT) {
+                resolveChecksumDecision(call, commit = true)
+            }
+            post(LocalSendRoutes.CHECKSUM_REJECT) {
+                resolveChecksumDecision(call, commit = false)
             }
         }
     }
 
+    /**
+     * 校验决策端点：只接受 sessionId + fileId + token，并校验来源 IP 与会话设备一致。
+     * 绝不接受路径参数，待清理的文件由服务端登记的临时句柄决定，避免伪造请求删除任意文件。
+     */
+    private suspend fun resolveChecksumDecision(
+        call: ApplicationCall,
+        commit: Boolean,
+    ) {
+        val sessionId = call.request.queryParameters["sessionId"]
+        val fileId = call.request.queryParameters["fileId"]
+        val token = call.request.queryParameters["token"]
+        if (sessionId == null || fileId == null || token == null) {
+            call.respond(HttpStatusCode.BadRequest, "Missing sessionId, fileId or token")
+            return
+        }
+
+        val session = activeSessions[sessionId]
+        if (session == null) {
+            call.respond(HttpStatusCode.NotFound, "Session not found")
+            return
+        }
+        val expectedToken = sessionTokens[sessionId]?.get(fileId)
+        val isIpMatch = WebShareHtmlRenderer.isSameIp(call.request.origin.remoteHost, session.device.ip)
+        if (expectedToken == null || expectedToken != token || !isIpMatch) {
+            call.respond(HttpStatusCode.Forbidden, "Invalid token or IP address")
+            return
+        }
+
+        val fileItem = session.files.firstOrNull { it.id == fileId }
+        if (fileItem == null) {
+            call.respond(HttpStatusCode.NotFound, "File metadata not found in session")
+            return
+        }
+
+        if (commit) {
+            val result = withContext(Dispatchers.IO) { pendingUploads.commit(sessionId, fileId, token) }
+            if (result.entry == null) {
+                call.respond(HttpStatusCode.NotFound, "Pending upload not found")
+                return
+            }
+            if (result.committed) {
+                finishUploadFile(session, sessionId, fileItem, TransferStatus.Completed, null)
+                call.respond(HttpStatusCode.OK, mapOf("message" to "Checksum confirmed, file committed"))
+            } else {
+                finishUploadFile(
+                    session,
+                    sessionId,
+                    fileItem,
+                    TransferStatus.Failed,
+                    context.getString(R.string.msg_checksum_commit_failed_receiver),
+                )
+                call.respond(HttpStatusCode.InternalServerError, mapOf("message" to "Failed to finalize file"))
+            }
+        } else {
+            if (withContext(Dispatchers.IO) { pendingUploads.reject(sessionId, fileId, token) } == null) {
+                call.respond(HttpStatusCode.NotFound, "Pending upload not found")
+                return
+            }
+            // 发送方报告摘要不一致：接收端已丢弃临时文件，不留下内容错误的文件
+            finishUploadFile(
+                session,
+                sessionId,
+                fileItem,
+                TransferStatus.Failed,
+                context.getString(R.string.msg_checksum_discarded_mismatch),
+            )
+            call.respond(HttpStatusCode.OK, mapOf("message" to "Pending upload discarded"))
+        }
+    }
+
     companion object {
+        private const val TAG = "LocalSendServer"
+
         /** prepare-upload 被拒时的 403 文案：主动取消与显式拒绝必须可区分，发送方据此选择提示语义。 */
         internal fun prepareUploadRejectionMessage(canceledByReceiver: Boolean): String = if (canceledByReceiver) ProtocolMessages.CANCELED_BY_RECEIVER else ProtocolMessages.DECLINED_BY_USER
 
@@ -835,15 +995,18 @@ class LocalSendServer(
         }
 
         /**
-         * 上传成功响应头：在原有 Connection 处理之上，仅在发送方请求回报时附带实际落盘摘要。
+         * 上传成功响应头：在原有 Connection 处理之上，仅在发送方请求回报时附带实际落盘摘要；
+         * [deferredCommit] 为 true 时额外标记“文件暂存未转正”，发送方须再确认。
          * 这是加载式扩展，不改公开协议字段；不认识该响应头的发送方会直接忽略。
          */
         internal fun uploadSuccessHeaders(
             httpVersion: String?,
             reportedSha256: String?,
+            deferredCommit: Boolean = false,
         ): Map<String, String> =
             getUploadResponseHeaders(httpVersion) +
-                if (reportedSha256 != null) mapOf(ChecksumHeaders.RESPONSE to reportedSha256) else emptyMap()
+                (if (reportedSha256 != null) mapOf(ChecksumHeaders.RESPONSE to reportedSha256) else emptyMap()) +
+                (if (deferredCommit) mapOf(ChecksumHeaders.PENDING to "1") else emptyMap())
 
         data class PrepareUploadDecision(
             val shouldRespondNoContent: Boolean,

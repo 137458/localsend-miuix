@@ -48,6 +48,11 @@ class ChecksumMismatchException(
     message: String,
 ) : IllegalStateException(message)
 
+/** 摘要一致但接收端未能确认转正：临时文件会被接收端按保鲜期丢弃，按失败上报以免误判成功。 */
+class ChecksumCommitException(
+    message: String,
+) : IllegalStateException(message)
+
 class LocalSendClient(
     private val context: Context,
     private val getLocalDevice: () -> Device,
@@ -334,6 +339,11 @@ class LocalSendClient(
                     Log.w(TAG, "Checksum mismatch for '${fileItem.name}', aborting retry")
                     break
                 }
+                // 转正未确认同样属于该项的终态失败，重传只会再次产生待确认临时文件
+                if (lastError is ChecksumCommitException) {
+                    Log.w(TAG, "Checksum commit unconfirmed for '${fileItem.name}', aborting retry")
+                    break
+                }
 
                 if (attempt < maxRetries && isTransientConnectionError) {
                     onProgress(0L, 0L)
@@ -393,8 +403,9 @@ class LocalSendClient(
                     setRequestProperty("Connection", "keep-alive")
                     setRequestProperty("Keep-Alive", "timeout=60")
                     if (requestChecksum) {
-                        // 自定义扩展头：请求接收端在落盘完成后回报实际摘要；官方/第三方接收端会忽略
-                        setRequestProperty(ChecksumHeaders.REQUEST, "1")
+                        // 自定义扩展头：要求接收端落盘后回报摘要并暂存，待本端比对后再确认转正；
+                        // 官方/第三方接收端会忽略；旧版接收端按 "1" 语义立即转正，不会误判成功
+                        setRequestProperty(ChecksumHeaders.REQUEST, ChecksumHeaders.REQUEST_DEFERRED)
                     }
                 }
 
@@ -449,6 +460,8 @@ class LocalSendClient(
                 if (requestChecksum) {
                     val peerChecksum = connection.getHeaderField(ChecksumHeaders.RESPONSE)?.trim()?.lowercase()
                     val localChecksum = digest?.digest()?.let { Sha256.hex(it) }
+                    // 接收端把文件暂存在临时位置，只有在收到本端的确认后才会转正
+                    val deferredCommit = connection.getHeaderField(ChecksumHeaders.PENDING) == "1"
                     when {
                         peerChecksum.isNullOrEmpty() -> {
                             // 对端是官方/第三方实现：不识别回报扩展，正常传输照旧算成功，仅降级为无校验
@@ -456,11 +469,32 @@ class LocalSendClient(
                             fileItem.integrity = IntegrityStatus.Unverified
                         }
                         peerChecksum == localChecksum -> {
-                            Log.i(TAG, "uploadFileOnce: checksum verified for '${fileItem.name}'")
+                            if (deferredCommit) {
+                                val decision = sendChecksumDecision(targetDevice, sessionId, fileItem, token, commit = true, timeoutMs = 10_000)
+                                if (decision.isFailure) {
+                                    Log.e(TAG, "uploadFileOnce: failed to confirm checksum for '${fileItem.name}': ${decision.exceptionOrNull()?.message}")
+                                    fileItem.integrity = IntegrityStatus.None
+                                    return Result.failure(
+                                        ChecksumCommitException(
+                                            safeGetString(
+                                                R.string.msg_checksum_commit_failed,
+                                                "Receiver did not confirm the file: ${fileItem.name}",
+                                                fileItem.name,
+                                            ),
+                                        ),
+                                    )
+                                }
+                            }
+                            Log.i(TAG, "uploadFileOnce: checksum verified for '${fileItem.name}' (deferredCommit=$deferredCommit)")
                             fileItem.integrity = IntegrityStatus.Verified
                         }
                         else -> {
                             Log.e(TAG, "uploadFileOnce: checksum mismatch for '${fileItem.name}': local=$localChecksum, peer=$peerChecksum")
+                            if (deferredCommit) {
+                                // 明确通知接收端丢弃暂存文件；即便请求丢失，接收端也会在保鲜期后自动清理
+                                sendChecksumDecision(targetDevice, sessionId, fileItem, token, commit = false, timeoutMs = 5_000)
+                                    .onFailure { Log.w(TAG, "uploadFileOnce: failed to notify receiver to discard '${fileItem.name}': ${it.message}") }
+                            }
                             fileItem.integrity = IntegrityStatus.Mismatch
                             return Result.failure(
                                 ChecksumMismatchException(
@@ -543,6 +577,61 @@ class LocalSendClient(
                 } catch (ignored: Exception) {
                 }
             }
+        }
+    }
+
+    /**
+     * 通知接收端转正或丢弃暂存文件。只携带 sessionId / fileId / token，不传任何路径：
+     * 接收端按自己登记的临时句柄操作，伪造请求无法删除任意文件。
+     * 该请求无法与上传响应合并（接收端要在发送方比对后才能知道结果），因此成功路径多一次往返。
+     */
+    private fun sendChecksumDecision(
+        targetDevice: Device,
+        sessionId: String,
+        fileItem: FileItem,
+        token: String,
+        commit: Boolean,
+        timeoutMs: Int,
+    ): Result<Unit> {
+        var connection: HttpURLConnection? = null
+        val route = if (commit) LocalSendRoutes.CHECKSUM_COMMIT else LocalSendRoutes.CHECKSUM_REJECT
+        return try {
+            val encodedSessionId = URLEncoder.encode(sessionId, "UTF-8")
+            val encodedFileId = URLEncoder.encode(fileItem.id, "UTF-8")
+            val encodedToken = URLEncoder.encode(token, "UTF-8")
+            val url = "${targetDevice.url}$route?sessionId=$encodedSessionId&fileId=$encodedFileId&token=$encodedToken"
+            FingerprintTrust.pin(targetDevice.fingerprint)
+            connection =
+                (URL(url).openConnection() as HttpURLConnection).apply {
+                    if (this is HttpsURLConnection) {
+                        sslSocketFactory = FingerprintTrust.pinnedSslSocketFactory
+                        hostnameVerifier = SslHelper.trustAllHostnameVerifier
+                    }
+                    requestMethod = "POST"
+                    useCaches = false
+                    connectTimeout = timeoutMs
+                    readTimeout = timeoutMs
+                }
+            val code = connection.responseCode
+            try {
+                connection.inputStream?.use { stream ->
+                    val drainBuf = ByteArray(4096)
+                    while (stream.read(drainBuf) != -1) {}
+                }
+            } catch (ignored: Exception) {
+            }
+            if (code in 200..299) {
+                Log.i(TAG, "sendChecksumDecision: peer ${if (commit) "committed" else "discarded"} '${fileItem.name}' (HTTP $code)")
+                Result.success(Unit)
+            } else {
+                Log.w(TAG, "sendChecksumDecision: peer returned HTTP $code for '${fileItem.name}'")
+                Result.failure(java.io.IOException("Checksum decision HTTP $code"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            FingerprintTrust.unpin(targetDevice.fingerprint)
+            runCatching { connection?.disconnect() }
         }
     }
 

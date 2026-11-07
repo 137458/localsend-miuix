@@ -51,6 +51,11 @@ object LocalSendRoutes {
     const val PREPARE_UPLOAD = "/api/localsend/v2/prepare-upload"
     const val UPLOAD = "/api/localsend/v2/upload"
     const val CANCEL = "/api/localsend/v2/cancel"
+
+    // 自定义扩展路由：超门槛文件校验通过后确认转正 / 不一致时丢弃临时文件；官方客户端不会调用
+    const val CHECKSUM_COMMIT = "/api/localsend/v2/checksum-commit"
+    const val CHECKSUM_REJECT = "/api/localsend/v2/checksum-reject"
+
     const val PREPARE_DOWNLOAD = "/api/localsend/v2/prepare-download"
     const val DOWNLOAD = "/api/localsend/v2/download"
     const val DOWNLOAD_ZIP = "/api/localsend/v2/download-zip"
@@ -69,11 +74,23 @@ object ProtocolMessages {
  * 这里用自定义请求/响应头承载，不修改任何公开协议字段；对端不认识时按 HTTP 规范忽略，传输行为不受影响。
  */
 object ChecksumHeaders {
-    /** 上传请求头：值为 "1" 表示发送方要求接收端在落盘完成后回报实际 SHA-256。 */
+    /** 上传请求头：值为 "1" 表示只要求回报摘要（旧版发送方），"2" 表示要求回报并暂存待确认。 */
     const val REQUEST = "X-Localsend-Miuix-Checksum"
+
+    /** 请求头取值：只要求回报摘要，接收端立即转正（旧版发送方）。 */
+    const val REQUEST_REPORT_ONLY = "1"
+
+    /** 请求头取值：要求回报摘要，并先暂存等待发送方确认后再转正。 */
+    const val REQUEST_DEFERRED = "2"
 
     /** 上传响应头：接收端回报实际落盘内容的小写十六进制 SHA-256，缺省即对端不支持回报。 */
     const val RESPONSE = "X-Localsend-Miuix-Sha256"
+
+    /** 上传响应头：值为 "1" 表示接收端已写入临时位置，等待发送方确认摘要后才转正。 */
+    const val PENDING = "X-Localsend-Miuix-Pending"
+
+    /** 接收端临时文件的保鲜期：发送方未在时限内确认时自动丢弃，避免残留错误文件。 */
+    const val PENDING_TTL_MS = 60_000L
 }
 
 object AppActions {

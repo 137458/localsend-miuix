@@ -438,6 +438,10 @@
     <string name="msg_port_occupied_fallback">Port %1$d is in use, switched to %2$d automatically</string>
     <string name="msg_sha256_mismatch">File verification failed: SHA-256 mismatch (422)</string>
     <string name="msg_checksum_mismatch_file">File verification failed: checksum reported by the receiver does not match %1$s</string>
+    <string name="msg_checksum_commit_failed">Receiver did not confirm the file: %1$s</string>
+    <string name="msg_checksum_discarded_mismatch">Checksum mismatch: the temporary file was discarded</string>
+    <string name="msg_checksum_confirm_timeout">Sender never confirmed the checksum: the temporary file was discarded</string>
+    <string name="msg_checksum_commit_failed_receiver">Checksum verified but the temporary file could not be finalized and was discarded</string>
     <string name="integrity_unverified">Unverified (peer did not report a checksum)</string>
     <string name="msg_session_not_found">Session or file not found on peer (404)</string>
     <string name="msg_upload_http">Upload failed: HTTP %1$d %2$s</string>

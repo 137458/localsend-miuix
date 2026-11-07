@@ -371,6 +371,14 @@ class LocalSendProtocolTest {
                 .uploadSuccessHeaders("HTTP/2.0", "deadbeef")
         assertFalse(http2WithChecksum.containsKey(io.ktor.http.HttpHeaders.Connection))
         assertEquals("deadbeef", http2WithChecksum[org.localsend.miuix.core.ChecksumHeaders.RESPONSE])
+        assertFalse("未暂存时不应要求发送方二次确认", http2WithChecksum.containsKey(org.localsend.miuix.core.ChecksumHeaders.PENDING))
+
+        // 暂存待确认时额外标记，发送方据此发起确认/丢弃请求
+        val deferred =
+            org.localsend.miuix.network.LocalSendServer
+                .uploadSuccessHeaders("HTTP/1.1", "deadbeef", deferredCommit = true)
+        assertEquals("1", deferred[org.localsend.miuix.core.ChecksumHeaders.PENDING])
+        assertEquals("deadbeef", deferred[org.localsend.miuix.core.ChecksumHeaders.RESPONSE])
     }
 
     @Test
