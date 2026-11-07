@@ -251,6 +251,9 @@ class LocalSendServer(
             val requestedPort = getPort()
             val portToUse = findAvailablePort(requestedPort)
             boundPort = portToUse
+            // 上次进程被杀可能遗留待确认临时文件：启动时按专有命名规则与范围上限清理。
+            // 在监听端口前同步执行，避免与随后开始的传输并发而误删正在写入的临时文件。
+            runCatching { saveTargetWriter.sweepOrphanedTempFiles(getSaveTarget()) }
             try {
                 if (getUseHttps()) startHttps(portToUse) else startHttp(portToUse)
             } catch (e: Exception) {
@@ -828,6 +831,7 @@ class LocalSendServer(
                                 sessionId = sessionId,
                                 fileId = fileId,
                                 token = token,
+                                deviceIp = session.device.ip,
                                 createdAt = System.currentTimeMillis(),
                                 commitAction = { saveTargetWriter.finishDeferredWrite(fileItem, saveTarget) },
                                 discardAction = { saveTargetWriter.deleteSavedFile(fileItem, saveTarget) },
@@ -897,77 +901,130 @@ class LocalSendServer(
             post(LocalSendRoutes.CHECKSUM_REJECT) {
                 resolveChecksumDecision(call, commit = false)
             }
+            // 自定义扩展：查询本次文件的确认结果，供发送方在确认请求超时时区分“确实失败”与“状态未知”
+            get(LocalSendRoutes.CHECKSUM_STATUS) {
+                resolveChecksumStatus(call)
+            }
         }
     }
 
+    /** 已鉴权的确认类请求作用域：会话已结束时 session/fileItem 为空，仅保留幂等结果。 */
+    private class ChecksumRequestScope(
+        val sessionId: String,
+        val fileId: String,
+        val token: String,
+        val session: TransferSession?,
+        val fileItem: FileItem?,
+    )
+
     /**
-     * 校验决策端点：只接受 sessionId + fileId + token，并校验来源 IP 与会话设备一致。
+     * 确认/丢弃/查询接口的统一鉴权：只接受 sessionId + fileId + token，并校验来源 IP。
      * 绝不接受路径参数，待清理的文件由服务端登记的临时句柄决定，避免伪造请求删除任意文件。
+     * 会话已结束后仍凭原 token + 原设备 IP 放行，使确认结果可重放查询。
      */
-    private suspend fun resolveChecksumDecision(
-        call: ApplicationCall,
-        commit: Boolean,
-    ) {
+    private suspend fun authorizeChecksumRequest(call: ApplicationCall): ChecksumRequestScope? {
         val sessionId = call.request.queryParameters["sessionId"]
         val fileId = call.request.queryParameters["fileId"]
         val token = call.request.queryParameters["token"]
         if (sessionId == null || fileId == null || token == null) {
             call.respond(HttpStatusCode.BadRequest, "Missing sessionId, fileId or token")
-            return
+            return null
         }
 
         val session = activeSessions[sessionId]
-        if (session == null) {
-            call.respond(HttpStatusCode.NotFound, "Session not found")
-            return
-        }
-        val expectedToken = sessionTokens[sessionId]?.get(fileId)
-        val isIpMatch = WebShareHtmlRenderer.isSameIp(call.request.origin.remoteHost, session.device.ip)
-        if (expectedToken == null || expectedToken != token || !isIpMatch) {
-            call.respond(HttpStatusCode.Forbidden, "Invalid token or IP address")
-            return
+        if (session != null) {
+            val expectedToken = sessionTokens[sessionId]?.get(fileId)
+            val isIpMatch = WebShareHtmlRenderer.isSameIp(call.request.origin.remoteHost, session.device.ip)
+            if (expectedToken == null || expectedToken != token || !isIpMatch) {
+                call.respond(HttpStatusCode.Forbidden, "Invalid token or IP address")
+                return null
+            }
+            val fileItem = session.files.firstOrNull { it.id == fileId }
+            if (fileItem == null) {
+                call.respond(HttpStatusCode.NotFound, "File metadata not found in session")
+                return null
+            }
+            return ChecksumRequestScope(sessionId, fileId, token, session, fileItem)
         }
 
-        val fileItem = session.files.firstOrNull { it.id == fileId }
-        if (fileItem == null) {
-            call.respond(HttpStatusCode.NotFound, "File metadata not found in session")
-            return
+        val ownerIp = withContext(Dispatchers.IO) { pendingUploads.ownerIp(sessionId, fileId, token) }
+        if (ownerIp == null) {
+            call.respond(HttpStatusCode.NotFound, "Pending upload not found")
+            return null
         }
+        if (!WebShareHtmlRenderer.isSameIp(call.request.origin.remoteHost, ownerIp)) {
+            call.respond(HttpStatusCode.Forbidden, "Invalid token or IP address")
+            return null
+        }
+        return ChecksumRequestScope(sessionId, fileId, token, null, null)
+    }
+
+    private suspend fun resolveChecksumDecision(
+        call: ApplicationCall,
+        commit: Boolean,
+    ) {
+        val scope = authorizeChecksumRequest(call) ?: return
 
         if (commit) {
-            val result = withContext(Dispatchers.IO) { pendingUploads.commit(sessionId, fileId, token) }
-            if (result.entry == null) {
-                call.respond(HttpStatusCode.NotFound, "Pending upload not found")
-                return
-            }
-            if (result.committed) {
-                finishUploadFile(session, sessionId, fileItem, TransferStatus.Completed, null)
-                call.respond(HttpStatusCode.OK, mapOf("message" to "Checksum confirmed, file committed"))
-            } else {
-                finishUploadFile(
-                    session,
-                    sessionId,
-                    fileItem,
-                    TransferStatus.Failed,
-                    context.getString(R.string.msg_checksum_commit_failed_receiver),
-                )
-                call.respond(HttpStatusCode.InternalServerError, mapOf("message" to "Failed to finalize file"))
+            val result = withContext(Dispatchers.IO) { pendingUploads.commit(scope.sessionId, scope.fileId, scope.token) }
+            when (result.state) {
+                CommitState.COMMITTED -> {
+                    finishChecksumFile(scope, TransferStatus.Completed, null)
+                    call.respond(HttpStatusCode.OK, mapOf("state" to "committed"))
+                }
+
+                CommitState.DISCARDED -> {
+                    finishChecksumFile(
+                        scope,
+                        TransferStatus.Failed,
+                        context.getString(R.string.msg_checksum_commit_failed_receiver),
+                    )
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("state" to "discarded"))
+                }
+
+                CommitState.PENDING, null -> call.respond(HttpStatusCode.NotFound, "Pending upload not found")
             }
         } else {
-            if (withContext(Dispatchers.IO) { pendingUploads.reject(sessionId, fileId, token) } == null) {
-                call.respond(HttpStatusCode.NotFound, "Pending upload not found")
-                return
+            when (withContext(Dispatchers.IO) { pendingUploads.reject(scope.sessionId, scope.fileId, scope.token) }) {
+                CommitState.DISCARDED -> {
+                    // 发送方报告摘要不一致：接收端已丢弃临时文件，不留下内容错误的文件
+                    finishChecksumFile(
+                        scope,
+                        TransferStatus.Failed,
+                        context.getString(R.string.msg_checksum_discarded_mismatch),
+                    )
+                    call.respond(HttpStatusCode.OK, mapOf("state" to "discarded"))
+                }
+
+                CommitState.COMMITTED -> call.respond(HttpStatusCode.Conflict, "Already committed")
+                CommitState.PENDING, null -> call.respond(HttpStatusCode.NotFound, "Pending upload not found")
             }
-            // 发送方报告摘要不一致：接收端已丢弃临时文件，不留下内容错误的文件
-            finishUploadFile(
-                session,
-                sessionId,
-                fileItem,
-                TransferStatus.Failed,
-                context.getString(R.string.msg_checksum_discarded_mismatch),
-            )
-            call.respond(HttpStatusCode.OK, mapOf("message" to "Pending upload discarded"))
         }
+    }
+
+    private suspend fun resolveChecksumStatus(call: ApplicationCall) {
+        val scope = authorizeChecksumRequest(call) ?: return
+        val state = withContext(Dispatchers.IO) { pendingUploads.state(scope.sessionId, scope.fileId, scope.token) }
+        val name = state?.name?.lowercase() ?: "unknown"
+        call.response.header(ChecksumHeaders.STATE, name)
+        call.respond(HttpStatusCode.OK, mapOf("state" to name))
+    }
+
+    /** 会话仍存在时把本次文件的确认结果落到界面状态；已终态的文件不重复结算，保证幂等重放无副作用。 */
+    private fun finishChecksumFile(
+        scope: ChecksumRequestScope,
+        status: TransferStatus,
+        error: String?,
+    ) {
+        val session = scope.session ?: return
+        val fileItem = scope.fileItem ?: return
+        if (fileItem.status == TransferStatus.Completed ||
+            fileItem.status == TransferStatus.Failed ||
+            fileItem.status == TransferStatus.Canceled
+        ) {
+            return
+        }
+        finishUploadFile(session, scope.sessionId, fileItem, status, error)
     }
 
     companion object {

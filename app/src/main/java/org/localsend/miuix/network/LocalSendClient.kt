@@ -53,12 +53,26 @@ class ChecksumCommitException(
     message: String,
 ) : IllegalStateException(message)
 
+/** 确认/查询接口返回了明确 HTTP 状态：可据此判定“确实失败”，而非网络不可达导致的“状态未知”。 */
+internal class ChecksumDecisionHttpException(
+    val code: Int,
+) : java.io.IOException("Checksum decision HTTP $code")
+
 class LocalSendClient(
     private val context: Context,
     private val getLocalDevice: () -> Device,
 ) {
     companion object {
         private const val TAG = "LocalSendTransfer"
+
+        /** 确认转正请求超时：超时后转入状态查询，不直接判坏。 */
+        private const val CHECKSUM_DECISION_TIMEOUT_MS = 10_000
+
+        /** 状态查询超时：查询失败只说明状态未知。 */
+        private const val CHECKSUM_STATUS_TIMEOUT_MS = 5_000
+
+        /** 确认仍处于 pending 时的幂等重试超时。 */
+        private const val CHECKSUM_RETRY_TIMEOUT_MS = 5_000
 
         /** 上传阶段对端的业务级拒绝状态码：命中即判定为不可重试。 */
         private val TERMINAL_REJECTION_CODES =
@@ -470,23 +484,18 @@ class LocalSendClient(
                         }
                         peerChecksum == localChecksum -> {
                             if (deferredCommit) {
-                                val decision = sendChecksumDecision(targetDevice, sessionId, fileItem, token, commit = true, timeoutMs = 10_000)
-                                if (decision.isFailure) {
-                                    Log.e(TAG, "uploadFileOnce: failed to confirm checksum for '${fileItem.name}': ${decision.exceptionOrNull()?.message}")
+                                // 确认转正可幂等重放，且能查询结果：超时后区分“确实失败”和“状态未知”，
+                                // 只有明确失败才判坏文件，否则按已校验但确认未知上报，避免误判。
+                                val confirmation = finalizeDeferredUpload(targetDevice, sessionId, fileItem, token)
+                                if (confirmation.isFailure) {
+                                    Log.e(TAG, "uploadFileOnce: failed to confirm checksum for '${fileItem.name}': ${confirmation.exceptionOrNull()?.message}")
                                     fileItem.integrity = IntegrityStatus.None
-                                    return Result.failure(
-                                        ChecksumCommitException(
-                                            safeGetString(
-                                                R.string.msg_checksum_commit_failed,
-                                                "Receiver did not confirm the file: ${fileItem.name}",
-                                                fileItem.name,
-                                            ),
-                                        ),
-                                    )
+                                    return confirmation
                                 }
+                            } else {
+                                fileItem.integrity = IntegrityStatus.Verified
                             }
-                            Log.i(TAG, "uploadFileOnce: checksum verified for '${fileItem.name}' (deferredCommit=$deferredCommit)")
-                            fileItem.integrity = IntegrityStatus.Verified
+                            Log.i(TAG, "uploadFileOnce: checksum verified for '${fileItem.name}' (deferredCommit=$deferredCommit, integrity=${fileItem.integrity})")
                         }
                         else -> {
                             Log.e(TAG, "uploadFileOnce: checksum mismatch for '${fileItem.name}': local=$localChecksum, peer=$peerChecksum")
@@ -625,10 +634,151 @@ class LocalSendClient(
                 Result.success(Unit)
             } else {
                 Log.w(TAG, "sendChecksumDecision: peer returned HTTP $code for '${fileItem.name}'")
-                Result.failure(java.io.IOException("Checksum decision HTTP $code"))
+                Result.failure(ChecksumDecisionHttpException(code))
             }
         } catch (e: Exception) {
             Result.failure(e)
+        } finally {
+            FingerprintTrust.unpin(targetDevice.fingerprint)
+            runCatching { connection?.disconnect() }
+        }
+    }
+
+    /** 接收端对本次文件的确认状态；UNKNOWN 表示当前无法定论，不得据此判坏文件。 */
+    private enum class PeerCommitState { COMMITTED, DISCARDED, PENDING, UNKNOWN }
+
+    /**
+     * 确认转正并处理不确定性：
+     * 1. 首次确认失败后查询服务端结果，已转正则视为成功（自愈）；
+     * 2. 明确已丢弃或确认请求拿到明确的 HTTP 失败才算真失败；
+     * 3. 服务端仍待确认则幂等重试一次；重试仍是网络不可达则记为“确认未知”，不判坏。
+     */
+    private fun finalizeDeferredUpload(
+        targetDevice: Device,
+        sessionId: String,
+        fileItem: FileItem,
+        token: String,
+    ): Result<Unit> {
+        val first =
+            sendChecksumDecision(
+                targetDevice,
+                sessionId,
+                fileItem,
+                token,
+                commit = true,
+                timeoutMs = CHECKSUM_DECISION_TIMEOUT_MS,
+            )
+        if (first.isSuccess) {
+            fileItem.integrity = IntegrityStatus.Verified
+            return Result.success(Unit)
+        }
+
+        when (queryChecksumState(targetDevice, sessionId, fileItem, token)) {
+            PeerCommitState.COMMITTED -> {
+                // 首次应答丢失但接收端已转正：幂等结果让本端自愈为成功
+                Log.i(TAG, "finalizeDeferredUpload: peer already committed '${fileItem.name}'")
+                fileItem.integrity = IntegrityStatus.Verified
+                return Result.success(Unit)
+            }
+
+            PeerCommitState.DISCARDED -> {
+                Log.e(TAG, "finalizeDeferredUpload: peer discarded '${fileItem.name}'")
+                return commitFailure(fileItem)
+            }
+
+            PeerCommitState.PENDING -> {
+                // 接收端尚未处理确认请求：幂等重试一次，成功则自愈
+                val retry =
+                    sendChecksumDecision(
+                        targetDevice,
+                        sessionId,
+                        fileItem,
+                        token,
+                        commit = true,
+                        timeoutMs = CHECKSUM_RETRY_TIMEOUT_MS,
+                    )
+                if (retry.isSuccess) {
+                    fileItem.integrity = IntegrityStatus.Verified
+                    return Result.success(Unit)
+                }
+                if (retry.exceptionOrNull() is ChecksumDecisionHttpException) {
+                    return commitFailure(fileItem)
+                }
+                Log.w(TAG, "finalizeDeferredUpload: commit state unknown for '${fileItem.name}': ${retry.exceptionOrNull()?.message}")
+                fileItem.integrity = IntegrityStatus.Unconfirmed
+                return Result.success(Unit)
+            }
+
+            PeerCommitState.UNKNOWN -> {
+                // 状态查询也失败：仅当首次确认拿到了明确 HTTP 状态时才可判定失败
+                if (first.exceptionOrNull() is ChecksumDecisionHttpException) {
+                    return commitFailure(fileItem)
+                }
+                Log.w(TAG, "finalizeDeferredUpload: commit state unknown for '${fileItem.name}': ${first.exceptionOrNull()?.message}")
+                fileItem.integrity = IntegrityStatus.Unconfirmed
+                return Result.success(Unit)
+            }
+        }
+    }
+
+    private fun commitFailure(fileItem: FileItem): Result<Unit> =
+        Result.failure(
+            ChecksumCommitException(
+                safeGetString(
+                    R.string.msg_checksum_commit_failed,
+                    "Receiver did not confirm the file: ${fileItem.name}",
+                    fileItem.name,
+                ),
+            ),
+        )
+
+    /** 查询接收端的确认结果；任何失败都收敛为 UNKNOWN，避免把网络问题误判成文件损坏。 */
+    private fun queryChecksumState(
+        targetDevice: Device,
+        sessionId: String,
+        fileItem: FileItem,
+        token: String,
+    ): PeerCommitState {
+        var connection: HttpURLConnection? = null
+        return try {
+            val encodedSessionId = URLEncoder.encode(sessionId, "UTF-8")
+            val encodedFileId = URLEncoder.encode(fileItem.id, "UTF-8")
+            val encodedToken = URLEncoder.encode(token, "UTF-8")
+            val url =
+                "${targetDevice.url}${LocalSendRoutes.CHECKSUM_STATUS}" +
+                    "?sessionId=$encodedSessionId&fileId=$encodedFileId&token=$encodedToken"
+            FingerprintTrust.pin(targetDevice.fingerprint)
+            connection =
+                (URL(url).openConnection() as HttpURLConnection).apply {
+                    if (this is HttpsURLConnection) {
+                        sslSocketFactory = FingerprintTrust.pinnedSslSocketFactory
+                        hostnameVerifier = SslHelper.trustAllHostnameVerifier
+                    }
+                    requestMethod = "GET"
+                    useCaches = false
+                    connectTimeout = CHECKSUM_STATUS_TIMEOUT_MS
+                    readTimeout = CHECKSUM_STATUS_TIMEOUT_MS
+                }
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                Log.w(TAG, "queryChecksumState: peer returned HTTP ${connection.responseCode} for '${fileItem.name}'")
+                return PeerCommitState.UNKNOWN
+            }
+            val rawState = connection.getHeaderField(ChecksumHeaders.STATE)?.trim()?.lowercase()
+            runCatching {
+                connection.inputStream?.use { stream ->
+                    val drainBuf = ByteArray(4096)
+                    while (stream.read(drainBuf) != -1) {}
+                }
+            }
+            when (rawState) {
+                "committed" -> PeerCommitState.COMMITTED
+                "discarded" -> PeerCommitState.DISCARDED
+                "pending" -> PeerCommitState.PENDING
+                else -> PeerCommitState.UNKNOWN
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "queryChecksumState: failed for '${fileItem.name}': ${e.message}")
+            PeerCommitState.UNKNOWN
         } finally {
             FingerprintTrust.unpin(targetDevice.fingerprint)
             runCatching { connection?.disconnect() }

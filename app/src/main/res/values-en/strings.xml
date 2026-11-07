@@ -443,6 +443,7 @@
     <string name="msg_checksum_confirm_timeout">Sender never confirmed the checksum: the temporary file was discarded</string>
     <string name="msg_checksum_commit_failed_receiver">Checksum verified but the temporary file could not be finalized and was discarded</string>
     <string name="integrity_unverified">Unverified (peer did not report a checksum)</string>
+    <string name="integrity_commit_unconfirmed">Verified, but the receiver\'s confirmation state is unknown (it will commit or clean up automatically)</string>
     <string name="msg_session_not_found">Session or file not found on peer (404)</string>
     <string name="msg_upload_http">Upload failed: HTTP %1$d %2$s</string>
     <string name="msg_peer_internal_error">Peer internal error (500): %1$s</string>

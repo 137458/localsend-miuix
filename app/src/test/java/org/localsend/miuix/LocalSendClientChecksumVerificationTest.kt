@@ -36,6 +36,10 @@ class LocalSendClientChecksumVerificationTest {
     private val requestChecksumHeader = AtomicReference<String?>(null)
     private val reportedChecksum = AtomicReference<String?>(null)
     private val pendingDeferred = AtomicBoolean(false)
+    private val commitAbortAlways = AtomicBoolean(false)
+    private val commitFailuresRemaining = AtomicInteger(0)
+    private val peerCommitState = AtomicReference<String?>(null)
+    private val statusRequests = AtomicInteger(0)
 
     @Before
     fun setUp() {
@@ -52,11 +56,32 @@ class LocalSendClientChecksumVerificationTest {
         server.createContext(LocalSendRoutes.CHECKSUM_COMMIT) { exchange ->
             commitRequests.incrementAndGet()
             exchange.requestBody.readAllBytes()
+            // 模拟确认应答丢失：直接关闭连接，客户端拿不到任何 HTTP 状态
+            if (commitAbortAlways.get()) {
+                exchange.close()
+                return@createContext
+            }
+            // 模拟接收端处理失败返回明确状态码（HTTP 状态不会被底层自动重试）
+            if (commitFailuresRemaining.getAndUpdate { if (it > 0) it - 1 else 0 } > 0) {
+                respond(exchange, 500)
+                return@createContext
+            }
             respond(exchange, commitStatus.get())
         }
         server.createContext(LocalSendRoutes.CHECKSUM_REJECT) { exchange ->
             rejectRequests.incrementAndGet()
             exchange.requestBody.readAllBytes()
+            respond(exchange, 200)
+        }
+        server.createContext(LocalSendRoutes.CHECKSUM_STATUS) { exchange ->
+            statusRequests.incrementAndGet()
+            val state = peerCommitState.get()
+            if (state == null) {
+                exchange.sendResponseHeaders(404, -1)
+                exchange.close()
+                return@createContext
+            }
+            exchange.responseHeaders.add(ChecksumHeaders.STATE, state)
             respond(exchange, 200)
         }
         server.start()
@@ -228,6 +253,119 @@ class LocalSendClientChecksumVerificationTest {
             assertTrue(result.exceptionOrNull()?.message?.contains("commit-fail.bin") == true)
             assertEquals("转正失败不应重传", 1, uploadAttempts.get())
             assertEquals(1, commitRequests.get())
+            assertEquals("确认拿到明确 HTTP 状态后仍需查询以便区分确定失败与状态未知", 1, statusRequests.get())
+        }
+
+    @Test
+    fun lostCommitResponseSelfHealsWhenPeerAlreadyCommitted() =
+        runBlocking {
+            // 接收端已转正但确认应答丢失：状态查询应把结果修正为成功，而不是误判失败
+            pendingDeferred.set(true)
+            commitAbortAlways.set(true)
+            peerCommitState.set("committed")
+            val payload = ByteArray(16 * 1024) { 4 }
+            val file = binaryFile("commit-lost-committed.bin", payload)
+            reportedChecksum.set(Sha256.hexDigest(payload))
+
+            val result =
+                client().uploadFile(
+                    targetDevice = targetDevice(),
+                    sessionId = "session-lost-committed",
+                    fileItem = file,
+                    token = "token-lost-committed",
+                    requestChecksum = true,
+                    onProgress = { _, _ -> },
+                )
+
+            assertTrue("确认应答丢失但服务端已转正时必须自愈为成功", result.isSuccess)
+            assertEquals(IntegrityStatus.Verified, file.integrity)
+            assertEquals("不得重传文件", 1, uploadAttempts.get())
+            // 底层可能对同一请求自动重发一次，只要求确认被尝试过
+            assertTrue(commitRequests.get() >= 1)
+            assertEquals(1, statusRequests.get())
+        }
+
+    @Test
+    fun lostCommitResponseFailsWhenPeerDiscarded() =
+        runBlocking {
+            pendingDeferred.set(true)
+            commitAbortAlways.set(true)
+            peerCommitState.set("discarded")
+            val payload = ByteArray(16 * 1024) { 5 }
+            val file = binaryFile("commit-lost-discarded.bin", payload)
+            reportedChecksum.set(Sha256.hexDigest(payload))
+
+            val result =
+                client().uploadFile(
+                    targetDevice = targetDevice(),
+                    sessionId = "session-lost-discarded",
+                    fileItem = file,
+                    token = "token-lost-discarded",
+                    requestChecksum = true,
+                    onProgress = { _, _ -> },
+                )
+
+            assertTrue("服务端已明确丢弃时必须判失败", result.isFailure)
+            assertTrue(result.exceptionOrNull() is ChecksumCommitException)
+            assertEquals(IntegrityStatus.None, file.integrity)
+            assertEquals("失败也不得重传", 1, uploadAttempts.get())
+            assertTrue(commitRequests.get() >= 1)
+            assertEquals("已明确丢弃时无需重试确认", 1, statusRequests.get())
+        }
+
+    @Test
+    fun unknownCommitStateIsNotReportedAsBadFile() =
+        runBlocking {
+            // 确认应答丢失，且状态查询也返回无法识别的结论：不得判坏文件
+            pendingDeferred.set(true)
+            commitAbortAlways.set(true)
+            peerCommitState.set("unknown")
+            val payload = ByteArray(16 * 1024) { 6 }
+            val file = binaryFile("commit-unknown.bin", payload)
+            reportedChecksum.set(Sha256.hexDigest(payload))
+
+            val result =
+                client().uploadFile(
+                    targetDevice = targetDevice(),
+                    sessionId = "session-unknown",
+                    fileItem = file,
+                    token = "token-unknown",
+                    requestChecksum = true,
+                    onProgress = { _, _ -> },
+                )
+
+            assertTrue("状态未知时不要直接判坏", result.isSuccess)
+            assertEquals(IntegrityStatus.Unconfirmed, file.integrity)
+            assertEquals("不得因确认未知而重传", 1, uploadAttempts.get())
+            assertTrue(statusRequests.get() >= 1)
+        }
+
+    @Test
+    fun pendingCommitIsRetriedOnceIdempotently() =
+        runBlocking {
+            // 接收端仍待确认：确认请求失败后按 pending 幂等重试一次即可成功
+            pendingDeferred.set(true)
+            commitFailuresRemaining.set(1)
+            peerCommitState.set("pending")
+            val payload = ByteArray(16 * 1024) { 7 }
+            val file = binaryFile("commit-retry.bin", payload)
+            reportedChecksum.set(Sha256.hexDigest(payload))
+
+            val result =
+                client().uploadFile(
+                    targetDevice = targetDevice(),
+                    sessionId = "session-retry",
+                    fileItem = file,
+                    token = "token-retry",
+                    requestChecksum = true,
+                    onProgress = { _, _ -> },
+                )
+
+            assertTrue(result.isSuccess)
+            assertEquals(IntegrityStatus.Verified, file.integrity)
+            assertEquals("只允许重试一次确认", 2, commitRequests.get())
+            assertEquals(1, statusRequests.get())
+            assertEquals("确认重试不应重传文件", 1, uploadAttempts.get())
         }
 
     @Test

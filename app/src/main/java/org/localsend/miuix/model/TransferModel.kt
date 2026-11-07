@@ -88,6 +88,9 @@ enum class IntegrityStatus {
 
     /** 超大文件：接收端回报摘要与发送端流式摘要不一致，该项显式失败。 */
     Mismatch,
+
+    /** 超大文件：摘要一致，但确认转正请求未获响应且查询也无法定论；接收端会按保鲜期处理，不据此判坏。 */
+    Unconfirmed,
 }
 
 data class FileItem(

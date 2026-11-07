@@ -171,6 +171,7 @@ internal fun FileDetailItem(
                 when {
                     file.status == TransferStatus.Failed && !file.error.isNullOrBlank() -> file.error
                     file.status == TransferStatus.Completed && file.integrity == IntegrityStatus.Unverified -> stringResource(R.string.integrity_unverified)
+                    file.status == TransferStatus.Completed && file.integrity == IntegrityStatus.Unconfirmed -> stringResource(R.string.integrity_commit_unconfirmed)
                     else -> null
                 }
             if (integrityNote != null) {

@@ -443,6 +443,7 @@
     <string name="msg_checksum_confirm_timeout">未收到发送方校验确认，已丢弃临时文件</string>
     <string name="msg_checksum_commit_failed_receiver">校验通过但无法转正临时文件，已丢弃</string>
     <string name="integrity_unverified">未校验（对端未回报摘要）</string>
+    <string name="integrity_commit_unconfirmed">已校验，接收端确认状态未知（会自动清理或已转正）</string>
     <string name="msg_session_not_found">会话或文件在对端不存在（404）</string>
     <string name="msg_upload_http">上传失败: HTTP %1$d %2$s</string>
     <string name="msg_peer_internal_error">对方内部错误（500）: %1$s</string>

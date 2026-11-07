@@ -98,8 +98,8 @@ internal class SaveTargetWriter(
                 }
                 val existing = currentDir.listFiles().mapNotNull { it.name }.toHashSet()
                 val uniqueName = uniqueTreeName(pathInfo.fileName, existing)
-                // 待确认的写入使用临时名，避免损坏内容以最终文件名可见；确认后重命名转正
-                val createName = if (deferCommit) "$uniqueName.part-${fileItem.id.take(8)}" else uniqueName
+                // 待确认的写入使用本应用专有临时名，避免损坏内容以最终文件名可见；确认后重命名或复制转正
+                val createName = if (deferCommit) DeferredTempNames.of(uniqueName, fileItem.id) else uniqueName
                 val created =
                     currentDir.createFile(fileItem.mimeType, createName)
                         ?: throw IllegalStateException(context.getString(R.string.msg_cannot_create_custom_file))
@@ -122,7 +122,10 @@ internal class SaveTargetWriter(
         }
     }
 
-    /** 待确认文件转正：MediaStore 清除 pending；SAF 把临时名重命名为最终名（必要时重新查重重名）。 */
+    /**
+     * 待确认文件转正：MediaStore 清除 pending；SAF 优先重命名为最终名，
+     * provider 不支持重命名时退化为“复制到最终位置后再删临时文件”。
+     */
     internal fun finishDeferredWrite(
         fileItem: FileItem,
         target: SaveTarget,
@@ -132,9 +135,77 @@ internal class SaveTargetWriter(
             is SaveTarget.UriTarget -> {
                 val uri = fileItem.mediaStoreUri ?: return false
                 val tempDoc = DocumentFile.fromSingleUri(context, uri) ?: return false
-                renameDeferredFile(fileItem, tempDoc)
+                commitDeferredWithFallback(
+                    rename = { renameDeferredFile(fileItem, tempDoc) },
+                    copyToFinal = { copyDeferredFile(fileItem, tempDoc) },
+                    deleteTemp = { tempDoc.delete() },
+                )
             }
         }
+
+    /**
+     * 复制回退：新建最终文件并流式写入，成功后才删除临时文件。
+     * 任一步失败即删除可能存在的半成品，返回 false，由调用方回滚临时文件。
+     */
+    private fun copyDeferredFile(
+        fileItem: FileItem,
+        tempDoc: DocumentFile,
+    ): Boolean {
+        val parent = tempDoc.parentFile ?: return false
+        val pathInfo = SavePathHelper.resolve(fileItem.name)
+        val existing =
+            parent
+                .listFiles()
+                .mapNotNull { it.name }
+                .filter { it != tempDoc.name }
+                .toHashSet()
+        val uniqueName = uniqueTreeName(pathInfo.fileName, existing)
+        val created = parent.createFile(fileItem.mimeType, uniqueName) ?: return false
+        val copied =
+            try {
+                context.contentResolver.openInputStream(tempDoc.uri)?.use { input ->
+                    context.contentResolver.openOutputStream(created.uri)?.use { output ->
+                        input.copyTo(output, 128 * 1024)
+                        true
+                    } ?: false
+                } ?: false
+            } catch (ignored: Exception) {
+                false
+            }
+        if (!copied) {
+            // 宁可失败也不留半份最终文件
+            runCatching { created.delete() }
+            return false
+        }
+        runCatching { tempDoc.delete() }
+        fileItem.name = if (pathInfo.subDirectory.isNotEmpty()) "${pathInfo.subDirectory}/$uniqueName" else uniqueName
+        fileItem.mediaStoreUri = created.uri
+        return true
+    }
+
+    /**
+     * 清理上次进程被杀遗留的待确认临时文件：只扫描当前 SAF 目标目录，深度与条目数有上限，
+     * 且只删除命名符合 [DeferredTempNames] 的文件。MediaStore 目标没有此类临时文件名，直接跳过。
+     */
+    internal fun sweepOrphanedTempFiles(target: SaveTarget): Int {
+        if (target !is SaveTarget.UriTarget) return 0
+        val root =
+            runCatching { DocumentFile.fromTreeUri(context, target.treeUri) }.getOrNull()
+                ?: return 0
+        return TempFileSweeper().sweep(DocumentSweepNode(root))
+    }
+
+    private class DocumentSweepNode(
+        private val doc: DocumentFile,
+    ) : SweepNode {
+        override val name: String? get() = runCatching { doc.name }.getOrNull()
+
+        override val isDirectory: Boolean get() = runCatching { doc.isDirectory }.getOrDefault(false)
+
+        override fun children(): List<SweepNode> = doc.listFiles().map { DocumentSweepNode(it) }
+
+        override fun delete(): Boolean = doc.delete()
+    }
 
     private fun renameDeferredFile(
         fileItem: FileItem,

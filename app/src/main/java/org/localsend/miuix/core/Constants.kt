@@ -56,6 +56,9 @@ object LocalSendRoutes {
     const val CHECKSUM_COMMIT = "/api/localsend/v2/checksum-commit"
     const val CHECKSUM_REJECT = "/api/localsend/v2/checksum-reject"
 
+    // 自定义扩展路由：查询本次文件的确认结果，供发送方在确认请求超时时区分“确实失败”与“状态未知”
+    const val CHECKSUM_STATUS = "/api/localsend/v2/checksum-status"
+
     const val PREPARE_DOWNLOAD = "/api/localsend/v2/prepare-download"
     const val DOWNLOAD = "/api/localsend/v2/download"
     const val DOWNLOAD_ZIP = "/api/localsend/v2/download-zip"
@@ -91,6 +94,15 @@ object ChecksumHeaders {
 
     /** 接收端临时文件的保鲜期：发送方未在时限内确认时自动丢弃，避免残留错误文件。 */
     const val PENDING_TTL_MS = 60_000L
+
+    /**
+     * 确认结果的保留时长：确认接口幂等可重放，发送方超时后可在此时限内查询到同一结果，
+     * 超时未查询的墓碑记录自动清理，避免内存无界增长。
+     */
+    const val RESOLUTION_TTL_MS = 5 * 60_000L
+
+    /** 状态查询响应头：committed / discarded / pending / unknown。 */
+    const val STATE = "X-Localsend-Miuix-Checksum-State"
 }
 
 object AppActions {
