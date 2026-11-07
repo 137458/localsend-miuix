@@ -352,6 +352,28 @@ class LocalSendProtocolTest {
     }
 
     @Test
+    fun testUploadSuccessHeadersReportChecksumOnlyWhenRequested() {
+        // 只有发送方主动请求时才回报摘要；未请求时保持与官方响应完全一致
+        val withChecksum =
+            org.localsend.miuix.network.LocalSendServer
+                .uploadSuccessHeaders("HTTP/1.1", "deadbeef")
+        assertEquals("deadbeef", withChecksum[org.localsend.miuix.core.ChecksumHeaders.RESPONSE])
+        assertEquals("keep-alive", withChecksum[io.ktor.http.HttpHeaders.Connection])
+
+        val withoutChecksum =
+            org.localsend.miuix.network.LocalSendServer
+                .uploadSuccessHeaders("HTTP/1.1", null)
+        assertFalse(withoutChecksum.containsKey(org.localsend.miuix.core.ChecksumHeaders.RESPONSE))
+
+        // HTTP/2 仍不允许出现连接级头，但可携带摘要
+        val http2WithChecksum =
+            org.localsend.miuix.network.LocalSendServer
+                .uploadSuccessHeaders("HTTP/2.0", "deadbeef")
+        assertFalse(http2WithChecksum.containsKey(io.ktor.http.HttpHeaders.Connection))
+        assertEquals("deadbeef", http2WithChecksum[org.localsend.miuix.core.ChecksumHeaders.RESPONSE])
+    }
+
+    @Test
     fun testLargeTxtFileIsNotConsideredTextMessage() {
         val txtFile =
             FileItem(

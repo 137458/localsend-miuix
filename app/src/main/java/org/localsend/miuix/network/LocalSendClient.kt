@@ -8,9 +8,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import org.localsend.miuix.R
 import org.localsend.miuix.core.AppJson
+import org.localsend.miuix.core.ChecksumHeaders
 import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.model.IntegrityStatus
 import org.localsend.miuix.model.PrepareUploadRequestDto
 import org.localsend.miuix.model.PrepareUploadResponseDto
 import org.localsend.miuix.util.Sha256
@@ -20,7 +22,17 @@ import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
+
+/** 单份文件的完整性校验路径，由 [LocalSendClient.checksumPlan] 统一判定。 */
+enum class ChecksumPlan {
+    /** 门槛内：握手前预置 sha256，并随 prepare-upload 声明。 */
+    Declared,
+
+    /** 超出门槛：不预置哈希，上传时流式计算摘要并由接收端回报比对。 */
+    Streamed,
+}
 
 class TargetPinRequiredException(
     message: String = "PIN required",
@@ -28,6 +40,11 @@ class TargetPinRequiredException(
 
 /** 对端明确拒绝本次上传（403/404/422 等业务错误），重试无意义，直接以该原因结束该项文件。 */
 class PeerRejectedException(
+    message: String,
+) : IllegalStateException(message)
+
+/** 发送端流式摘要与接收端回报不一致：数据已在链路或落盘环节损坏，显式失败且不重试。 */
+class ChecksumMismatchException(
     message: String,
 ) : IllegalStateException(message)
 
@@ -54,22 +71,29 @@ class LocalSendClient(
         const val SHA256_PREFILL_MAX_FILES = 3
 
         /**
-         * 是否要为该条目声明 sha256：内联文本内容恒定，始终声明；普通文件仅在
-         * “待发文件数 ≤ 3 且单份 ≤ 2 MB”时声明。超出门槛的条目留空（协议字段可选），
-         * 既不阻塞握手，也不会用早期快照摘要去校验后续被改写的字节。
+         * 单份文件的完整性校验路径：这里是唯一的判定处，避免“握手前预置”与“上传时流式”两套逻辑并存。
+         *
+         * 内联文本内容恒定，始终走声明路径；普通文件仅当“待发文件数 ≤ 3 且单份 ≤ 2 MB”时预置 sha256，
+         * 其余一律改为上传时流式计算摘要，由接收端落盘后回报比对。
          */
-        internal fun shouldDeclareSha256(
+        internal fun checksumPlan(
             files: List<FileItem>,
             fileItem: FileItem,
-        ): Boolean =
-            fileItem.textContent != null ||
+        ): ChecksumPlan =
+            if (fileItem.textContent != null ||
                 (files.size <= SHA256_PREFILL_MAX_FILES && fileItem.size in 1..SHA256_PREFILL_MAX_BYTES)
+            ) {
+                ChecksumPlan.Declared
+            } else {
+                ChecksumPlan.Streamed
+            }
 
         /** 源文件指纹中记录的字节数；解析失败按 0 处理（视为未超出门槛）。 */
         private fun stampLength(stamp: String): Long = stamp.substringBefore(':').toLongOrNull() ?: 0L
 
         /**
-         * 为合格条目补算 sha256；已有摘要但源文件指纹已变化时重算，保证声明值与上传内容同源。
+         * 为走声明路径的条目补算 sha256；已有摘要但源文件指纹已变化时重算，保证声明值与上传内容同源。
+         * 流式路径一律撤销历史声明：否则握手会带上早先批次预热出的快照摘要，与上传阶段的流式校验形成两套判定。
          * [shouldCancel] 在每份文件前求值，便于取消传输或文件被移出待发列表时尽快退出。
          */
         internal fun fillMissingSha256(
@@ -80,27 +104,28 @@ class LocalSendClient(
         ) {
             for (fileItem in files) {
                 if (shouldCancel()) return
-                val stamp = sourceStamp(fileItem)
-                if (!shouldDeclareSha256(files, fileItem)) {
-                    // 超出门槛的条目不再补算（避免握手前整文件预读）。
-                    // 但若此处已有更早批次预热出的声明，且源文件指纹已变，必须撤销：
-                    // 否则过期摘要会随握手发给对端，触发 422 让整份文件作废。
-                    if (fileItem.expectedSha256 != null && stamp != null && stamp != fileItem.sha256SourceStamp) {
-                        fileItem.expectedSha256 = null
-                        fileItem.sha256SourceStamp = null
-                    }
+                if (checksumPlan(files, fileItem) != ChecksumPlan.Declared) {
+                    fileItem.expectedSha256 = null
+                    fileItem.sha256SourceStamp = null
+                    fileItem.integrity = IntegrityStatus.None
                     continue
                 }
+                val stamp = sourceStamp(fileItem)
                 // 文本/URI 无指纹来源视为内容恒定；已有摘要且指纹未变时复用，避免重复读盘
-                if (fileItem.expectedSha256 != null && (stamp == null || stamp == fileItem.sha256SourceStamp)) continue
+                if (fileItem.expectedSha256 != null && (stamp == null || stamp == fileItem.sha256SourceStamp)) {
+                    fileItem.integrity = IntegrityStatus.Declared
+                    continue
+                }
                 if (stamp != null && stampLength(stamp) > SHA256_PREFILL_MAX_BYTES) {
                     // 添加后被追加写入、已超出声明门槛：撤销过期声明，避免陈旧摘要触发接收端 422
                     fileItem.expectedSha256 = null
                     fileItem.sha256SourceStamp = null
+                    fileItem.integrity = IntegrityStatus.None
                     continue
                 }
                 fileItem.expectedSha256 = compute(fileItem)
                 fileItem.sha256SourceStamp = stamp
+                fileItem.integrity = if (fileItem.expectedSha256 != null) IntegrityStatus.Declared else IntegrityStatus.None
             }
         }
 
@@ -262,6 +287,7 @@ class LocalSendClient(
         sessionId: String,
         fileItem: FileItem,
         token: String,
+        requestChecksum: Boolean = false,
         maxRetries: Int = 2,
         isCanceled: () -> Boolean = { false },
         onProgress: (bytesWritten: Long, speed: Long) -> Unit,
@@ -281,6 +307,7 @@ class LocalSendClient(
                         sessionId = sessionId,
                         fileItem = fileItem,
                         token = token,
+                        requestChecksum = requestChecksum,
                         isCanceled = isCanceled,
                         onProgress = onProgress,
                     )
@@ -302,6 +329,11 @@ class LocalSendClient(
                     Log.w(TAG, "Upload rejected with terminal HTTP status, aborting retry: $msg")
                     break
                 }
+                // 摘要不一致说明本次数据已损坏，重传同源数据通常无收益，直接以该项失败结束
+                if (lastError is ChecksumMismatchException) {
+                    Log.w(TAG, "Checksum mismatch for '${fileItem.name}', aborting retry")
+                    break
+                }
 
                 if (attempt < maxRetries && isTransientConnectionError) {
                     onProgress(0L, 0L)
@@ -318,6 +350,7 @@ class LocalSendClient(
         sessionId: String,
         fileItem: FileItem,
         token: String,
+        requestChecksum: Boolean,
         isCanceled: () -> Boolean,
         onProgress: (bytesWritten: Long, speed: Long) -> Unit,
     ): Result<Unit> {
@@ -325,6 +358,7 @@ class LocalSendClient(
         var connection: HttpURLConnection? = null
         var isSucceeded = false
         val startTime = System.currentTimeMillis()
+        val digest = if (requestChecksum) MessageDigest.getInstance("SHA-256") else null
         return try {
             inputStream = openSourceStream(fileItem)?.buffered(128 * 1024)
                 ?: throw IllegalStateException("Cannot open input stream for ${fileItem.name}")
@@ -358,6 +392,10 @@ class LocalSendClient(
                     setRequestProperty("Content-Type", "application/octet-stream")
                     setRequestProperty("Connection", "keep-alive")
                     setRequestProperty("Keep-Alive", "timeout=60")
+                    if (requestChecksum) {
+                        // 自定义扩展头：请求接收端在落盘完成后回报实际摘要；官方/第三方接收端会忽略
+                        setRequestProperty(ChecksumHeaders.REQUEST, "1")
+                    }
                 }
 
             val outputStream: OutputStream = connection.outputStream.buffered(128 * 1024)
@@ -373,6 +411,8 @@ class LocalSendClient(
                     throw java.io.InterruptedIOException(context.getString(R.string.session_canceled))
                 }
                 outputStream.write(buffer, 0, read)
+                // 摘要与写入套接字的字节严格同源：校验值覆盖的就是本次实际发送的内容
+                digest?.update(buffer, 0, read)
                 bytesWritten += read
                 bytesSinceLast += read
 
@@ -405,6 +445,34 @@ class LocalSendClient(
                         while (stream.read(drainBuf) != -1) {}
                     }
                 } catch (ignored: Exception) {
+                }
+                if (requestChecksum) {
+                    val peerChecksum = connection.getHeaderField(ChecksumHeaders.RESPONSE)?.trim()?.lowercase()
+                    val localChecksum = digest?.digest()?.let { Sha256.hex(it) }
+                    when {
+                        peerChecksum.isNullOrEmpty() -> {
+                            // 对端是官方/第三方实现：不识别回报扩展，正常传输照旧算成功，仅降级为无校验
+                            Log.w(TAG, "uploadFileOnce: peer did not report sha256 for '${fileItem.name}' (unsupported receiver), transfer succeeded without verification")
+                            fileItem.integrity = IntegrityStatus.Unverified
+                        }
+                        peerChecksum == localChecksum -> {
+                            Log.i(TAG, "uploadFileOnce: checksum verified for '${fileItem.name}'")
+                            fileItem.integrity = IntegrityStatus.Verified
+                        }
+                        else -> {
+                            Log.e(TAG, "uploadFileOnce: checksum mismatch for '${fileItem.name}': local=$localChecksum, peer=$peerChecksum")
+                            fileItem.integrity = IntegrityStatus.Mismatch
+                            return Result.failure(
+                                ChecksumMismatchException(
+                                    safeGetString(
+                                        R.string.msg_checksum_mismatch_file,
+                                        "Checksum mismatch for ${fileItem.name}",
+                                        fileItem.name,
+                                    ),
+                                ),
+                            )
+                        }
+                    }
                 }
                 onProgress(bytesWritten, 0L)
                 isSucceeded = true

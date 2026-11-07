@@ -49,6 +49,7 @@ import org.localsend.miuix.model.ShareSession
 import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.network.ChecksumPlan
 import org.localsend.miuix.network.DiscoveryService
 import org.localsend.miuix.network.FingerprintTrust
 import org.localsend.miuix.network.IncomingDecision
@@ -341,10 +342,10 @@ class LocalSendManager(
 
     fun addFiles(files: List<FileItem>) {
         _selectedFiles.update { it + files }
-        // 后台预热 sha256：只对可声明门槛内的条目排队（≤3 份且单份 ≤2 MB），大文件永不预读
+        // 后台预热 sha256：只对走声明路径的条目排队（≤3 份且单份 ≤2 MB），大文件永不预读
         val selected = _selectedFiles.value
         files.forEach { fileItem ->
-            if (!LocalSendClient.shouldDeclareSha256(selected, fileItem)) return@forEach
+            if (LocalSendClient.checksumPlan(selected, fileItem) != ChecksumPlan.Declared) return@forEach
             sha256WarmupJobs.remove(fileItem.id)?.cancel()
             val job =
                 scope.launch {
@@ -663,12 +664,15 @@ class LocalSendManager(
                     fileItem.status = TransferStatus.InProgress
                     Log.i(TAG, "Uploading [${index + 1}/${filesToSend.size}]: '${fileItem.name}' (${fileItem.size} bytes, id=${fileItem.id})")
 
+                    // 完整性校验路径与握手前预置共用同一次判定：超出门槛的条目在上传中流式计算摘要并要求接收端回报
+                    val requestChecksum = LocalSendClient.checksumPlan(filesToSend, fileItem) == ChecksumPlan.Streamed
                     val uploadResult =
                         client.uploadFile(
                             targetDevice = activeDevice,
                             sessionId = remoteSessionId,
                             fileItem = fileItem,
                             token = token,
+                            requestChecksum = requestChecksum,
                             isCanceled = { canceledSessionIds.contains(sessionId) },
                         ) { bytesWritten, speed ->
                             fileItem.bytesTransferred = bytesWritten

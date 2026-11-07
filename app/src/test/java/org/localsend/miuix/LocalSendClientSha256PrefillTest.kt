@@ -5,6 +5,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.model.IntegrityStatus
+import org.localsend.miuix.network.ChecksumPlan
 import org.localsend.miuix.network.LocalSendClient
 
 class LocalSendClientSha256PrefillTest {
@@ -45,6 +47,7 @@ class LocalSendClientSha256PrefillTest {
         val big = file("big", size = LocalSendClient.SHA256_PREFILL_MAX_BYTES + 1)
         LocalSendClient.fillMissingSha256(listOf(big)) { "should-not-run" }
         assertNull(big.expectedSha256)
+        assertEquals(IntegrityStatus.None, big.integrity)
 
         // 文件数超过 3：全部不声明（多文件逐份预读同样拖慢握手）
         val batch = (1..4).map { file("f$it", size = 1024L) }
@@ -55,6 +58,26 @@ class LocalSendClientSha256PrefillTest {
         val small = file("small", size = 1024L)
         LocalSendClient.fillMissingSha256(listOf(small)) { "small-hash" }
         assertEquals("small-hash", small.expectedSha256)
+        assertEquals(IntegrityStatus.Declared, small.integrity)
+    }
+
+    @Test
+    fun checksumPlanIsTheSingleDecisionPoint() {
+        // 门槛内：预置声明
+        val small = file("small", size = 1024L)
+        assertEquals(ChecksumPlan.Declared, LocalSendClient.checksumPlan(listOf(small), small))
+
+        // 单份超 2 MB：流式校验
+        val big = file("big", size = LocalSendClient.SHA256_PREFILL_MAX_BYTES + 1)
+        assertEquals(ChecksumPlan.Streamed, LocalSendClient.checksumPlan(listOf(big), big))
+
+        // 批次超过 3 份：小文件也改流式
+        val batch = (1..4).map { file("f$it", size = 1024L) }
+        assertTrue(batch.all { LocalSendClient.checksumPlan(batch, it) == ChecksumPlan.Streamed })
+
+        // 内联文本内容恒定，始终走声明路径
+        val text = FileItem(id = "text", name = "text.txt", size = 4L * 1024 * 1024, textContent = "hi")
+        assertEquals(ChecksumPlan.Declared, LocalSendClient.checksumPlan(listOf(text), text))
     }
 
     @Test
@@ -104,15 +127,18 @@ class LocalSendClientSha256PrefillTest {
     }
 
     @Test
-    fun keepsWarmedHashWhenBatchGrowsButSourceUnchanged() {
-        // 指纹未变时保留已预热摘要：不再读盘，且声明值与上传内容仍一致
-        val warmed = file("warmed", sha256 = "keep", stamp = "512:50")
+    fun revokesWarmedHashWhenBatchGrowsPastCountThresholdEvenIfSourceUnchanged() {
+        // 批次超过数量门槛后该条目改用流式校验：即使指纹未变也不能把早先预热出的摘要带进握手，
+        // 否则同一文件会同时存在“握手声明校验”和“上传流式校验”两套判定
+        val warmed = file("warmed", sha256 = "stale", stamp = "512:50")
         val others = (1..3).map { file("o$it", size = 1024L) }
         LocalSendClient.fillMissingSha256(
             listOf(warmed) + others,
             sourceStamp = { item -> if (item.id == "warmed") "512:50" else null },
         ) { "should-not-run" }
-        assertEquals("keep", warmed.expectedSha256)
+        assertNull(warmed.expectedSha256)
+        assertNull(warmed.sha256SourceStamp)
+        assertEquals(IntegrityStatus.None, warmed.integrity)
     }
 
     @Test

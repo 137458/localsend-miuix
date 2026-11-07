@@ -33,6 +33,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.localsend.miuix.R
 import org.localsend.miuix.core.AppJson
+import org.localsend.miuix.core.ChecksumHeaders
 import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.core.ProtocolMessages
 import org.localsend.miuix.model.Device
@@ -49,6 +50,7 @@ import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.transfer.TransferOutcome
 import org.localsend.miuix.util.AcceptPolicy
+import org.localsend.miuix.util.Sha256
 import org.localsend.miuix.webshare.WebShareCopy
 import java.io.File
 import java.io.InputStream
@@ -682,6 +684,8 @@ class LocalSendServer(
                 }
 
                 val saveTarget = getSaveTarget()
+                // 发送方通过自定义扩展头请求回报摘要；官方发送端不会发送，行为与原来一致
+                val returnsChecksum = call.request.headers[ChecksumHeaders.REQUEST] == "1"
 
                 fileItem.status = TransferStatus.InProgress
                 fileItem.bytesTransferred = 0L
@@ -690,7 +694,7 @@ class LocalSendServer(
                     val checksum =
                         withContext(Dispatchers.IO) {
                             var digest: MessageDigest? =
-                                if (fileItem.expectedSha256 != null) {
+                                if (fileItem.expectedSha256 != null || returnsChecksum) {
                                     MessageDigest.getInstance("SHA-256")
                                 } else {
                                     null
@@ -753,7 +757,7 @@ class LocalSendServer(
                             }
                             // MediaStore 路径：写入完成后清除 IS_PENDING，使文件立即可见
                             saveTargetWriter.confirmMediaStoreWrite(fileItem)
-                            digest?.digest()?.joinToString("") { "%02x".format(it) }
+                            digest?.digest()?.let { Sha256.hex(it) }
                         }
 
                     // 发送方声明了 sha256 且校验失败：删除已写入文件并按规范回 422
@@ -766,7 +770,10 @@ class LocalSendServer(
 
                     finishUploadFile(session, sessionId, fileItem, TransferStatus.Completed, null)
 
-                    getUploadResponseHeaders(call.request.origin.version).forEach { (name, value) ->
+                    uploadSuccessHeaders(
+                        httpVersion = call.request.origin.version,
+                        reportedSha256 = checksum?.takeIf { returnsChecksum },
+                    ).forEach { (name, value) ->
                         call.response.header(name, value)
                     }
                     call.respond(HttpStatusCode.OK, mapOf("message" to "File uploaded successfully"))
@@ -826,6 +833,17 @@ class LocalSendServer(
                 mapOf(HttpHeaders.Connection to "keep-alive")
             }
         }
+
+        /**
+         * 上传成功响应头：在原有 Connection 处理之上，仅在发送方请求回报时附带实际落盘摘要。
+         * 这是加载式扩展，不改公开协议字段；不认识该响应头的发送方会直接忽略。
+         */
+        internal fun uploadSuccessHeaders(
+            httpVersion: String?,
+            reportedSha256: String?,
+        ): Map<String, String> =
+            getUploadResponseHeaders(httpVersion) +
+                if (reportedSha256 != null) mapOf(ChecksumHeaders.RESPONSE to reportedSha256) else emptyMap()
 
         data class PrepareUploadDecision(
             val shouldRespondNoContent: Boolean,

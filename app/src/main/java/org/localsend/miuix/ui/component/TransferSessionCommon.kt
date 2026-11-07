@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
 import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.model.IntegrityStatus
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.transfer.RemainingTime
@@ -163,6 +164,23 @@ internal fun FileDetailItem(
                             .fillMaxWidth()
                             .height(4.dp)
                             .clip(RoundedCornerShape(2.dp)),
+                )
+            }
+            // 失败原因/完整性降级直接呈现在具体文件行上，避免只看到“部分文件失败”却无法定位
+            val integrityNote =
+                when {
+                    file.status == TransferStatus.Failed && !file.error.isNullOrBlank() -> file.error
+                    file.status == TransferStatus.Completed && file.integrity == IntegrityStatus.Unverified -> stringResource(R.string.integrity_unverified)
+                    else -> null
+                }
+            if (integrityNote != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = integrityNote,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = if (file.status == TransferStatus.Failed) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

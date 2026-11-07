@@ -437,6 +437,8 @@
     <string name="msg_busy_cannot_change_network">有传输正在进行，请等待结束后再修改端口或 HTTPS</string>
     <string name="msg_port_occupied_fallback">端口 %1$d 已被占用，已自动改用 %2$d</string>
     <string name="msg_sha256_mismatch">文件校验失败：SHA-256 不匹配（422）</string>
+    <string name="msg_checksum_mismatch_file">文件校验失败：%1$s 与接收端回报的摘要不一致</string>
+    <string name="integrity_unverified">未校验（对端未回报摘要）</string>
     <string name="msg_session_not_found">会话或文件在对端不存在（404）</string>
     <string name="msg_upload_http">上传失败: HTTP %1$d %2$s</string>
     <string name="msg_peer_internal_error">对方内部错误（500）: %1$s</string>

@@ -64,6 +64,18 @@ object ProtocolMessages {
     const val DECLINED_BY_USER = "Transfer declined by user"
 }
 
+/**
+ * 大文件完整性校验的加载式扩展：官方协议只在 prepare-upload 中提供可选 sha256，没有“接收端回报摘要”的字段。
+ * 这里用自定义请求/响应头承载，不修改任何公开协议字段；对端不认识时按 HTTP 规范忽略，传输行为不受影响。
+ */
+object ChecksumHeaders {
+    /** 上传请求头：值为 "1" 表示发送方要求接收端在落盘完成后回报实际 SHA-256。 */
+    const val REQUEST = "X-Localsend-Miuix-Checksum"
+
+    /** 上传响应头：接收端回报实际落盘内容的小写十六进制 SHA-256，缺省即对端不支持回报。 */
+    const val RESPONSE = "X-Localsend-Miuix-Sha256"
+}
+
 object AppActions {
     const val ACTION_CANCEL_TRANSFER = "org.localsend.miuix.action.CANCEL_TRANSFER"
     const val ACTION_ACCEPT_TRANSFER = "org.localsend.miuix.action.ACCEPT_TRANSFER"

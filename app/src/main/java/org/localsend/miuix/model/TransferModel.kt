@@ -72,6 +72,24 @@ const val MAX_INLINE_TEXT_SIZE = 512 * 1024L
 /** 纯文本消息在协议中的 MIME 类型（官方客户端按 MIME 前缀解码 fileType）。 */
 const val TEXT_MESSAGE_MIME = "text/plain"
 
+/** 单份文件最终的完整性结论；Unverified 表示对端不支持回报摘要，传输成功但无校验。 */
+enum class IntegrityStatus {
+    /** 未参与完整性校验（如尚未开始或握手前被撤销声明）。 */
+    None,
+
+    /** 门槛内文件：已随 prepare-upload 声明 sha256，由接收端在落盘时校验。 */
+    Declared,
+
+    /** 超大文件：上传中流式计算摘要，接收端回报值一致。 */
+    Verified,
+
+    /** 超大文件：对端未回报摘要（官方/第三方接收端），降级为无校验但传输成功。 */
+    Unverified,
+
+    /** 超大文件：接收端回报摘要与发送端流式摘要不一致，该项显式失败。 */
+    Mismatch,
+}
+
 data class FileItem(
     val id: String = UUID.randomUUID().toString(),
     var name: String,
@@ -85,6 +103,8 @@ data class FileItem(
     var expectedSha256: String? = null,
     // 声明上述摘要时源文件的 (长度, 修改时间) 指纹；发送前指纹不一致即重算，保证声明值与上传内容同源
     var sha256SourceStamp: String? = null,
+    // 传输结束后的完整性结论：区分已校验、对端不回报而降级、以及摘要不一致失败
+    var integrity: IntegrityStatus = IntegrityStatus.None,
     var status: TransferStatus = TransferStatus.WaitingApproval,
     var progress: Float = 0f,
     var bytesTransferred: Long = 0L,
