@@ -49,6 +49,7 @@ import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.HistoryFileEntry
 import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.ui.util.rememberUiTimeText
 import org.localsend.miuix.util.InstallHelper
 import org.localsend.miuix.util.ThumbnailHelper
 import top.yukonga.miuix.kmp.basic.Button
@@ -60,9 +61,6 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun HistoryDetailDialog(
@@ -74,10 +72,7 @@ fun HistoryDetailDialog(
 ) {
     if (item == null) return
     val context = LocalContext.current
-    val formattedTime =
-        remember(item.timestamp) {
-            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(item.timestamp))
-        }
+    val formattedTime = rememberUiTimeText("yyyy-MM-dd HH:mm:ss", item.timestamp)
 
     WindowBottomSheet(
         show = show,

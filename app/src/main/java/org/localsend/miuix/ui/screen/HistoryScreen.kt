@@ -43,6 +43,7 @@ import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.HistoryDetailDialog
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
+import org.localsend.miuix.ui.util.rememberUiTimeText
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -318,10 +319,7 @@ private fun HistoryItemCard(
 
                 Spacer(modifier = Modifier.height(2.dp))
 
-                val formattedTime =
-                    remember(item.timestamp) {
-                        java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(item.timestamp))
-                    }
+                val formattedTime = rememberUiTimeText("MM-dd HH:mm", item.timestamp)
 
                 Text(
                     text = "${item.deviceIp} · ${item.formattedSize} · $formattedTime",
