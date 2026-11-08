@@ -44,6 +44,24 @@ class JsonFileStoreTest {
     }
 
     @Test
+    fun corruptFileIsPreservedInsteadOfSilentlyOverwritten() {
+        val file = tempFolder.newFile("corrupt-keep.json")
+        val corrupt = "{ this is invalid json content"
+        file.writeText(corrupt)
+        val store = JsonFileStore(file, TestItem.serializer())
+
+        store.load()
+        val backup = File(tempFolder.root, "corrupt-keep.json.corrupt")
+        assertTrue(backup.exists())
+        assertEquals(corrupt, backup.readText())
+
+        // 后续正常写入不应再触碰已备份的损坏内容
+        store.persist(listOf(TestItem("fresh", 1)))
+        assertEquals(listOf(TestItem("fresh", 1)), store.load())
+        assertEquals(corrupt, backup.readText())
+    }
+
+    @Test
     fun persistAndLoadRoundTrip() {
         val file = File(tempFolder.root, "items.json")
         val store = JsonFileStore(file, TestItem.serializer())

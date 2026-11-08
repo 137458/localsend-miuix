@@ -1,9 +1,11 @@
 package org.localsend.miuix.core
 
+import android.util.Log
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.IOException
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -28,17 +30,42 @@ class JsonFileStore<T>(
 
     /**
      * 从磁盘加载列表。
-     * 若文件不存在、内容为空或解析异常，均返回空列表。
+     * 文件不存在、内容为空或解析异常时返回空列表；解析失败会把原文件另存为 `.corrupt` 备份，
+     * 避免下一次落盘直接覆盖掉用户数据且现场无据可查。
      */
     fun load(): List<T> {
         synchronized(writeLock) {
+            if (!file.exists()) return emptyList()
+            val text =
+                try {
+                    file.readText()
+                } catch (e: IOException) {
+                    Log.w(TAG, "load: failed to read ${file.name}", e)
+                    return emptyList()
+                }
+            if (text.isBlank()) return emptyList()
             return try {
-                if (!file.exists()) return emptyList()
-                val text = file.readText()
-                if (text.isBlank()) emptyList() else json.decodeFromString(listSerializer, text)
-            } catch (_: Exception) {
+                json.decodeFromString(listSerializer, text)
+            } catch (e: Exception) {
+                Log.w(TAG, "load: corrupt JSON in ${file.name}, keeping backup before overwrite", e)
+                backupCorruptFile()
                 emptyList()
             }
+        }
+    }
+
+    /** 把无法解析的原文件改名保留，成功后原路径为空，后续落盘不会覆盖证据。 */
+    private fun backupCorruptFile() {
+        val backup = File(file.parentFile, "${file.name}.corrupt")
+        try {
+            if (backup.exists() && !backup.delete()) {
+                Log.w(TAG, "load: cannot replace stale backup ${backup.name}")
+            }
+            if (!file.renameTo(backup)) {
+                Log.w(TAG, "load: failed to preserve corrupt file ${file.name}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "load: failed to preserve corrupt file ${file.name}", e)
         }
     }
 
@@ -68,5 +95,9 @@ class JsonFileStore<T>(
             }
             tempFile.delete()
         }
+    }
+
+    private companion object {
+        const val TAG = "JsonFileStore"
     }
 }
