@@ -20,7 +20,7 @@
 
 ### 修复
 - 对齐上游 v1.18.2 协议行为：协议版本常量、设备 DTO 默认值与本机宣告统一为 `2.2`，未知 `deviceType`（含缺省值）按协议回退为 `desktop`。
-- 修复了 HTTPS 下 HTTP 层发现失效的问题（UDP 组播发现与设备列表可见性不受影响）：发现请求补齐客户端证书，使子网扫描与 announce 应答的 `register` 能通过官方默认的强制 mTLS；HTTPS 设备身份改取服务端证书 SHA-256，而非响应体 `fingerprint`；announce 改为每轮 100/500/2000 ms 三连发。
+- 修复了 HTTPS 发现链路的偏差：发现请求补齐客户端证书，使子网扫描的 `GET /info` 与 announce 应答的 `POST /register` 能建立 TLS 连接（官方在 Web 未启用时强制 mTLS）；子网扫描得到的 HTTPS 设备此前因 `/info` 响应不含 `protocol`/`port` 被登记成 `http://ip:53317`，register 与传输因此走明文而失败，现按实际探测协议登记为 `https`，且设备表合并时 https 条目不会被更弱的 http 结果覆盖；HTTPS 设备身份改取服务端证书 SHA-256，而非可被伪造的响应体 `fingerprint`；announce 改为每轮 100/500/2000 ms 三连发。被动 UDP 组播发现不受上述改动影响：收到 announce 即入表，不依赖 TLS，也不依赖 register 结果。
 - 修复了 Web 页面访问会把浏览器登记成一台「web 设备」污染设备列表的问题，官方实现不产生该发现事件。
 - 修复了取消语义与上游不一致的问题：等待审批的请求可按来源 IP 取消并立即结束挂起审批；传输中取消同时校验来源 IP；对端取消本机正在外发的会话时停止发送，不再继续上传。
 - 修复了上传接口错误码与状态机不一致的问题：缺 `sessionId`/`fileId`/`token` 统一返回 400 `Missing parameters`，未知会话、令牌或 IP 不符、文件不属于会话统一 403；已完成/已取消的文件拒绝重放；成功上传返回 200 空 body。

@@ -13,6 +13,7 @@ class DeviceDirectoryTest {
         fingerprint: String,
         ip: String,
         port: Int = 53317,
+        protocol: String = "http",
         lastSeen: Long = 1_000L,
         alternateIps: List<String> = emptyList(),
         deviceModel: String? = null,
@@ -20,6 +21,7 @@ class DeviceDirectoryTest {
         alias = alias,
         fingerprint = fingerprint,
         port = port,
+        protocol = protocol,
         ip = ip,
         alternateIps = alternateIps,
         lastSeen = lastSeen,
@@ -62,6 +64,45 @@ class DeviceDirectoryTest {
         assertEquals(listOf("192.168.43.15"), merged[0].alternateIps)
         assertEquals("Pixel 8", merged[0].deviceModel)
         assertEquals(2_000L, merged[0].lastSeen)
+    }
+
+    @Test
+    fun weakerHttpEntryDoesNotDowngradeHttpsDevice() {
+        val directory =
+            DeviceDirectory(
+                ttlMs = 90_000L,
+                clock = { 10_000L },
+                primaryIp = { null },
+            )
+        directory.upsert(device("Peer", "fp-peer", "10.0.0.5", protocol = "https", lastSeen = 1_000L))
+
+        // 子网扫描若把同一设备识别成 http（或其它弱信息），不得覆盖可达性字段
+        val merged =
+            directory.upsert(
+                device("Peer", "fp-peer", "10.0.0.5", protocol = "http", lastSeen = 2_000L),
+            )
+
+        assertEquals(1, merged.size)
+        assertEquals("https", merged[0].protocol)
+        assertEquals("https://10.0.0.5:53317", merged[0].url)
+    }
+
+    @Test
+    fun strongerHttpsEntryUpgradesHttpDevice() {
+        val directory =
+            DeviceDirectory(
+                ttlMs = 90_000L,
+                clock = { 10_000L },
+                primaryIp = { null },
+            )
+        directory.upsert(device("Peer", "fp-peer", "10.0.0.5", protocol = "http", lastSeen = 1_000L))
+
+        val merged =
+            directory.upsert(
+                device("Peer", "fp-peer", "10.0.0.5", protocol = "https", lastSeen = 2_000L),
+            )
+
+        assertEquals("https", merged[0].protocol)
     }
 
     @Test

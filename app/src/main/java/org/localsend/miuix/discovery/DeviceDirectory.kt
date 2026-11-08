@@ -41,10 +41,16 @@ class DeviceDirectory(
                     } else {
                         device.ip
                     }
+                // 协议/端口是可达性信息：https 条目不得被更弱的 http 结果覆盖，反向则允许升级
+                val keepHttps =
+                    known.protocol.equals("https", ignoreCase = true) &&
+                        !device.protocol.equals("https", ignoreCase = true)
                 val merged =
                     device.copy(
                         ip = bestIp,
                         alternateIps = allConfirmedIps.filter { it != bestIp },
+                        protocol = if (keepHttps) known.protocol else device.protocol,
+                        port = if (keepHttps) known.port else device.port,
                         deviceModel = device.deviceModel ?: known.deviceModel,
                         lastSeen = maxOf(known.lastSeen, device.lastSeen),
                     )

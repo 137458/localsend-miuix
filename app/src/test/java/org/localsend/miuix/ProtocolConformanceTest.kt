@@ -11,6 +11,7 @@ import org.localsend.miuix.model.DeviceDto
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.network.attachmentContentDisposition
+import org.localsend.miuix.network.deviceFromHttpsProbe
 import org.localsend.miuix.network.findPendingCancelTarget
 import org.localsend.miuix.network.isUploadFileAcceptable
 
@@ -26,6 +27,22 @@ class ProtocolConformanceTest {
         assertEquals("2.2", NetworkConstants.PROTOCOL_VERSION)
         assertEquals(NetworkConstants.PROTOCOL_VERSION, dto.version)
         assertEquals("desktop", dto.deviceType)
+    }
+
+    @Test
+    fun httpsProbeRegistersDeviceAsHttpsReachable() {
+        // 上游 /info 响应只有 alias/version/deviceModel/deviceType/fingerprint/download，
+        // 没有 protocol/port，DTO 缺省会落在 http://ip:53317
+        val dto = DeviceDto(alias = "peer", fingerprint = "BODY-FP")
+        assertEquals("http", dto.protocol)
+
+        val device = deviceFromHttpsProbe(dto, "192.168.1.9", "CERT-FP")
+
+        assertEquals("https", device.protocol)
+        assertEquals(NetworkConstants.DEFAULT_PORT, device.port)
+        assertEquals("https://192.168.1.9:53317", device.url)
+        // HTTPS 下身份取自证书指纹，而非响应体
+        assertEquals("CERT-FP", device.fingerprint)
     }
 
     @Test

@@ -390,6 +390,8 @@ class DiscoveryService(
                         setRequestProperty("Content-Type", "application/json; charset=utf-8")
                     }
                 connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+                // 已知局限：官方对指纹不符的 register 同样返回 200（静默忽略），
+                // 本地只判状态码，无法区分“已被接受”与“被忽略”。
                 connection.responseCode == HttpURLConnection.HTTP_OK
             } catch (ignored: Exception) {
                 false
@@ -425,7 +427,7 @@ class DiscoveryService(
                     if (certFingerprint.isBlank() || isSameFingerprint(certFingerprint, localDevice.fingerprint)) continue
                     val text = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                     val dto = json.decodeFromString<DeviceDto>(text)
-                    return@withContext Device.fromDto(dto, targetIp).copy(fingerprint = certFingerprint)
+                    return@withContext deviceFromHttpsProbe(dto, targetIp, certFingerprint)
                 } catch (ignored: Exception) {
                     // 该协议/路由未响应，继续下一个候选
                 } finally {
@@ -512,3 +514,19 @@ class DiscoveryService(
         return job
     }
 }
+
+/**
+ * HTTPS 探测结果：上游 `/info` 响应不含 `protocol`/`port`，DTO 缺省会落成 `http`。
+ * 必须按实际探测协议补齐，否则该设备会以 `http://ip:53317` 入表，
+ * 后续 register 与传输都走明文并失败。HTTPS 下身份取自证书指纹，而非响应体。
+ */
+internal fun deviceFromHttpsProbe(
+    dto: DeviceDto,
+    ip: String,
+    certFingerprint: String,
+): Device =
+    Device.fromDto(dto, ip).copy(
+        fingerprint = certFingerprint,
+        protocol = "https",
+        port = NetworkConstants.DEFAULT_PORT,
+    )

@@ -565,6 +565,9 @@ class LocalSendServer(
                 call.respond(getLocalDevice().toDto())
             }
 
+            // 已知局限：本机服务端不要求客户端证书，也不校验 register 声明的指纹，
+            // 安全语义弱于上游（官方在 Web 未启用时强制 mTLS，并比对证书指纹）。
+            // Ktor Netty 的 sslConnector 没有读取客户端证书的入口，补齐需要大改。
             post(LocalSendRoutes.REGISTER_V2) {
                 val remoteDto = call.receive<DeviceDto>()
                 val remoteIp = call.request.origin.remoteHost
