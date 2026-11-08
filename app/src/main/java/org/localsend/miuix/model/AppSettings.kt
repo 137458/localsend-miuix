@@ -1,9 +1,11 @@
 package org.localsend.miuix.model
 
+import org.localsend.miuix.core.NetworkConstants
+
 data class AppSettings(
     val alias: String = generateDefaultAlias(),
-    val port: Int = 53317,
-    val multicastGroup: String = "224.0.0.167",
+    val port: Int = NetworkConstants.DEFAULT_PORT,
+    val multicastGroup: String = NetworkConstants.DEFAULT_MULTICAST_IP,
     // 设备发现超时（秒）
     val discoveryTimeout: Int = 5,
     // 逗号分隔的网卡名或 IP 前缀，仅这些网络参与发现

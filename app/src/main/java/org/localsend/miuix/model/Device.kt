@@ -1,6 +1,7 @@
 package org.localsend.miuix.model
 
 import kotlinx.serialization.Serializable
+import org.localsend.miuix.core.NetworkConstants
 
 // 枚举项须与 LocalSend 协议中的设备类型字面量一致，且 kotlinx.serialization 按枚举项名序列化，故保持小写
 @Serializable
@@ -28,7 +29,7 @@ data class DeviceDto(
     val deviceModel: String? = null,
     val deviceType: String? = "desktop",
     val fingerprint: String,
-    val port: Int = 53317,
+    val port: Int = NetworkConstants.DEFAULT_PORT,
     val protocol: String = "http",
     val download: Boolean = false,
     val announce: Boolean? = null,
@@ -40,7 +41,7 @@ data class Device(
     val deviceModel: String? = null,
     val deviceType: DeviceType = DeviceType.mobile,
     val fingerprint: String,
-    val port: Int = 53317,
+    val port: Int = NetworkConstants.DEFAULT_PORT,
     val protocol: String = "http",
     val download: Boolean = false,
     val ip: String,

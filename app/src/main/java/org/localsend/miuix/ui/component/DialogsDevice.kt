@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
+import org.localsend.miuix.core.NetworkConstants
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
@@ -159,7 +160,7 @@ fun ManualIpDialog(
     onSend: (ip: String, port: Int) -> Unit,
 ) {
     var ip by remember(show) { mutableStateOf(recentIps.firstOrNull().orEmpty()) }
-    var port by remember(show) { mutableStateOf("53317") }
+    var port by remember(show) { mutableStateOf(NetworkConstants.DEFAULT_PORT.toString()) }
 
     WindowDialog(
         show = show,
@@ -247,7 +248,7 @@ fun ManualIpDialog(
                 Button(
                     onClick = {
                         val targetIp = ip.trim()
-                        val targetPort = port.trim().toIntOrNull() ?: 53317
+                        val targetPort = port.trim().toIntOrNull() ?: NetworkConstants.DEFAULT_PORT
                         if (targetIp.isNotEmpty()) {
                             onSend(targetIp, targetPort)
                             onDismissRequest()

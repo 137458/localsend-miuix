@@ -742,7 +742,7 @@ class LocalSendManager(
     /** 手动输入 IP 发起传输：先通过 /info 探查目标设备元数据，再发起上传。 */
     fun sendToIp(
         ip: String,
-        port: Int = 53317,
+        port: Int = NetworkConstants.DEFAULT_PORT,
         filesToSend: List<FileItem> = _selectedFiles.value,
     ) {
         if (filesToSend.isEmpty()) return

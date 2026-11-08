@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.localsend.miuix.core.AppJson
 import org.localsend.miuix.core.JsonFileStore
+import org.localsend.miuix.core.NetworkConstants
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceType
 import java.io.File
@@ -13,7 +14,7 @@ data class FavoriteDevice(
     val alias: String,
     val fingerprint: String,
     val ip: String,
-    val port: Int = 53317,
+    val port: Int = NetworkConstants.DEFAULT_PORT,
     val protocol: String = "http",
     val deviceModel: String? = null,
     val deviceType: DeviceType = DeviceType.mobile,

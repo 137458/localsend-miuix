@@ -23,7 +23,7 @@ internal fun loadSettings(
 ): AppSettings =
     AppSettings(
         alias = alias,
-        port = prefs.getInt(PreferenceKeys.KEY_PORT, 53317),
+        port = prefs.getInt(PreferenceKeys.KEY_PORT, NetworkConstants.DEFAULT_PORT),
         multicastGroup = prefs.getString(PreferenceKeys.KEY_MULTICAST_GROUP, NetworkConstants.DEFAULT_MULTICAST_IP) ?: NetworkConstants.DEFAULT_MULTICAST_IP,
         discoveryTimeout = prefs.getInt(PreferenceKeys.KEY_DISCOVERY_TIMEOUT, 5),
         networkWhitelist = prefs.getString(PreferenceKeys.KEY_NETWORK_WHITELIST, "") ?: "",
