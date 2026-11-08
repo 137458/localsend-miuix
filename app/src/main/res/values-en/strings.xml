@@ -349,6 +349,9 @@
     <string name="update_dialog_btn_update_now">Update Now</string>
     <string name="update_dialog_github_release_note">View release notes on GitHub ↗</string>
     <string name="update_install_failed">Failed to launch package installer, please check permissions</string>
+    <string name="update_download_failure_network">Network connection lost. Check your network and try again.</string>
+    <string name="update_download_failure_checksum">Package verification failed. Retry or download it in a browser.</string>
+    <string name="update_download_failure_write">Failed to save the package. Check available storage.</string>
 
     <!-- Notification & Live Updates -->
     <string name="notif_channel_live_name">Live Transfer Updates</string>

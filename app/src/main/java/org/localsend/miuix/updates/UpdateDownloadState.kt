@@ -1,5 +1,7 @@
 package org.localsend.miuix.updates
 
+import androidx.annotation.StringRes
+import org.localsend.miuix.R
 import java.io.File
 
 /**
@@ -25,9 +27,9 @@ sealed interface UpdateDownloadState {
 
 /** 失败分类固定文案：网络、校验、写盘，不把底层异常直接抛给用户。 */
 enum class UpdateDownloadFailure(
-    val message: String,
+    @StringRes val messageRes: Int,
 ) {
-    NETWORK("网络连接中断，请检查网络后重试"),
-    CHECKSUM("安装包校验未通过，请重试或用浏览器下载"),
-    WRITE("安装包写入失败，请检查存储空间"),
+    NETWORK(R.string.update_download_failure_network),
+    CHECKSUM(R.string.update_download_failure_checksum),
+    WRITE(R.string.update_download_failure_write),
 }

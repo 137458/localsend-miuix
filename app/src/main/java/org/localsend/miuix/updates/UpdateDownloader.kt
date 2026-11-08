@@ -165,10 +165,10 @@ class UpdateDownloader(
             throw e
         } catch (e: UpdateTransferException) {
             target.delete()
-            publish(attempt, UpdateDownloadState.Failed(e.failure.message))
+            publish(attempt, UpdateDownloadState.Failed(context.getString(e.failure.messageRes)))
         } catch (e: Exception) {
             target.delete()
-            publish(attempt, UpdateDownloadState.Failed(UpdateDownloadFailure.NETWORK.message))
+            publish(attempt, UpdateDownloadState.Failed(context.getString(UpdateDownloadFailure.NETWORK.messageRes)))
         } finally {
             connection?.disconnect()
             synchronized(this) { if (attempt == generation) job = null }
