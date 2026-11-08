@@ -531,5 +531,6 @@ internal fun deviceFromHttpsProbe(
     Device.fromDto(dto, ip).copy(
         fingerprint = certFingerprint,
         protocol = "https",
-        port = NetworkConstants.DEFAULT_PORT,
+        // 端口以 /info 公布的为准，缺省或非法值才回落到默认端口
+        port = dto.port.takeIf { it in 1..65535 } ?: NetworkConstants.DEFAULT_PORT,
     )

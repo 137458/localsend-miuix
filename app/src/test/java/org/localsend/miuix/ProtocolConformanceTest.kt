@@ -46,6 +46,15 @@ class ProtocolConformanceTest {
     }
 
     @Test
+    fun httpsProbePrefersPortFromInfoResponse() {
+        val custom = DeviceDto(alias = "peer", fingerprint = "BODY-FP", port = 50000)
+        assertEquals(50000, deviceFromHttpsProbe(custom, "192.168.1.9", "CERT-FP").port)
+
+        val invalid = DeviceDto(alias = "peer", fingerprint = "BODY-FP", port = 0)
+        assertEquals(NetworkConstants.DEFAULT_PORT, deviceFromHttpsProbe(invalid, "192.168.1.9", "CERT-FP").port)
+    }
+
+    @Test
     fun uploadAcceptsRetryableStatesAndRejectsReplayOfFinishedFiles() {
         assertTrue(isUploadFileAcceptable(TransferStatus.WaitingApproval))
         assertTrue(isUploadFileAcceptable(TransferStatus.InProgress))
