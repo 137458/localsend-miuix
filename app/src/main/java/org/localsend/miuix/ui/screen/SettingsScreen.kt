@@ -38,16 +38,15 @@ import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.CertFingerprintDialog
 import org.localsend.miuix.ui.component.DialogButtonRow
 import org.localsend.miuix.ui.component.PinDialog
+import org.localsend.miuix.ui.component.SectionCard
 import org.localsend.miuix.ui.component.TextInputDialog
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import org.localsend.miuix.util.AppLanguage
 import org.localsend.miuix.util.SettingsValidators
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -169,8 +168,7 @@ fun SettingsScreen(
             ) {
                 // Section 1: General Settings
                 item {
-                    SmallTitle(text = stringResource(R.string.settings_section_general))
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    SectionCard(title = stringResource(R.string.settings_section_general)) {
                         ArrowPreference(
                             title = stringResource(R.string.settings_pref_alias_title),
                             summary = settings.alias,
@@ -250,8 +248,7 @@ fun SettingsScreen(
                 // Section 2: Receive Settings
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = stringResource(R.string.settings_section_receive))
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    SectionCard(title = stringResource(R.string.settings_section_receive)) {
                         SwitchPreference(
                             title = stringResource(R.string.receive_pref_quick_save_title),
                             summary = stringResource(R.string.settings_pref_quick_save_desc),
@@ -319,8 +316,7 @@ fun SettingsScreen(
                 // Section 3: Network & Security Settings
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = stringResource(R.string.settings_section_network_security))
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    SectionCard(title = stringResource(R.string.settings_section_network_security)) {
                         ArrowPreference(
                             title = stringResource(R.string.settings_pref_port_title),
                             summary = settings.port.toString(),
@@ -347,8 +343,7 @@ fun SettingsScreen(
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = stringResource(R.string.settings_section_advanced_network))
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    SectionCard(title = stringResource(R.string.settings_section_advanced_network)) {
                         ArrowPreference(
                             title = stringResource(R.string.settings_pref_network_whitelist_title),
                             summary = settings.networkWhitelist.ifEmpty { "—" },
@@ -375,8 +370,7 @@ fun SettingsScreen(
                 // Section 4: About
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = stringResource(R.string.settings_section_about))
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    SectionCard(title = stringResource(R.string.settings_section_about)) {
                         ArrowPreference(
                             title = stringResource(R.string.settings_pref_check_update_title),
                             summary = stringResource(R.string.settings_pref_check_update_summary, org.localsend.miuix.BuildConfig.VERSION_NAME),

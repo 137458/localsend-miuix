@@ -57,6 +57,7 @@ import org.localsend.miuix.ui.component.EmptyStateCard
 import org.localsend.miuix.ui.component.FilePreviewDialog
 import org.localsend.miuix.ui.component.FileThumbnail
 import org.localsend.miuix.ui.component.InlineTransferProgress
+import org.localsend.miuix.ui.component.SectionCard
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import org.localsend.miuix.util.ThumbnailHelper
@@ -244,8 +245,7 @@ fun SendScreen(
                 ) {
                     // Section 1: Quick Action Grid (6 types)
                     item {
-                        SmallTitle(text = stringResource(R.string.send_section_quick_pick))
-                        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                        SectionCard(title = stringResource(R.string.send_section_quick_pick)) {
                             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -295,8 +295,7 @@ fun SendScreen(
                     if (selectedFiles.isNotEmpty()) {
                         item {
                             Spacer(modifier = Modifier.height(4.dp))
-                            SmallTitle(text = stringResource(R.string.send_section_selected_files, selectedFiles.size))
-                            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                            SectionCard(title = stringResource(R.string.send_section_selected_files, selectedFiles.size)) {
                                 Column(
                                     modifier =
                                         Modifier
@@ -446,8 +445,7 @@ fun SendScreen(
                         val resendDev = targetResendDevice!!
                         item {
                             Spacer(modifier = Modifier.height(4.dp))
-                            SmallTitle(text = stringResource(R.string.history_action_resend))
-                            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                            SectionCard(title = stringResource(R.string.history_action_resend)) {
                                 Column(modifier = Modifier.fillMaxWidth()) {
                                     ArrowPreference(
                                         title = resendDev.alias,

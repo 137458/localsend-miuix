@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,10 +34,10 @@ import org.localsend.miuix.network.NetworkUtils
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.EmptyStateCard
+import org.localsend.miuix.ui.component.SectionCard
 import org.localsend.miuix.ui.component.TransferSessionCard
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -115,8 +113,7 @@ fun ReceiveScreen(
             ) {
                 // Section 1: Device Info Card
                 item {
-                    SmallTitle(text = stringResource(R.string.receive_section_local_device))
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    SectionCard(title = stringResource(R.string.receive_section_local_device)) {
                         ArrowPreference(
                             title = settings.alias,
                             summary = stringResource(R.string.receive_pref_alias_summary),
@@ -146,8 +143,7 @@ fun ReceiveScreen(
                 // Section 2: Quick Receive Preferences
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    SmallTitle(text = stringResource(R.string.receive_section_options))
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    SectionCard(title = stringResource(R.string.receive_section_options)) {
                         SwitchPreference(
                             title = stringResource(R.string.receive_pref_quick_save_title),
                             summary = stringResource(R.string.receive_pref_quick_save_summary),

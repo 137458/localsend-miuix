@@ -50,6 +50,7 @@ import org.localsend.miuix.manager.UpdateCheckResult
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.MarkdownText
+import org.localsend.miuix.ui.component.SectionCard
 import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
@@ -62,14 +63,12 @@ import org.localsend.miuix.updates.UpdateDownloadState
 import org.localsend.miuix.updates.UpdatePrompt
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -352,13 +351,7 @@ fun UpdateScreen(
                                     stringResource(R.string.update_changelog_title_current, BuildConfig.VERSION_NAME)
                                 }
                             val defaultReleaseTitle = stringResource(R.string.update_release_default_title)
-                            SmallTitle(text = changelogTitle)
-                            Card(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp),
-                            ) {
+                            SectionCard(title = changelogTitle) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text(
                                         text = releaseInfo?.releaseTitle?.ifBlank { defaultReleaseTitle } ?: defaultReleaseTitle,
@@ -478,13 +471,7 @@ fun UpdateScreen(
 
                     // ── 更新设置 ──
                     item(key = "settings") {
-                        SmallTitle(text = stringResource(R.string.update_section_settings))
-                        Card(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp),
-                        ) {
+                        SectionCard(title = stringResource(R.string.update_section_settings)) {
                             SwitchPreference(
                                 title = stringResource(R.string.update_pref_auto_check_title),
                                 summary = stringResource(R.string.update_pref_auto_check_summary),
@@ -516,13 +503,7 @@ fun UpdateScreen(
 
                     // ── 版本通道与操作 ──
                     item(key = "channel") {
-                        SmallTitle(text = stringResource(R.string.update_section_channel))
-                        Card(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp),
-                        ) {
+                        SectionCard(title = stringResource(R.string.update_section_channel)) {
                             BasicComponent(
                                 title = stringResource(R.string.update_pref_manual_check_title),
                                 summary = if (isChecking) stringResource(R.string.update_pref_manual_check_busy) else stringResource(R.string.update_pref_manual_check_idle),
