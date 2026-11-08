@@ -2,7 +2,8 @@ package org.localsend.miuix.webshare
 
 /**
  * User-visible copy for the Web Share HTML page (protocol §5.1).
- * Selected from the browser Accept-Language header; does not change REST routes.
+ * Selected from the browser Accept-Language header: Chinese when zh is present with
+ * at least the weight of en, otherwise English (including missing/unknown headers).
  */
 data class WebShareCopy(
     val htmlLang: String,
@@ -246,9 +247,13 @@ data class WebShareCopy(
                 pastedImageUploading = "Clipboard image detected, uploading...",
             )
 
-        fun fromAcceptLanguage(header: String?): WebShareCopy = if (prefersEnglish(header)) English else Chinese
+        fun fromAcceptLanguage(header: String?): WebShareCopy = if (prefersChinese(header)) Chinese else English
 
-        fun prefersEnglish(header: String?): Boolean {
+        /**
+         * 仅当 Accept-Language 含中文且中文权重不低于英文时使用中文；
+         * 其余语言（en/de/fr/ja 等）、无法识别或缺失请求头一律回落英文，不再用中文兜底。
+         */
+        fun prefersChinese(header: String?): Boolean {
             if (header.isNullOrBlank()) return false
             var bestEn = 0.0
             var bestZh = 0.0
@@ -268,7 +273,7 @@ data class WebShareCopy(
                     tag.startsWith("en") -> bestEn = maxOf(bestEn, q)
                 }
             }
-            return bestEn > bestZh
+            return bestZh > 0.0 && bestZh >= bestEn
         }
 
         private fun jsonEscape(value: String): String =

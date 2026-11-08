@@ -19,18 +19,30 @@ class WebShareCopyTest {
     }
 
     @Test
-    fun chineseOrMissingHeaderKeepsChinesePageCopy() {
-        assertEquals("zh-CN", WebShareCopy.fromAcceptLanguage(null).htmlLang)
-        assertEquals("zh-CN", WebShareCopy.fromAcceptLanguage("").htmlLang)
+    fun chineseHeaderKeepsChinesePageCopy() {
         val copy = WebShareCopy.fromAcceptLanguage("zh-CN,zh;q=0.9,en;q=0.8")
+        assertEquals("zh-CN", copy.htmlLang)
         assertEquals("下载", copy.download)
         assertTrue(copy.dropzoneText.contains("拖拽"))
     }
 
     @Test
+    fun nonChineseLanguagesAndMissingHeaderFallBackToEnglish() {
+        assertEquals("en", WebShareCopy.fromAcceptLanguage(null).htmlLang)
+        assertEquals("en", WebShareCopy.fromAcceptLanguage("").htmlLang)
+        assertEquals("en", WebShareCopy.fromAcceptLanguage("   ").htmlLang)
+        assertEquals("en", WebShareCopy.fromAcceptLanguage("en-US,en;q=0.9").htmlLang)
+        assertEquals("en", WebShareCopy.fromAcceptLanguage("de-DE,de;q=0.9").htmlLang)
+        assertEquals("en", WebShareCopy.fromAcceptLanguage("fr-FR,fr;q=0.8").htmlLang)
+        assertEquals("en", WebShareCopy.fromAcceptLanguage("ja-JP,ja;q=0.9").htmlLang)
+        assertEquals("en", WebShareCopy.fromAcceptLanguage("xx-YY").htmlLang)
+        assertEquals("zh-CN", WebShareCopy.fromAcceptLanguage("zh-TW").htmlLang)
+    }
+
+    @Test
     fun qualityValuesPreferHigherLanguage() {
-        assertTrue(WebShareCopy.prefersEnglish("en;q=0.8,zh;q=0.4"))
-        assertFalse(WebShareCopy.prefersEnglish("zh;q=0.9,en;q=0.3"))
+        assertFalse(WebShareCopy.prefersChinese("en;q=0.8,zh;q=0.4"))
+        assertTrue(WebShareCopy.prefersChinese("zh;q=0.9,en;q=0.3"))
     }
 
     @Test
@@ -56,18 +68,18 @@ class WebShareCopyTest {
     }
 
     @Test
-    fun blankOrNilHeaderIsNotEnglish() {
-        assertFalse(WebShareCopy.prefersEnglish(null))
-        assertFalse(WebShareCopy.prefersEnglish(""))
-        assertFalse(WebShareCopy.prefersEnglish("   "))
+    fun blankOrNilHeaderIsNotChinese() {
+        assertFalse(WebShareCopy.prefersChinese(null))
+        assertFalse(WebShareCopy.prefersChinese(""))
+        assertFalse(WebShareCopy.prefersChinese("   "))
     }
 
     @Test
     fun qualityWeightsWithTiePreferChinese() {
-        assertTrue(WebShareCopy.prefersEnglish("en-US,en;q=0.9"))
-        assertTrue(WebShareCopy.prefersEnglish("zh;q=0.5,en;q=0.9"))
+        assertFalse(WebShareCopy.prefersChinese("en-US,en;q=0.9"))
+        assertFalse(WebShareCopy.prefersChinese("zh;q=0.5,en;q=0.9"))
         // 等权重时按中文处理，英文必须严格更高才选中
-        assertFalse(WebShareCopy.prefersEnglish("en,zh"))
+        assertTrue(WebShareCopy.prefersChinese("en,zh"))
     }
 
     @Test
