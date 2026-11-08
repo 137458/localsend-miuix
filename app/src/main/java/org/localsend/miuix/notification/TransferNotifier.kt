@@ -179,7 +179,8 @@ object TransferNotifier {
                     context.startActivity(promotionIntent)
                     return
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.w(TAG, "open notification settings (promotion) failed", e)
             }
         }
 
@@ -191,7 +192,8 @@ object TransferNotifier {
                 }
             context.startActivity(intent)
             return
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "open notification settings failed", e)
         }
 
         try {
@@ -201,7 +203,8 @@ object TransferNotifier {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
             context.startActivity(fallbackIntent)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "open app details settings failed", e)
         }
     }
 

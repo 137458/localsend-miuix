@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.os.Build
+import android.util.Log
 import android.util.LruCache
 import android.util.Size
 import androidx.core.graphics.drawable.toBitmap
@@ -12,6 +13,8 @@ import org.localsend.miuix.model.FileItem
 import java.io.File
 
 object ThumbnailHelper {
+    private const val TAG = "ThumbnailHelper"
+
     // 内存缓存以 KB 为单位，限制最大使用可用堆内存的 1/8（通常在 16MB ~ 64MB 之间），防止 OOM
     private val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024).toInt()
     private val cacheSizeKb = (maxMemoryKb / 8).coerceIn(16 * 1024, 64 * 1024)
@@ -85,6 +88,7 @@ object ThumbnailHelper {
                     else -> null
                 }
             } catch (t: Throwable) {
+                Log.w(TAG, "loadThumbnail failed for ${file.name}", t)
                 null
             }
 
@@ -134,6 +138,7 @@ object ThumbnailHelper {
                     null
                 }
             } catch (t: Throwable) {
+                Log.w(TAG, "loadPreviewImage failed for ${file.name}", t)
                 null
             }
 
@@ -173,6 +178,7 @@ object ThumbnailHelper {
                     }
                 }
             } catch (t: Throwable) {
+                Log.w(TAG, "fd decode failed for ${file.name}", t)
             }
 
             // 2. Android 10+ (API 29+) 原生 loadThumbnail 高速硬件解码降级
@@ -180,6 +186,7 @@ object ThumbnailHelper {
                 try {
                     return context.contentResolver.loadThumbnail(uri, Size(targetSize, targetSize), null)
                 } catch (t: Throwable) {
+                    Log.w(TAG, "image loadThumbnail failed for ${file.name}", t)
                 }
             }
 
@@ -216,6 +223,7 @@ object ThumbnailHelper {
                     }
                 }
             } catch (t: Throwable) {
+                Log.w(TAG, "stream decode failed for ${file.name}", t)
             }
         } else if (!path.isNullOrEmpty()) {
             return decodeSampledBitmapFromFile(path, targetSize, targetSize)
@@ -236,6 +244,7 @@ object ThumbnailHelper {
                 try {
                     return context.contentResolver.loadThumbnail(uri, Size(targetSize, targetSize), null)
                 } catch (t: Throwable) {
+                    Log.w(TAG, "video loadThumbnail failed for ${file.name}", t)
                 }
             }
             val retriever = MediaMetadataRetriever()
@@ -249,6 +258,7 @@ object ThumbnailHelper {
                     }
                 if (frame != null) return frame
             } catch (t: Throwable) {
+                Log.w(TAG, "video frame (uri) failed for ${file.name}", t)
             } finally {
                 try {
                     retriever.release()
@@ -267,6 +277,7 @@ object ThumbnailHelper {
                     }
                 if (frame != null) return frame
             } catch (t: Throwable) {
+                Log.w(TAG, "video frame (path) failed for $path", t)
             } finally {
                 try {
                     retriever.release()
@@ -292,6 +303,7 @@ object ThumbnailHelper {
             val icon = appInfo.loadIcon(pm)
             icon.toBitmap(width = targetSize, height = targetSize, config = Bitmap.Config.ARGB_8888)
         } catch (t: Throwable) {
+            Log.w(TAG, "loadApkIcon failed for $path", t)
             null
         }
     }
@@ -314,6 +326,7 @@ object ThumbnailHelper {
             }
             BitmapFactory.decodeFile(path, options)
         } catch (t: Throwable) {
+            Log.w(TAG, "decodeSampledBitmapFromFile failed for $path", t)
             null
         }
     }

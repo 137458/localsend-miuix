@@ -1,9 +1,12 @@
 package org.localsend.miuix.network
 
+import android.util.Log
 import org.localsend.miuix.util.IfInfo
 import org.localsend.miuix.util.NetworkFilter
 import java.net.Inet4Address
 import java.net.NetworkInterface
+
+private const val TAG = "NetworkUtils"
 
 object NetworkUtils {
     /** 检查是否属于局域网私有 IPv4 地址（RFC 1918） */
@@ -74,7 +77,7 @@ object NetworkUtils {
                 if (ips.isNotEmpty()) perInterface.add(IfInfo(intf.name, ips))
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "enumerate interface addresses failed", e)
         }
 
         for (iface in NetworkFilter.selectInterfaces(perInterface, whitelist, blacklist)) {
@@ -122,7 +125,7 @@ object NetworkUtils {
                 if (ifaceBroadcasts.isNotEmpty()) perInterface.add(IfInfo(intf.name, ifaceBroadcasts))
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "collect interface broadcasts failed", e)
         }
         for (iface in NetworkFilter.selectInterfaces(perInterface, whitelist, blacklist)) {
             for (host in iface.addresses) {

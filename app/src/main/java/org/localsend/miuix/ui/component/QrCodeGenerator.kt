@@ -1,6 +1,7 @@
 package org.localsend.miuix.ui.component
 
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -23,6 +24,8 @@ import android.graphics.Color as AndroidColor
  * 确保微信、系统相机、iOS 及各类扫码工具均可在各类光照与缩放条件下秒级识别。
  */
 object QrCodeGenerator {
+    private const val TAG = "QrCodeGenerator"
+
     fun generateQrBitmap(
         content: String,
         sizePx: Int = 512,
@@ -50,7 +53,7 @@ object QrCodeGenerator {
             bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
             bitmap
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "encode qr bitmap failed", e)
             Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888).apply {
                 eraseColor(lightColor)
             }

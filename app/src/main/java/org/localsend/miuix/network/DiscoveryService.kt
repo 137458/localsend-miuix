@@ -2,6 +2,7 @@ package org.localsend.miuix.network
 
 import android.content.Context
 import android.net.wifi.WifiManager
+import android.util.Log
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -115,6 +116,8 @@ internal fun isListenerStale(
     current: ListenerConfig?,
 ): Boolean = current != null && current != bound
 
+private const val TAG = "DiscoveryService"
+
 class DiscoveryService(
     private val context: Context,
     private val scope: CoroutineScope,
@@ -203,7 +206,7 @@ class DiscoveryService(
                     }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "multicast lock acquire failed", e)
         }
     }
 
@@ -214,7 +217,7 @@ class DiscoveryService(
             }
             multicastLock = null
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "multicast lock release failed", e)
         }
     }
 
@@ -347,7 +350,7 @@ class DiscoveryService(
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.w(TAG, "multicast lock acquire failed", e)
             }
         }
     }

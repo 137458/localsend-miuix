@@ -260,14 +260,14 @@ class LocalSendServer(
             try {
                 if (getUseHttps()) startHttps(portToUse) else startHttp(portToUse)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.w(TAG, "start server on port $portToUse failed", e)
                 // Retry with a fallback port if needed
                 val fallbackPort = findAvailablePort(portToUse + 1)
                 boundPort = fallbackPort
                 try {
                     if (getUseHttps()) startHttps(fallbackPort) else startHttp(fallbackPort)
                 } catch (retryEx: Exception) {
-                    retryEx.printStackTrace()
+                    Log.e(TAG, "start server on fallback port $fallbackPort failed", retryEx)
                 }
             }
             startPendingSweep()
@@ -875,7 +875,7 @@ class LocalSendServer(
                             )
                         }
                     } else {
-                        e.printStackTrace()
+                        Log.w(TAG, "upload failed for '${fileItem.name}'", e)
                         val failureMessage = e.message ?: "Upload failed"
                         finishUploadFile(session, sessionId, fileItem, TransferStatus.Failed, failureMessage)
                         call.respond(HttpStatusCode.InternalServerError, mapOf("message" to failureMessage))

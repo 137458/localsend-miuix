@@ -8,7 +8,10 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.util.Log
 import org.localsend.miuix.notification.TransferNotifier
+
+private const val TAG = "TransferService"
 
 /**
  * 前台传输服务（Android 14+ dataSync 类型）。
@@ -49,7 +52,7 @@ class TransferService : Service() {
                 startForeground(TransferNotifier.NOTIF_ID_FOREGROUND_SERVICE, notification)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "startForeground failed", e)
         }
 
         return START_NOT_STICKY
@@ -75,7 +78,7 @@ class TransferService : Service() {
                     }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "acquireLocks failed", e)
         }
     }
 
@@ -127,7 +130,7 @@ class TransferService : Service() {
                     }
                 context.startForegroundService(intent)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.w(TAG, "startForegroundService failed", e)
             }
         }
 
