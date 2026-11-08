@@ -62,7 +62,8 @@ class TransferService : Service() {
                 wakeLock =
                     powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, org.localsend.miuix.core.NetworkConstants.WAKE_LOCK_TAG)?.apply {
                         setReferenceCounted(false)
-                        acquire(60 * 60 * 1000L) // 最大持有 60 分钟保护
+                        // 不设超时：长传输可能远超 1 小时，锁随前台服务停止/销毁释放。
+                        acquire()
                     }
             }
             if (wifiLock == null) {
