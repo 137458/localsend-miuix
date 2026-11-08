@@ -66,6 +66,53 @@ class UpdateManager(
         const val GITHUB_OWNER = "137458"
         const val GITHUB_REPO = "localsend-miuix"
         const val API_LATEST_RELEASE = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+
+        /** 无状态操作，放在伴生对象里调用方无需为了开个链接而构造携带 HttpClient 的实例。 */
+        fun installApk(
+            context: Context,
+            apkFile: File,
+        ) {
+            try {
+                if (!context.packageManager.canRequestPackageInstalls()) {
+                    val settingsIntent =
+                        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                    context.startActivity(settingsIntent)
+                    return
+                }
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
+
+                val intent =
+                    Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "installApk: failed to launch package installer: ${e.message}", e)
+                try {
+                    Toast.makeText(context, context.getString(R.string.update_install_failed), Toast.LENGTH_SHORT).show()
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        fun openInBrowser(
+            context: Context,
+            url: String,
+        ) {
+            try {
+                val intent =
+                    Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                context.startActivity(intent)
+            } catch (_: Exception) {
+                Toast.makeText(context, context.getString(R.string.toast_cannot_open_link), Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private val json =
@@ -131,52 +178,4 @@ class UpdateManager(
                 Result.failure(e)
             }
         }
-
-    fun installApk(
-        context: Context,
-        apkFile: File,
-    ) {
-        try {
-            if (!context.packageManager.canRequestPackageInstalls()) {
-                val settingsIntent =
-                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                        data = Uri.parse("package:${context.packageName}")
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                context.startActivity(settingsIntent)
-                return
-            }
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
-
-            val intent =
-                Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "application/vnd.android.package-archive")
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-                }
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "installApk: failed to launch package installer: ${e.message}", e)
-            try {
-                android.widget.Toast
-                    .makeText(context, context.getString(R.string.update_install_failed), android.widget.Toast.LENGTH_SHORT)
-                    .show()
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    fun openInBrowser(
-        context: Context,
-        url: String,
-    ) {
-        try {
-            val intent =
-                Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-            context.startActivity(intent)
-        } catch (_: Exception) {
-            Toast.makeText(context, context.getString(R.string.toast_cannot_open_link), Toast.LENGTH_SHORT).show()
-        }
-    }
 }

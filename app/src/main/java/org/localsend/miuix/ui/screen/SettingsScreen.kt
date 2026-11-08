@@ -389,14 +389,14 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_pref_github_title),
                             summary = ExternalLinks.GITHUB_REPO,
                             onClick = {
-                                UpdateManager(context).openInBrowser(context, ExternalLinks.GITHUB_REPO)
+                                UpdateManager.openInBrowser(context, ExternalLinks.GITHUB_REPO)
                             },
                         )
                         ArrowPreference(
                             title = stringResource(R.string.settings_pref_license_title),
                             summary = stringResource(R.string.settings_pref_license_summary),
                             onClick = {
-                                UpdateManager(context).openInBrowser(context, ExternalLinks.APACHE_LICENSE)
+                                UpdateManager.openInBrowser(context, ExternalLinks.APACHE_LICENSE)
                             },
                         )
                     }

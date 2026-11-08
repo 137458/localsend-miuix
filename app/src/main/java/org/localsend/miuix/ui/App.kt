@@ -650,13 +650,13 @@ fun App(manager: LocalSendManager) {
                         if (apk != null) {
                             manager.updates.downloader.start(apk)
                         } else {
-                            updateManager.openInBrowser(context, release.releaseUrl)
+                            UpdateManager.openInBrowser(context, release.releaseUrl)
                         }
                     }
                 },
-                onInstall = { file -> updateManager.installApk(context, file) },
+                onInstall = { file -> UpdateManager.installApk(context, file) },
                 onCancelDownload = { manager.updates.downloader.cancel() },
-                onOpenBrowser = { url -> updateManager.openInBrowser(context, url) },
+                onOpenBrowser = { url -> UpdateManager.openInBrowser(context, url) },
                 onIgnore = { ver ->
                     val next = UpdatePrompt.toggleIgnored(settings.ignoredVersion, ver)
                     manager.updateSettings { it.copy(ignoredVersion = next) }

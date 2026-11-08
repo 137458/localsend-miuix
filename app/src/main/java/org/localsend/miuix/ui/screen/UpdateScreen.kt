@@ -144,7 +144,7 @@ fun UpdateScreen(
         if (apk != null) {
             manager.updates.downloader.start(apk)
         } else {
-            updateManager.openInBrowser(context, updateBrowserUrl(release))
+            UpdateManager.openInBrowser(context, updateBrowserUrl(release))
         }
     }
 
@@ -432,7 +432,7 @@ fun UpdateScreen(
                                         is UpdateDownloadState.Done -> {
                                             TextButton(
                                                 text = stringResource(R.string.update_btn_install_now),
-                                                onClick = { updateManager.installApk(context, state.file) },
+                                                onClick = { UpdateManager.installApk(context, state.file) },
                                                 colors = ButtonDefaults.textButtonColorsPrimary(),
                                                 modifier = Modifier.fillMaxWidth(),
                                             )
@@ -448,7 +448,7 @@ fun UpdateScreen(
                                             TextButton(
                                                 text = stringResource(R.string.update_dialog_btn_browser),
                                                 onClick = {
-                                                    releaseInfo?.let { updateManager.openInBrowser(context, updateBrowserUrl(it)) }
+                                                    releaseInfo?.let { UpdateManager.openInBrowser(context, updateBrowserUrl(it)) }
                                                 },
                                                 modifier = Modifier.fillMaxWidth(),
                                             )
@@ -542,7 +542,7 @@ fun UpdateScreen(
                                 title = "GitHub Releases",
                                 summary = stringResource(R.string.update_pref_github_releases_summary),
                                 onClick = {
-                                    updateManager.openInBrowser(context, "https://github.com/137458/localsend-miuix/releases")
+                                    UpdateManager.openInBrowser(context, "https://github.com/137458/localsend-miuix/releases")
                                 },
                             )
 
@@ -570,9 +570,9 @@ fun UpdateScreen(
                 downloadState = downloadState,
                 onDismiss = { showDialog = false },
                 onDownload = { startDownload() },
-                onInstall = { file -> updateManager.installApk(context, file) },
+                onInstall = { file -> UpdateManager.installApk(context, file) },
                 onCancelDownload = { manager.updates.downloader.cancel() },
-                onOpenBrowser = { url -> updateManager.openInBrowser(context, url) },
+                onOpenBrowser = { url -> UpdateManager.openInBrowser(context, url) },
                 onIgnore = { ver ->
                     manager.updateSettings { it.copy(ignoredVersion = UpdatePrompt.toggleIgnored(settings.ignoredVersion, ver)) }
                     showDialog = false
