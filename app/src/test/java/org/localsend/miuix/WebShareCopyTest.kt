@@ -95,7 +95,6 @@ class WebShareCopyTest {
         val copy = WebShareCopy.Chinese
         assertEquals("Pixel - LocalSend 局域网快传", copy.pageTitle("Pixel"))
         assertEquals("3 条", copy.textCountLabel(3))
-        assertEquals("浏览器 Web 端 (192.168.1.7)", copy.webAliasFor("192.168.1.7"))
         assertEquals(0, copy.textCountLabel(0).indexOf("0"))
     }
 

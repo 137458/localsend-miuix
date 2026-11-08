@@ -45,9 +45,6 @@ object InstallHelper {
         return mimeType != null && mimeType.equals(APK_MIME_TYPE, ignoreCase = true)
     }
 
-    /** 从文件名列表中选出第一个 apk 条目（无则 null）。 */
-    fun firstApkName(fileNames: List<String>): String? = fileNames.firstOrNull { isApk(it) }
-
     /** 以 FileProvider URI 构造安装意图（apk 落盘为真实文件时使用）；路径未被 file_paths 覆盖等映射失败返回 null。 */
     fun buildInstallIntent(
         context: Context,

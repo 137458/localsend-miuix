@@ -47,13 +47,6 @@ class InstallHelperTest {
     }
 
     @Test
-    fun firstApkName_picksFirstApkAmongMixed() {
-        assertEquals("b.APK", InstallHelper.firstApkName(listOf("a.zip", "b.APK", "c.apk")))
-        assertNull(InstallHelper.firstApkName(listOf("a.zip", "b.bin")))
-        assertNull(InstallHelper.firstApkName(emptyList()))
-    }
-
-    @Test
     fun pickFileSource_prefersExistingDiskFile() {
         val file: File = tmp.newFile("real.apk")
         val source = pickFileSource(path = file.absolutePath, uriString = "content://media/xxx")

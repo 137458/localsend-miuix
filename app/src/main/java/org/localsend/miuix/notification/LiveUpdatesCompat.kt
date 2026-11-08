@@ -1,7 +1,6 @@
 package org.localsend.miuix.notification
 
 import android.app.Notification
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.graphics.Bitmap
@@ -58,10 +57,6 @@ object LiveUpdatesCompat {
     ): Notification {
         val speedText = if (session.speed > 0) session.formattedSpeed else context.getString(R.string.live_preparing)
         val compactEta = formatCompactEta(session, context)
-        val etaPart = if (compactEta.isNotEmpty()) " · $compactEta" else ""
-
-        val actionType = if (session.isIncoming) context.getString(R.string.live_receiving) else context.getString(R.string.live_sending)
-        val fileIndexInfo = if (session.files.size > 1) " (${session.currentFileIndex + 1}/${session.files.size})" else ""
 
         // 展开态大标题：发送至 / 接收自 目标设备（简练纯粹，不折行）
         val direction = if (session.isIncoming) context.getString(R.string.live_from_prefix) else context.getString(R.string.live_to_prefix)
@@ -252,16 +247,5 @@ object LiveUpdatesCompat {
             }
             else -> context.getString(R.string.live_remaining_hours, seconds / 3600)
         }
-    }
-
-    /**
-     * 检查系统是否允许本应用发布提升型持续实时通知（API 36+）。
-     */
-    fun canPostLiveUpdates(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT >= 36) {
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            return nm?.canPostPromotedNotifications() ?: true
-        }
-        return true
     }
 }

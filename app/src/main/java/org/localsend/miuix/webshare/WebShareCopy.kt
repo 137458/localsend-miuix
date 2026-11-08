@@ -71,8 +71,6 @@ data class WebShareCopy(
 
     val fileCountLabel: String get() = fileCount
 
-    fun webAliasFor(ip: String): String = "$webAlias ($ip)"
-
     fun toJsObject(): String =
         jsMap().entries.joinToString(prefix = "{", postfix = "}") { (key, value) ->
             "\"$key\":${jsonEscape(value)}"

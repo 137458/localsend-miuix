@@ -39,20 +39,13 @@ data class PrepareDownloadResponseDto(
  * Web Share（Download API）的共享会话。
  *
  * 我方作为 sender，把一组选中文件共享给局域网内的浏览器（接收方不装 LocalSend）。
- * 协议 §5 明确 Download 恒走明文 HTTP（浏览器拒绝自签证书），故 [downloadLink] 固定为 http。
+ * 协议 §5 明确 Download 恒走明文 HTTP（浏览器拒绝自签证书）。
  */
 data class ShareSession(
     val sessionId: String = UUID.randomUUID().toString(),
     val createdAt: Long = System.currentTimeMillis(),
     val files: List<FileItem>,
-) {
-    /** 接收方浏览器访问的入口地址（协议 §5.1）。根据服务协议动态决定 http/https，端口取端口号。 */
-    fun downloadLink(
-        protocol: String = "http",
-        ip: String,
-        port: Int,
-    ): String = "$protocol://$ip:$port"
-}
+)
 
 @Serializable
 enum class TransferStatus {

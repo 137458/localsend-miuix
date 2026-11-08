@@ -77,33 +77,6 @@ object SslHelper {
 
     val trustAllHostnameVerifier: HostnameVerifier = HostnameVerifier { _, _ -> true }
 
-    /**
-     * Discovery-only TrustManager: LocalSend HTTPS peers use self-signed certs, so
-     * /info must complete TLS before the DTO fingerprint is known. Records the
-     * observed SHA-256 so callers can bind it to DeviceDto.fingerprint (protocol §2).
-     */
-    val lastDiscoveryCertFp = ThreadLocal<String>()
-
-    val discoveryTrustManager: X509TrustManager =
-        object : X509TrustManager {
-            override fun checkClientTrusted(
-                chain: Array<out X509Certificate>?,
-                authType: String?,
-            ) {}
-
-            override fun checkServerTrusted(
-                chain: Array<out X509Certificate>?,
-                authType: String?,
-            ) {
-                if (chain.isNullOrEmpty()) return
-                lastDiscoveryCertFp.set(FingerprintTrust.normalize(FingerprintTrust.sha256(chain[0])))
-            }
-
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        }
-
-    fun observedDiscoveryCertFp(): String = lastDiscoveryCertFp.get().orEmpty()
-
     fun certSha256(connection: HttpsURLConnection): String {
         return try {
             val cert = connection.serverCertificates.firstOrNull() as? X509Certificate ?: return ""

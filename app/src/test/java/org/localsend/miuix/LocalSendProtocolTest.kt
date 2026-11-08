@@ -137,15 +137,6 @@ class LocalSendProtocolTest {
     }
 
     @Test
-    fun testShareSessionDownloadLink() {
-        val share =
-            org.localsend.miuix.model
-                .ShareSession(files = emptyList())
-        assertEquals("http://192.168.1.10:53317", share.downloadLink("http", "192.168.1.10", 53317))
-        assertEquals("https://192.168.1.10:53317", share.downloadLink("https", "192.168.1.10", 53317))
-    }
-
-    @Test
     fun testDeviceMultiHomedAllIps() {
         val device =
             Device(
