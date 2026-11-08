@@ -17,16 +17,16 @@ enum class DeviceType(
     ;
 
     companion object {
-        fun fromString(str: String?): DeviceType = entries.firstOrNull { it.value.equals(str, ignoreCase = true) } ?: mobile
+        fun fromString(str: String?): DeviceType = entries.firstOrNull { it.value.equals(str, ignoreCase = true) } ?: desktop
     }
 }
 
 @Serializable
 data class DeviceDto(
     val alias: String,
-    val version: String = "2.1",
+    val version: String = "2.2",
     val deviceModel: String? = null,
-    val deviceType: String? = "mobile",
+    val deviceType: String? = "desktop",
     val fingerprint: String,
     val port: Int = 53317,
     val protocol: String = "http",
@@ -36,7 +36,7 @@ data class DeviceDto(
 
 data class Device(
     val alias: String,
-    val version: String = "2.1",
+    val version: String = "2.2",
     val deviceModel: String? = null,
     val deviceType: DeviceType = DeviceType.mobile,
     val fingerprint: String,

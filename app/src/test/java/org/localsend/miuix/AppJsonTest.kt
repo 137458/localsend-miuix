@@ -48,10 +48,10 @@ class AppJsonTest {
     @Test
     fun encodeDefaultsWritesDefaultProtocolFields() {
         val encoded = AppJson.default.encodeToString(DeviceDto.serializer(), DeviceDto(alias = "A", fingerprint = "F"))
-        assertTrue(encoded.contains("\"version\":\"2.1\""))
+        assertTrue(encoded.contains("\"version\":\"2.2\""))
         assertTrue(encoded.contains("\"port\":53317"))
         assertTrue(encoded.contains("\"protocol\":\"http\""))
-        assertTrue(encoded.contains("\"deviceType\":\"mobile\""))
+        assertTrue(encoded.contains("\"deviceType\":\"desktop\""))
     }
 
     @Test

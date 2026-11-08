@@ -119,7 +119,7 @@ object NetworkConstants {
     const val DEFAULT_MULTICAST_IP = "224.0.0.167"
     const val DEFAULT_PORT = 53317
     const val DEFAULT_DISCOVERY_TIMEOUT_SECONDS = 5
-    const val PROTOCOL_VERSION = "2.1"
+    const val PROTOCOL_VERSION = "2.2"
     const val MULTICAST_LOCK_TAG = "LocalSendMiuixMulticastLock"
     const val WAKE_LOCK_TAG = "LocalSend:TransferWakeLock"
     const val WIFI_LOCK_TAG = "LocalSend:TransferWifiLock"

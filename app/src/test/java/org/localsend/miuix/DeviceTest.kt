@@ -19,10 +19,10 @@ class DeviceTest {
     }
 
     @Test
-    fun deviceTypeFromStringFallsBackToMobile() {
-        assertEquals(DeviceType.mobile, DeviceType.fromString(null))
-        assertEquals(DeviceType.mobile, DeviceType.fromString("unknown-device"))
-        assertEquals(DeviceType.mobile, DeviceType.fromString(""))
+    fun deviceTypeFromStringFallsBackToDesktop() {
+        assertEquals(DeviceType.desktop, DeviceType.fromString(null))
+        assertEquals(DeviceType.desktop, DeviceType.fromString("unknown-device"))
+        assertEquals(DeviceType.desktop, DeviceType.fromString(""))
     }
 
     @Test
