@@ -7,6 +7,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -73,17 +74,51 @@ fun FileThumbnail(
     modifier: Modifier = Modifier,
     size: Dp = 42.dp,
 ) {
+    FileThumbnailContent(
+        name = file.name,
+        mimeType = file.mimeType,
+        uri = file.uri,
+        path = file.path,
+        isTextMessage = file.isTextMessage,
+        stateKey = file.id,
+        modifier = modifier,
+        size = size,
+    )
+}
+
+/**
+ * 缩略图渲染的共享实现：供传输中的 [FileItem] 与历史记录条目（字段结构不同）复用。
+ * [stateKey] 变化时重新加载缩略图。
+ */
+@Composable
+internal fun FileThumbnailContent(
+    name: String,
+    mimeType: String,
+    uri: Uri?,
+    path: String?,
+    isTextMessage: Boolean,
+    stateKey: Any?,
+    modifier: Modifier = Modifier,
+    size: Dp = 42.dp,
+) {
     val context = LocalContext.current
     val isImageOrVideoOrApk =
-        ThumbnailHelper.isImage(file) ||
-            ThumbnailHelper.isVideo(file) ||
-            ThumbnailHelper.isApk(file)
+        ThumbnailHelper.isImage(name, mimeType) ||
+            ThumbnailHelper.isVideo(name, mimeType) ||
+            ThumbnailHelper.isApk(name, mimeType)
 
-    val thumbnailBitmap by produceState<Bitmap?>(initialValue = null, file.id) {
+    val thumbnailBitmap by produceState<Bitmap?>(initialValue = null, stateKey) {
         if (isImageOrVideoOrApk) {
             value =
                 withContext(Dispatchers.IO) {
-                    ThumbnailHelper.loadThumbnail(context, file, targetSize = (size.value * 2.5f).toInt().coerceAtLeast(96))
+                    ThumbnailHelper.loadThumbnail(
+                        context = context,
+                        name = name,
+                        mimeType = mimeType,
+                        uri = uri,
+                        path = path,
+                        targetSize = (size.value * 2.5f).toInt().coerceAtLeast(96),
+                    )
                 }
         }
     }
@@ -99,7 +134,7 @@ fun FileThumbnail(
         if (thumbnailBitmap != null) {
             Image(
                 bitmap = thumbnailBitmap!!.asImageBitmap(),
-                contentDescription = file.name,
+                contentDescription = name,
                 modifier =
                     Modifier
                         .size(size)
@@ -107,7 +142,7 @@ fun FileThumbnail(
                 contentScale = ContentScale.Crop,
             )
             // 视频类型额外显示半透明播放图标标记
-            if (ThumbnailHelper.isVideo(file)) {
+            if (ThumbnailHelper.isVideo(name, mimeType)) {
                 Box(
                     modifier =
                         Modifier
@@ -125,7 +160,7 @@ fun FileThumbnail(
                 }
             }
         } else {
-            val icon = if (file.isTextMessage) AppIcons.Text else AppIcons.getFileIcon(file.mimeType, file.name)
+            val icon = if (isTextMessage) AppIcons.Text else AppIcons.getFileIcon(mimeType, name)
             Icon(
                 imageVector = icon,
                 contentDescription = null,
