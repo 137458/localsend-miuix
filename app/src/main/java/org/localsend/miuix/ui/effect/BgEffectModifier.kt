@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 fun Modifier.bgEffectDraw(
     painter: BgEffectPainter,
     preset: BgEffectConfig.Config,
-    deviceType: DeviceType,
+    deviceType: EffectDeviceType,
     isDarkTheme: Boolean,
     surface: Color,
     effectBackground: Boolean,
@@ -40,7 +40,7 @@ fun Modifier.bgEffectDraw(
 private data class BgEffectElement(
     val painter: BgEffectPainter,
     val preset: BgEffectConfig.Config,
-    val deviceType: DeviceType,
+    val deviceType: EffectDeviceType,
     val isDarkTheme: Boolean,
     val surface: Color,
     val effectBackground: Boolean,
@@ -82,7 +82,7 @@ private data class BgEffectElement(
 private class BgEffectNode(
     private var painter: BgEffectPainter,
     private var preset: BgEffectConfig.Config,
-    private var deviceType: DeviceType,
+    private var deviceType: EffectDeviceType,
     private var isDarkTheme: Boolean,
     private var surface: Color,
     private var effectBackground: Boolean,
@@ -108,7 +108,7 @@ private class BgEffectNode(
     fun update(
         painter: BgEffectPainter,
         preset: BgEffectConfig.Config,
-        deviceType: DeviceType,
+        deviceType: EffectDeviceType,
         isDarkTheme: Boolean,
         surface: Color,
         effectBackground: Boolean,

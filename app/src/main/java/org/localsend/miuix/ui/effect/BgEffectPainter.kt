@@ -23,7 +23,7 @@ class BgEffectPainter(
 
     private var animTime = Float.NaN
     private var isDarkCached: Boolean? = null
-    private var deviceTypeCached: DeviceType? = null
+    private var deviceTypeCached: EffectDeviceType? = null
 
     private var presetApplied = false
 
@@ -142,7 +142,7 @@ class BgEffectPainter(
     }
 
     fun updatePresetIfNeeded(
-        deviceType: DeviceType,
+        deviceType: EffectDeviceType,
         isDark: Boolean,
     ) {
         if (presetApplied && isDarkCached == isDark && deviceTypeCached == deviceType) return
@@ -155,7 +155,7 @@ class BgEffectPainter(
     }
 
     private fun applyPreset(
-        deviceType: DeviceType,
+        deviceType: EffectDeviceType,
         isDark: Boolean,
     ) {
         val preset = BgEffectConfig.get(deviceType, isDark, isOs3)

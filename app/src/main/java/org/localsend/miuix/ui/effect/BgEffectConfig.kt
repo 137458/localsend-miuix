@@ -109,19 +109,19 @@ object BgEffectConfig {
         )
 
     fun get(
-        deviceType: DeviceType,
+        deviceType: EffectDeviceType,
         isDark: Boolean,
         isOs3: Boolean,
     ): Config =
         if (!isOs3) {
             when (deviceType) {
-                DeviceType.PHONE -> if (!isDark) OS2_PHONE_LIGHT else OS2_PHONE_DARK
-                DeviceType.PAD -> if (!isDark) OS2_PAD_LIGHT else OS2_PAD_DARK
+                EffectDeviceType.PHONE -> if (!isDark) OS2_PHONE_LIGHT else OS2_PHONE_DARK
+                EffectDeviceType.PAD -> if (!isDark) OS2_PAD_LIGHT else OS2_PAD_DARK
             }
         } else {
             when (deviceType) {
-                DeviceType.PHONE -> if (!isDark) OS3_PHONE_LIGHT else OS3_PHONE_DARK
-                DeviceType.PAD -> if (!isDark) OS3_PAD_LIGHT else OS3_PAD_DARK
+                EffectDeviceType.PHONE -> if (!isDark) OS3_PHONE_LIGHT else OS3_PHONE_DARK
+                EffectDeviceType.PAD -> if (!isDark) OS3_PAD_LIGHT else OS3_PAD_DARK
             }
         }
 }
