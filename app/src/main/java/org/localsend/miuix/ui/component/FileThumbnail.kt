@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -380,7 +381,7 @@ fun FilePreviewDialog(
                                         } else {
                                             Modifier.border(1.dp, Color.Transparent, RoundedCornerShape(8.dp))
                                         },
-                                    ).clickable { currentIndex = index }
+                                    ).clickable(role = Role.Button) { currentIndex = index }
                                     .padding(2.dp),
                         ) {
                             FileThumbnail(file = item, size = 40.dp)

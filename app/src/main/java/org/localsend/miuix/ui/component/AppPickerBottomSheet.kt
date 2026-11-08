@@ -229,7 +229,7 @@ fun AppPickerBottomSheet(
                         color = if (isRefreshing) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.primary,
                         modifier =
                             Modifier
-                                .clickable(enabled = !isRefreshing) {
+                                .clickable(role = Role.Button, enabled = !isRefreshing) {
                                     coroutineScope.launch {
                                         isRefreshing = true
                                         allApps = manager.getInstalledApps(forceRefresh = true)
@@ -262,7 +262,7 @@ fun AppPickerBottomSheet(
                         color = MiuixTheme.colorScheme.primary,
                         modifier =
                             Modifier
-                                .clickable {
+                                .clickable(role = Role.Button) {
                                     selectedPackages =
                                         if (isAllFilteredSelected) {
                                             selectedPackages - filteredApps.map { it.packageName }.toSet()

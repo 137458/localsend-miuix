@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
@@ -207,7 +208,7 @@ fun ManualIpDialog(
                                         } else {
                                             MiuixTheme.colorScheme.surfaceContainer
                                         },
-                                    ).clickable { ip = histIp }
+                                    ).clickable(role = Role.Button) { ip = histIp }
                                     .padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {
                             Text(

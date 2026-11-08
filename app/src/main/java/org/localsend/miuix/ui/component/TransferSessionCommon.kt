@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
@@ -117,7 +118,7 @@ internal fun FileDetailItem(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
                 .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.35f))
-                .clickable(onClick = onClick)
+                .clickable(role = Role.Button, onClick = onClick)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

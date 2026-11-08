@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
@@ -314,7 +315,7 @@ internal fun InlineFileTransferProgress(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(6.dp))
-                    .clickable { onToggleExpanded() }
+                    .clickable(role = Role.Button) { onToggleExpanded() }
                     .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,

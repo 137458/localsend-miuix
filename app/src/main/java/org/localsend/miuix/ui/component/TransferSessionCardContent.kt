@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
@@ -342,7 +343,7 @@ internal fun FileTransferCardContent(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f))
-                        .clickable { previewInitialIndex = session.currentFileIndex.coerceIn(0, (session.files.size - 1).coerceAtLeast(0)) }
+                        .clickable(role = Role.Button) { previewInitialIndex = session.currentFileIndex.coerceIn(0, (session.files.size - 1).coerceAtLeast(0)) }
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -439,7 +440,7 @@ internal fun FileTransferCardContent(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(6.dp))
-                    .clickable { onToggleExpanded() }
+                    .clickable(role = Role.Button) { onToggleExpanded() }
                     .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,

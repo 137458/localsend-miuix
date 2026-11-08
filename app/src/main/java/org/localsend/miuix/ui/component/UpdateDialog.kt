@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -132,7 +133,7 @@ fun UpdateDialog(
                             modifier =
                                 Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .clickable { expanded = !expanded }
+                                    .clickable(role = Role.Button) { expanded = !expanded }
                                     .padding(vertical = 2.dp),
                         )
                     }
@@ -152,7 +153,7 @@ fun UpdateDialog(
                         modifier =
                             Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .clickable { onIgnore(releaseInfo.latestVersion) }
+                                .clickable(role = Role.Button) { onIgnore(releaseInfo.latestVersion) }
                                 .padding(vertical = 2.dp),
                     )
                 }

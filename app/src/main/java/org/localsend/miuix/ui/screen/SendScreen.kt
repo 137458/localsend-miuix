@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -365,7 +366,7 @@ fun SendScreen(
                                                     Modifier
                                                         .fillMaxWidth()
                                                         .clip(RoundedCornerShape(8.dp))
-                                                        .clickable { previewingIndex = actualIndex }
+                                                        .clickable(role = Role.Button) { previewingIndex = actualIndex }
                                                         .padding(vertical = 6.dp, horizontal = 4.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
@@ -415,7 +416,7 @@ fun SendScreen(
                                                 Modifier
                                                     .fillMaxWidth()
                                                     .clip(RoundedCornerShape(8.dp))
-                                                    .clickable { isFileListExpanded = !isFileListExpanded }
+                                                    .clickable(role = Role.Button) { isFileListExpanded = !isFileListExpanded }
                                                     .padding(vertical = 8.dp),
                                             horizontalArrangement = Arrangement.Center,
                                             verticalAlignment = Alignment.CenterVertically,
@@ -645,7 +646,7 @@ private fun QuickActionItem(
         modifier =
             Modifier
                 .clip(RoundedCornerShape(12.dp))
-                .clickable(onClick = onClick)
+                .clickable(role = Role.Button, onClick = onClick)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
