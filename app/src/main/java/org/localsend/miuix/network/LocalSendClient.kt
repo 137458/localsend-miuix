@@ -20,10 +20,8 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.security.MessageDigest
-import javax.net.ssl.HttpsURLConnection
 
 /** 单份文件的完整性校验路径，由 [LocalSendClient.checksumPlan] 统一判定。 */
 enum class ChecksumPlan {
@@ -388,28 +386,23 @@ class LocalSendClient(
             val encodedFileId = URLEncoder.encode(fileItem.id, "UTF-8")
             val encodedToken = URLEncoder.encode(token, "UTF-8")
             val uploadUrlStr = "${targetDevice.url}${LocalSendRoutes.UPLOAD}?sessionId=$encodedSessionId&fileId=$encodedFileId&token=$encodedToken"
-            val uploadUrl = URL(uploadUrlStr)
-
             Log.d(TAG, "uploadFileOnce: connecting to ${targetDevice.url}${LocalSendRoutes.UPLOAD} for '${fileItem.name}' (id=${fileItem.id}, size=${fileItem.size})")
 
             FingerprintTrust.pin(targetDevice.fingerprint)
             connection =
-                (uploadUrl.openConnection() as HttpURLConnection).apply {
-                    if (this is HttpsURLConnection) {
-                        sslSocketFactory = FingerprintTrust.pinnedSslSocketFactory
-                        hostnameVerifier = SslHelper.trustAllHostnameVerifier
-                    }
-                    requestMethod = "POST"
+                LocalSendHttpClient.open(
+                    url = uploadUrlStr,
+                    method = "POST",
+                    connectTimeoutMs = 15_000,
+                    readTimeoutMs = 120_000,
+                    followRedirects = false,
+                ) {
                     doOutput = true
-                    useCaches = false
-                    instanceFollowRedirects = false
                     if (fileItem.size > 0L) {
                         setFixedLengthStreamingMode(fileItem.size)
                     } else {
                         setChunkedStreamingMode(128 * 1024)
                     }
-                    connectTimeout = 15000
-                    readTimeout = 120000
                     setRequestProperty("Content-Type", "application/octet-stream")
                     setRequestProperty("Connection", "keep-alive")
                     setRequestProperty("Keep-Alive", "timeout=60")
@@ -608,16 +601,12 @@ class LocalSendClient(
             val url = "${targetDevice.url}$route?sessionId=$encodedSessionId&fileId=$encodedFileId&token=$encodedToken"
             FingerprintTrust.pin(targetDevice.fingerprint)
             connection =
-                (URL(url).openConnection() as HttpURLConnection).apply {
-                    if (this is HttpsURLConnection) {
-                        sslSocketFactory = FingerprintTrust.pinnedSslSocketFactory
-                        hostnameVerifier = SslHelper.trustAllHostnameVerifier
-                    }
-                    requestMethod = "POST"
-                    useCaches = false
-                    connectTimeout = timeoutMs
-                    readTimeout = timeoutMs
-                }
+                LocalSendHttpClient.open(
+                    url = url,
+                    method = "POST",
+                    connectTimeoutMs = timeoutMs,
+                    readTimeoutMs = timeoutMs,
+                )
             val code = connection.responseCode
             try {
                 connection.inputStream?.use { stream ->
@@ -746,16 +735,12 @@ class LocalSendClient(
                     "?sessionId=$encodedSessionId&fileId=$encodedFileId&token=$encodedToken"
             FingerprintTrust.pin(targetDevice.fingerprint)
             connection =
-                (URL(url).openConnection() as HttpURLConnection).apply {
-                    if (this is HttpsURLConnection) {
-                        sslSocketFactory = FingerprintTrust.pinnedSslSocketFactory
-                        hostnameVerifier = SslHelper.trustAllHostnameVerifier
-                    }
-                    requestMethod = "GET"
-                    useCaches = false
-                    connectTimeout = CHECKSUM_STATUS_TIMEOUT_MS
-                    readTimeout = CHECKSUM_STATUS_TIMEOUT_MS
-                }
+                LocalSendHttpClient.open(
+                    url = url,
+                    method = "GET",
+                    connectTimeoutMs = CHECKSUM_STATUS_TIMEOUT_MS,
+                    readTimeoutMs = CHECKSUM_STATUS_TIMEOUT_MS,
+                )
             if (connection.responseCode != HttpURLConnection.HTTP_OK) {
                 Log.w(TAG, "queryChecksumState: peer returned HTTP ${connection.responseCode} for '${fileItem.name}'")
                 return PeerCommitState.UNKNOWN
