@@ -5,14 +5,6 @@ package org.localsend.miuix.ui.component
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,8 +43,6 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Copy
-import top.yukonga.miuix.kmp.icon.extended.ExpandLess
-import top.yukonga.miuix.kmp.icon.extended.ExpandMore
 import top.yukonga.miuix.kmp.icon.extended.Messages
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -348,112 +338,23 @@ internal fun FileTransferCardContent(
         }
     }
 
-    // 3. 总体进度条（平滑动画过渡与状态自适应）
-    val animatedSessionProgress by animateFloatAsState(
-        targetValue = if (session.status == TransferStatus.Completed) 1f else session.progress,
-        animationSpec = tween(durationMillis = 80, easing = LinearEasing),
-        label = "SessionProgress",
-    )
-
+    // 3. 总体进度条与指标行
     Spacer(modifier = Modifier.height(10.dp))
-    if (session.status == TransferStatus.WaitingApproval) {
-        LinearProgressIndicator(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-        )
-    } else {
-        LinearProgressIndicator(
-            progress = animatedSessionProgress,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-        )
-    }
+    SessionProgressBar(session = session)
 
     // 4. 传输指标行（左侧：已传输/总大小 (百分比)；右侧：实时速率 • 剩余时间）
     Spacer(modifier = Modifier.height(6.dp))
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "${session.formattedTransferredSize} / ${session.formattedTotalSize} (${session.progressPercent}%)",
-            style = MiuixTheme.textStyles.footnote1,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (session.status == TransferStatus.InProgress) {
-                Text(
-                    text = session.formattedSpeed,
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.primary,
-                )
-                val remainingLabel = remainingTimeLabel(session)
-                if (remainingLabel.isNotEmpty()) {
-                    Text(
-                        text = " • $remainingLabel",
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                }
-            }
-        }
-    }
+    SessionMetricsRow(session = session)
 
     // 5. 可折叠文件明细清单（Accordion）
     if (session.files.isNotEmpty()) {
         Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable(role = Role.Button) { onToggleExpanded() }
-                    .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.session_file_list_title, session.files.count { it.status == TransferStatus.Completed }, session.files.size),
-                style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-            Icon(
-                imageVector = if (isExpanded) MiuixIcons.ExpandLess else MiuixIcons.ExpandMore,
-                contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
-                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                session.files.forEachIndexed { index, file ->
-                    androidx.compose.runtime.key(file.id) {
-                        FileDetailItem(
-                            file = file,
-                            onClick = { previewInitialIndex = index },
-                        )
-                    }
-                }
-            }
-        }
+        SessionFileList(
+            session = session,
+            isExpanded = isExpanded,
+            onToggleExpanded = onToggleExpanded,
+            onPreview = { previewInitialIndex = it },
+        )
     }
 
     if (previewInitialIndex >= 0 && previewInitialIndex < session.files.size) {
