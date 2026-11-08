@@ -54,6 +54,7 @@ import org.localsend.miuix.model.ShareSession
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.transfer.TransferOutcome
+import org.localsend.miuix.transfer.isReceivedSizeConsistent
 import org.localsend.miuix.util.AcceptPolicy
 import org.localsend.miuix.util.Sha256
 import org.localsend.miuix.webshare.WebShareCopy
@@ -509,17 +510,18 @@ class LocalSendServer(
                 }
             }
 
-            // Web Share 增强：多文件一键打包流式下载为 ZIP
+            // Web Share 增强：多文件一键打包流式下载为 ZIP；与单文件下载一致，按来源 IP 绑定会话。
             get(LocalSendRoutes.DOWNLOAD_ZIP) {
                 val sessionId = call.request.queryParameters["sessionId"]
-                val session =
-                    if (sessionId != null) {
-                        getShares().firstOrNull { it.sessionId == sessionId }
-                    } else {
-                        getShares().firstOrNull()
-                    }
+                val remoteIp = call.request.origin.remoteHost
+                val boundIp = sessionId?.let { downloadSessionIps[it] }
+                val session = sessionId?.let { id -> getShares().firstOrNull { it.sessionId == id } }
                 if (session == null || session.files.isEmpty()) {
                     call.respond(HttpStatusCode.NotFound, "No files found in share session")
+                    return@get
+                }
+                if (boundIp == null || !WebShareHtmlRenderer.isSameIp(remoteIp, boundIp)) {
+                    call.respond(HttpStatusCode.Forbidden, "Invalid sessionId.")
                     return@get
                 }
                 val zipFileName = "LocalSend_${session.files.size}_Files.zip"
@@ -808,6 +810,14 @@ class LocalSendServer(
                             if (!deferredCommit) saveTargetWriter.confirmMediaStoreWrite(fileItem)
                             digest?.digest()?.let { Sha256.hex(it) }
                         }
+
+                    // 声明了大小却与实际收到字节不一致：删除残文件并按请求错误处理
+                    if (!isReceivedSizeConsistent(fileItem.size, fileItem.bytesTransferred)) {
+                        saveTargetWriter.deleteSavedFile(fileItem, saveTarget)
+                        finishUploadFile(session, sessionId, fileItem, TransferStatus.Failed, "SIZE_MISMATCH")
+                        call.respond(HttpStatusCode.BadRequest, "SIZE_MISMATCH")
+                        return@post
+                    }
 
                     // 发送方声明了 sha256 且校验失败：删除已写入文件并按规范回 422
                     if (fileItem.expectedSha256 != null && fileItem.expectedSha256 != checksum) {
