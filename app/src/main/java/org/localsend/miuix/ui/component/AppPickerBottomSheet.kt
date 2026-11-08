@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,7 +54,7 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -193,13 +195,18 @@ fun AppPickerBottomSheet(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { showSystemApps = !showSystemApps },
+                    modifier =
+                        Modifier.toggleable(
+                            value = showSystemApps,
+                            role = Role.Checkbox,
+                            onValueChange = { showSystemApps = it },
+                        ),
                 ) {
                     Checkbox(
                         state =
                             androidx.compose.ui.state
                                 .ToggleableState(showSystemApps),
-                        onClick = { showSystemApps = !showSystemApps },
+                        onClick = {},
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
@@ -277,7 +284,7 @@ fun AppPickerBottomSheet(
                             .height((maxListHeight * 0.7f).coerceIn(180.dp, 260.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp))
+                    InfiniteProgressIndicator(modifier = Modifier.size(36.dp))
                 }
             } else if (filteredApps.isEmpty()) {
                 Box(
@@ -308,17 +315,15 @@ fun AppPickerBottomSheet(
                     ) { app ->
                         val isSelected = selectedPackages.contains(app.packageName)
                         Card(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        selectedPackages =
-                                            if (isSelected) {
-                                                selectedPackages - app.packageName
-                                            } else {
-                                                selectedPackages + app.packageName
-                                            }
-                                    },
+                            onClick = {
+                                selectedPackages =
+                                    if (isSelected) {
+                                        selectedPackages - app.packageName
+                                    } else {
+                                        selectedPackages + app.packageName
+                                    }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Row(
                                 modifier =

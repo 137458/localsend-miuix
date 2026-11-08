@@ -13,7 +13,6 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -284,23 +283,21 @@ fun HistoryDetailDialog(
                 ) {
                     items(item.fileEntries) { file ->
                         Card(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        file.uri?.let { uri ->
-                                            try {
-                                                val intent =
-                                                    Intent(Intent.ACTION_VIEW).apply {
-                                                        setDataAndType(uri, file.mimeType)
-                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                    }
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, context.getString(R.string.toast_cannot_open_file), Toast.LENGTH_SHORT).show()
+                            onClick = {
+                                file.uri?.let { uri ->
+                                    try {
+                                        val intent =
+                                            Intent(Intent.ACTION_VIEW).apply {
+                                                setDataAndType(uri, file.mimeType)
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                             }
-                                        }
-                                    },
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, context.getString(R.string.toast_cannot_open_file), Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Row(
                                 modifier =

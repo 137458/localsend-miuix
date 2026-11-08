@@ -1,7 +1,5 @@
 package org.localsend.miuix.ui.component
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.model.TransferSession
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -66,13 +65,9 @@ fun InlineTransferProgress(
                 .fillMaxWidth()
                 .padding(top = 4.dp, bottom = 2.dp),
     ) {
-        // 分割线
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f)),
+        HorizontalDivider(
+            thickness = 1.dp,
+            color = MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f),
         )
         Spacer(modifier = Modifier.height(10.dp))
 

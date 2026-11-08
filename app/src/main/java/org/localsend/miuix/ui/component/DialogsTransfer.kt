@@ -6,7 +6,6 @@ package org.localsend.miuix.ui.component
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
@@ -250,22 +251,25 @@ fun IncomingTransferDialog(
                         )
 
                         if (totalFilesCount > 1) {
+                            val toggleAll = {
+                                selectedFileIds = if (isAllSelected) emptySet() else session.files.map { it.id }.toSet()
+                            }
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier =
                                     Modifier
                                         .clip(RoundedCornerShape(6.dp))
-                                        .clickable {
-                                            selectedFileIds = if (isAllSelected) emptySet() else session.files.map { it.id }.toSet()
-                                        }.padding(horizontal = 4.dp, vertical = 2.dp),
+                                        .toggleable(
+                                            value = isAllSelected,
+                                            role = Role.Checkbox,
+                                            onValueChange = { toggleAll() },
+                                        ).padding(horizontal = 4.dp, vertical = 2.dp),
                             ) {
                                 Checkbox(
                                     state =
                                         androidx.compose.ui.state
                                             .ToggleableState(isAllSelected),
-                                    onClick = {
-                                        selectedFileIds = if (isAllSelected) emptySet() else session.files.map { it.id }.toSet()
-                                    },
+                                    onClick = {},
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
@@ -290,19 +294,25 @@ fun IncomingTransferDialog(
                         ) {
                             items(session.files, key = { it.id }) { file ->
                                 val isChecked = selectedFileIds.contains(file.id)
+                                val toggleFile = {
+                                    selectedFileIds =
+                                        if (isChecked) {
+                                            selectedFileIds - file.id
+                                        } else {
+                                            selectedFileIds + file.id
+                                        }
+                                }
                                 Row(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                selectedFileIds =
-                                                    if (isChecked) {
-                                                        selectedFileIds - file.id
-                                                    } else {
-                                                        selectedFileIds + file.id
-                                                    }
-                                            }.padding(vertical = 4.dp, horizontal = 4.dp),
+                                            .toggleable(
+                                                value = isChecked,
+                                                enabled = totalFilesCount > 1,
+                                                role = Role.Checkbox,
+                                                onValueChange = { toggleFile() },
+                                            ).padding(vertical = 4.dp, horizontal = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     if (totalFilesCount > 1) {
@@ -310,14 +320,7 @@ fun IncomingTransferDialog(
                                             state =
                                                 androidx.compose.ui.state
                                                     .ToggleableState(isChecked),
-                                            onClick = {
-                                                selectedFileIds =
-                                                    if (isChecked) {
-                                                        selectedFileIds - file.id
-                                                    } else {
-                                                        selectedFileIds + file.id
-                                                    }
-                                            },
+                                            onClick = {},
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                     }

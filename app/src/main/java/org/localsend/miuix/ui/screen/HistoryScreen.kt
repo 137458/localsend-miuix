@@ -6,7 +6,6 @@ package org.localsend.miuix.ui.screen
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -254,11 +253,11 @@ private fun HistoryItemCard(
         }
 
     Card(
+        onClick = onClick,
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .clickable(onClick = onClick),
+                .padding(horizontal = 12.dp),
     ) {
         Row(
             modifier =
