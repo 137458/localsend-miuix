@@ -138,33 +138,7 @@ fun IncomingTransferDialog(
                     val defaultTextMsg = stringResource(R.string.notif_plain_text_message)
                     val previewText = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent ?: defaultTextMsg
                     val detectedUrl =
-                        remember(previewText) {
-                            val trimmed = previewText.trim()
-                            if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
-                                if (!trimmed.contains(" ") && !trimmed.contains("\n")) {
-                                    trimmed
-                                } else {
-                                    val matcher =
-                                        android.util.Patterns.WEB_URL
-                                            .matcher(trimmed)
-                                    if (matcher.find()) matcher.group() else null
-                                }
-                            } else {
-                                val matcher =
-                                    android.util.Patterns.WEB_URL
-                                        .matcher(trimmed)
-                                if (matcher.find()) {
-                                    val found = matcher.group()
-                                    if (found.startsWith("http://", ignoreCase = true) || found.startsWith("https://", ignoreCase = true)) {
-                                        found
-                                    } else {
-                                        "https://$found"
-                                    }
-                                } else {
-                                    null
-                                }
-                            }
-                        }
+                        remember(previewText) { detectWebUrlInText(previewText) }
 
                     Text(
                         text = stringResource(R.string.dialog_incoming_text_length, previewText.length),

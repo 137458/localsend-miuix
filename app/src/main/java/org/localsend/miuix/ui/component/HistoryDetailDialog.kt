@@ -194,33 +194,7 @@ fun HistoryDetailDialog(
                                 .padding(14.dp),
                     ) {
                         val detectedUrl =
-                            remember(item.textContent) {
-                                val trimmed = item.textContent.trim()
-                                if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
-                                    if (!trimmed.contains(" ") && !trimmed.contains("\n")) {
-                                        trimmed
-                                    } else {
-                                        val matcher =
-                                            android.util.Patterns.WEB_URL
-                                                .matcher(trimmed)
-                                        if (matcher.find()) matcher.group() else null
-                                    }
-                                } else {
-                                    val matcher =
-                                        android.util.Patterns.WEB_URL
-                                            .matcher(trimmed)
-                                    if (matcher.find()) {
-                                        val found = matcher.group()
-                                        if (found.startsWith("http://", ignoreCase = true) || found.startsWith("https://", ignoreCase = true)) {
-                                            found
-                                        } else {
-                                            "https://$found"
-                                        }
-                                    } else {
-                                        null
-                                    }
-                                }
-                            }
+                            remember(item.textContent) { detectWebUrlInText(item.textContent) }
 
                         Text(
                             text = item.textContent,
