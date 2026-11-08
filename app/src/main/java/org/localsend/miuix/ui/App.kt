@@ -56,7 +56,7 @@ import org.localsend.miuix.ui.component.IosLiquidGlassNavigationBar
 import org.localsend.miuix.ui.component.PortDialog
 import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
-import org.localsend.miuix.ui.component.UpdateDialog
+import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.navigation.AppRoute
 import org.localsend.miuix.ui.navigation.LocalTabGesturePosition
 import org.localsend.miuix.ui.screen.HistoryScreen
@@ -185,8 +185,6 @@ fun App(manager: LocalSendManager) {
     val updateManager = remember { UpdateManager(context) }
     var availableUpdate by remember { mutableStateOf<UpdateCheckResult?>(null) }
     var showUpdateDialog by remember { mutableStateOf(false) }
-    val downloaderState = manager.updates.downloader.state
-    val updateDownloadState by downloaderState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         if (!settings.autoCheckUpdate) return@LaunchedEffect
@@ -638,31 +636,11 @@ fun App(manager: LocalSendManager) {
             )
         }
 
-        if (availableUpdate != null) {
-            UpdateDialog(
-                show = showUpdateDialog,
-                releaseInfo = availableUpdate!!,
-                downloadState = updateDownloadState,
-                onDismiss = { showUpdateDialog = false },
-                onDownload = {
-                    availableUpdate?.let { release ->
-                        val apk = release.apk
-                        if (apk != null) {
-                            manager.updates.downloader.start(apk)
-                        } else {
-                            UpdateManager.openInBrowser(context, release.releaseUrl)
-                        }
-                    }
-                },
-                onInstall = { file -> UpdateManager.installApk(context, file) },
-                onCancelDownload = { manager.updates.downloader.cancel() },
-                onOpenBrowser = { url -> UpdateManager.openInBrowser(context, url) },
-                onIgnore = { ver ->
-                    val next = UpdatePrompt.toggleIgnored(settings.ignoredVersion, ver)
-                    manager.updateSettings { it.copy(ignoredVersion = next) }
-                    showUpdateDialog = false
-                },
-            )
-        }
+        UpdateDialogHost(
+            show = showUpdateDialog,
+            manager = manager,
+            releaseInfo = availableUpdate,
+            onDismiss = { showUpdateDialog = false },
+        )
     }
 }

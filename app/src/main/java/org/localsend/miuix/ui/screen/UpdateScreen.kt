@@ -50,7 +50,7 @@ import org.localsend.miuix.manager.UpdateCheckResult
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.MarkdownText
-import org.localsend.miuix.ui.component.UpdateDialog
+import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import org.localsend.miuix.ui.component.updateBrowserUrl
@@ -563,21 +563,11 @@ fun UpdateScreen(
         }
 
         // 官方 Miuix 风格更新弹窗
-        if (showDialog && releaseInfo != null) {
-            UpdateDialog(
-                show = showDialog,
-                releaseInfo = releaseInfo!!,
-                downloadState = downloadState,
-                onDismiss = { showDialog = false },
-                onDownload = { startDownload() },
-                onInstall = { file -> UpdateManager.installApk(context, file) },
-                onCancelDownload = { manager.updates.downloader.cancel() },
-                onOpenBrowser = { url -> UpdateManager.openInBrowser(context, url) },
-                onIgnore = { ver ->
-                    manager.updateSettings { it.copy(ignoredVersion = UpdatePrompt.toggleIgnored(settings.ignoredVersion, ver)) }
-                    showDialog = false
-                },
-            )
-        }
+        UpdateDialogHost(
+            show = showDialog,
+            manager = manager,
+            releaseInfo = releaseInfo,
+            onDismiss = { showDialog = false },
+        )
     }
 }
