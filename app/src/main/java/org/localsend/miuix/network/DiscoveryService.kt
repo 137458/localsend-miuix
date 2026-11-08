@@ -9,10 +9,6 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +18,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import org.localsend.miuix.core.AppJson
 import org.localsend.miuix.core.LocalSendRoutes
@@ -30,11 +27,14 @@ import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.MulticastSocket
+import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import javax.net.ssl.HttpsURLConnection
 
 /** 监听端配置快照：组播组地址 + 发现超时，二者在绑定与设置读取两侧总是结伴出现。 */
 internal data class ListenerConfig(
@@ -142,11 +142,6 @@ class DiscoveryService(
     private val httpClient by lazy {
         HttpClient(CIO) {
             followRedirects = false
-            engine {
-                https {
-                    trustManager = SslHelper.discoveryTrustManager
-                }
-            }
             install(ContentNegotiation) {
                 json(this@DiscoveryService.json)
             }
@@ -329,20 +324,25 @@ class DiscoveryService(
                 DatagramSocket().use { socket ->
                     socket.broadcast = true
 
-                    // 1. Send to multicast 224.0.0.167
-                    try {
-                        val packet1 = DatagramPacket(payload, payload.size, multicastGroup, NetworkConstants.DEFAULT_PORT)
-                        socket.send(packet1)
-                    } catch (ignored: Exception) {
-                    }
+                    // 与上游一致：同一轮连发 3 次，降低丢包/对端刚入网时漏发现的概率
+                    for (burstDelay in longArrayOf(100L, 500L, 2000L)) {
+                        delay(burstDelay)
 
-                    // 2. Send to all broadcast addresses (directed subnet + 255.255.255.255)
-                    for (bcast in broadcasts) {
+                        // 1. Send to multicast 224.0.0.167
                         try {
-                            val addr = InetAddress.getByName(bcast)
-                            val packet2 = DatagramPacket(payload, payload.size, addr, NetworkConstants.DEFAULT_PORT)
-                            socket.send(packet2)
+                            val packet1 = DatagramPacket(payload, payload.size, multicastGroup, NetworkConstants.DEFAULT_PORT)
+                            socket.send(packet1)
                         } catch (ignored: Exception) {
+                        }
+
+                        // 2. Send to all broadcast addresses (directed subnet + 255.255.255.255)
+                        for (bcast in broadcasts) {
+                            try {
+                                val addr = InetAddress.getByName(bcast)
+                                val packet2 = DatagramPacket(payload, payload.size, addr, NetworkConstants.DEFAULT_PORT)
+                                socket.send(packet2)
+                            } catch (ignored: Exception) {
+                            }
                         }
                     }
                 }
@@ -354,23 +354,116 @@ class DiscoveryService(
 
     private fun sendDirectResponse(targetDevice: Device) {
         scope.launch(Dispatchers.IO) {
-            val localDevice = getLocalDevice()
+            val payload = json.encodeToString(DeviceDto.serializer(), getLocalDevice().toDto())
             for (route in listOf(LocalSendRoutes.REGISTER_V2, LocalSendRoutes.REGISTER_V1)) {
-                try {
-                    val url = "${targetDevice.url}$route"
-                    val response =
-                        httpClient.post(url) {
-                            contentType(ContentType.Application.Json)
-                            setBody(localDevice.toDto())
-                        }
-                    if (response.status == io.ktor.http.HttpStatusCode.OK) {
-                        break
-                    }
-                } catch (ignored: Exception) {
-                }
+                if (postRegister(targetDevice, route, payload)) break
             }
         }
     }
+
+    /**
+     * 直接向目标设备注册。HTTPS 目标按 announce/扫描得到的指纹固定证书，
+     * 与上游一致地携带客户端证书，避免官方默认（Web 未启用时强制 mTLS）的设备拒绝握手。
+     */
+    private suspend fun postRegister(
+        targetDevice: Device,
+        route: String,
+        payload: String,
+    ): Boolean =
+        withContext(Dispatchers.IO) {
+            val isHttps = targetDevice.protocol.equals("https", ignoreCase = true)
+            val pinned = isHttps && targetDevice.fingerprint.isNotBlank()
+            if (pinned) FingerprintTrust.pin(targetDevice.fingerprint)
+            var connection: HttpURLConnection? = null
+            try {
+                connection =
+                    (URL("${targetDevice.url}$route").openConnection() as HttpURLConnection).apply {
+                        if (this is HttpsURLConnection) {
+                            sslSocketFactory = if (pinned) FingerprintTrust.pinnedSslSocketFactory else SslHelper.sslSocketFactory
+                            hostnameVerifier = SslHelper.trustAllHostnameVerifier
+                        }
+                        requestMethod = "POST"
+                        doOutput = true
+                        useCaches = false
+                        connectTimeout = 1000
+                        readTimeout = 2000
+                        setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                    }
+                connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+                connection.responseCode == HttpURLConnection.HTTP_OK
+            } catch (ignored: Exception) {
+                false
+            } finally {
+                connection?.disconnect()
+                if (pinned) FingerprintTrust.unpin(targetDevice.fingerprint)
+            }
+        }
+
+    /**
+     * HTTPS 探测：本地直接持有客户端证书，且以服务端证书 SHA-256 作为设备身份，
+     * 与上游保持一致（响应体 fingerprint 在 HTTPS 下不可作为身份依据）。
+     */
+    private suspend fun probeHttps(
+        targetIp: String,
+        localDevice: Device,
+    ): Device? =
+        withContext(Dispatchers.IO) {
+            for (route in listOf(LocalSendRoutes.INFO_V2, LocalSendRoutes.INFO_V1)) {
+                var connection: HttpsURLConnection? = null
+                try {
+                    connection =
+                        (URL("https://$targetIp:${NetworkConstants.DEFAULT_PORT}$route").openConnection() as HttpsURLConnection).apply {
+                            sslSocketFactory = SslHelper.sslSocketFactory
+                            hostnameVerifier = SslHelper.trustAllHostnameVerifier
+                            requestMethod = "GET"
+                            useCaches = false
+                            connectTimeout = 1000
+                            readTimeout = 2000
+                        }
+                    if (connection.responseCode != HttpURLConnection.HTTP_OK) continue
+                    val certFingerprint = SslHelper.certSha256(connection)
+                    if (certFingerprint.isBlank() || isSameFingerprint(certFingerprint, localDevice.fingerprint)) continue
+                    val text = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                    val dto = json.decodeFromString<DeviceDto>(text)
+                    return@withContext Device.fromDto(dto, targetIp).copy(fingerprint = certFingerprint)
+                } catch (ignored: Exception) {
+                    // 该协议/路由未响应，继续下一个候选
+                } finally {
+                    connection?.disconnect()
+                }
+            }
+            null
+        }
+
+    private suspend fun probeHttp(
+        targetIp: String,
+        localDevice: Device,
+    ): Device? {
+        for (route in listOf(LocalSendRoutes.INFO_V2, LocalSendRoutes.INFO_V1)) {
+            try {
+                val response =
+                    httpClient.get("http://$targetIp:${NetworkConstants.DEFAULT_PORT}$route") {
+                        timeout {
+                            // 单目标探测封顶：不受“发现超时”设置放大，
+                            // 避免 254×4 次探测被个别无响应目标拖长
+                            requestTimeoutMillis = SCAN_PROBE_TIMEOUT_MS
+                        }
+                    }
+                val dto = response.body<DeviceDto>()
+                if (!isSameFingerprint(dto.fingerprint, localDevice.fingerprint)) {
+                    return Device.fromDto(dto, targetIp)
+                }
+            } catch (ignored: Exception) {
+                // Target not responding on this route
+            }
+        }
+        return null
+    }
+
+    private fun isSameFingerprint(
+        left: String,
+        right: String,
+    ): Boolean = FingerprintTrust.normalize(left) == FingerprintTrust.normalize(right)
 
     /** 发起子网扫描并返回该轮任务；被新一轮扫描取代时返回的 Job 以取消态完成。 */
     fun scanSubnet(onScanProgress: ((current: Int, total: Int) -> Unit)? = null): Job {
@@ -397,33 +490,11 @@ class DiscoveryService(
                                 async {
                                     val targetIp = "$baseIp.$i"
                                     if (!localIps.contains(targetIp)) {
-                                        // Try HTTPS first (LocalSend default), then HTTP
-                                        var found = false
-                                        for (proto in listOf("https", "http")) {
-                                            if (found) break
-                                            for (route in listOf(LocalSendRoutes.INFO_V2, LocalSendRoutes.INFO_V1)) {
-                                                if (found) break
-                                                try {
-                                                    val url = "$proto://$targetIp:${NetworkConstants.DEFAULT_PORT}$route"
-                                                    val response =
-                                                        httpClient.get(url) {
-                                                            timeout {
-                                                                // 单目标探测封顶：不受“发现超时”设置放大，
-                                                                // 避免 254×4 次探测被个别无响应目标拖长
-                                                                requestTimeoutMillis = SCAN_PROBE_TIMEOUT_MS
-                                                            }
-                                                        }
-                                                    val dto = response.body<DeviceDto>()
-                                                    if (dto.fingerprint != localDevice.fingerprint) {
-                                                        val device = Device.fromDto(dto, targetIp)
-                                                        onDeviceDiscovered(device)
-                                                        sendDirectResponse(device)
-                                                        found = true
-                                                    }
-                                                } catch (ignored: Exception) {
-                                                    // Target not responding on this proto/route
-                                                }
-                                            }
+                                        // HTTPS 优先（LocalSend 默认），失败再退回 HTTP
+                                        val device = probeHttps(targetIp, localDevice) ?: probeHttp(targetIp, localDevice)
+                                        if (device != null) {
+                                            onDeviceDiscovered(device)
+                                            sendDirectResponse(device)
                                         }
                                     }
                                     reporter.report(current.incrementAndGet(), total)
