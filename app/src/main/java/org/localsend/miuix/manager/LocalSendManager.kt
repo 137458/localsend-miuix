@@ -34,6 +34,7 @@ import kotlinx.serialization.decodeFromString
 import org.localsend.miuix.R
 import org.localsend.miuix.core.AppJson
 import org.localsend.miuix.core.LocalSendRoutes
+import org.localsend.miuix.core.NetworkConstants
 import org.localsend.miuix.discovery.DeviceDirectory
 import org.localsend.miuix.discovery.FavoriteDevice
 import org.localsend.miuix.discovery.FavoriteStore
@@ -59,6 +60,7 @@ import org.localsend.miuix.network.NetworkUtils
 import org.localsend.miuix.network.SslHelper
 import org.localsend.miuix.network.TargetPinRequiredException
 import org.localsend.miuix.network.TlsStore
+import org.localsend.miuix.network.WebShareHtmlRenderer
 import org.localsend.miuix.notification.TransferNotifier
 import org.localsend.miuix.transfer.TransferOutcome
 import org.localsend.miuix.updates.UpdateDomain
@@ -247,6 +249,9 @@ class LocalSendManager(
             onSessionUpdated = { session ->
                 handleSessionUpdate(session)
             },
+            onCancelReceived = { sessionId, remoteIp ->
+                handleCancelReceived(sessionId, remoteIp)
+            },
             getSaveTextAsFile = { _settings.value.saveTextAsFile },
             getAutoCategorizeMedia = { _settings.value.autoCategorizeMedia },
         )
@@ -325,15 +330,15 @@ class LocalSendManager(
         val useHttps = _settings.value.useHttps
         return Device(
             alias = _settings.value.alias,
-            version = "2.1",
+            version = NetworkConstants.PROTOCOL_VERSION,
             deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
             deviceType = _settings.value.deviceType,
             // 始终与本机自签名证书 SHA-256 指纹保持一致（协议 §2），确保作为客户端连接 HTTPS 对端时证书与 DTO 指纹完全匹配
             fingerprint = TlsStore.fingerprint(context),
             port = server.getBoundPort(),
             protocol = if (useHttps) "https" else "http",
-            // Web Share 启用时按协议 §2 announce download=true；否则沿用设置
-            download = _shares.value.isNotEmpty() || _settings.value.download,
+            // 与上游一致：仅 Web Share 下载页活动期间宣告 download=true
+            download = _shares.value.isNotEmpty(),
             ip = primaryIp,
         )
     }
@@ -946,6 +951,21 @@ class LocalSendManager(
 
     fun consumeSessionMessage() {
         _sessionMessage.value = null
+    }
+
+    /** 对端通过 /cancel 取消：先结束挂起的审批，再按来源 IP 停止本机对应的外发会话（不回发 cancel，避免循环）。 */
+    private fun handleCancelReceived(
+        sessionId: String,
+        remoteIp: String,
+    ) {
+        incomingApprovalDeferreds[sessionId]?.complete(IncomingDecision.Rejected)
+        val localSessionId = remoteSessionIds.entries.firstOrNull { it.value == sessionId }?.key ?: sessionId
+        val session = _activeSessions.value.firstOrNull { it.sessionId == localSessionId && !it.isIncoming } ?: return
+        if (!WebShareHtmlRenderer.isSameIp(remoteIp, session.device.ip)) return
+        canceledSessionIds.add(session.sessionId)
+        session.status = TransferStatus.Canceled
+        session.endTime = System.currentTimeMillis()
+        updateSessionState(session)
     }
 
     fun cancelTransfer(sessionId: String) {

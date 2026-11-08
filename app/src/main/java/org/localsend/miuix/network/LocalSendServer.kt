@@ -44,7 +44,6 @@ import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.core.ProtocolMessages
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceDto
-import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.model.FileDto
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.PrepareDownloadResponseDto
@@ -60,6 +59,7 @@ import org.localsend.miuix.util.Sha256
 import org.localsend.miuix.webshare.WebShareCopy
 import java.io.File
 import java.io.InputStream
+import java.net.URLEncoder
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -92,6 +92,7 @@ class LocalSendServer(
     private val onDeviceDiscovered: (Device) -> Unit,
     private val onIncomingRequest: suspend (session: TransferSession) -> IncomingDecision,
     private val onSessionUpdated: (TransferSession) -> Unit,
+    private val onCancelReceived: (sessionId: String, remoteIp: String) -> Unit = { _, _ -> },
     private val getSaveTextAsFile: () -> Boolean = { false },
     private val getAutoCategorizeMedia: () -> Boolean = { false },
 ) {
@@ -99,6 +100,7 @@ class LocalSendServer(
     private val json = AppJson.default
     private val activeSessions = ConcurrentHashMap<String, TransferSession>()
     private val sessionTokens = ConcurrentHashMap<String, MutableMap<String, String>>() // sessionId -> (fileId -> token)
+    private val downloadSessionIps = ConcurrentHashMap<String, String>() // Web Share 下载会话 -> 绑定来源 IP
     private val saveTargetWriter = SaveTargetWriter(context)
     private val rateLimiter = RequestRateLimiter()
     private val pendingUploads = PendingUploads()
@@ -414,25 +416,7 @@ class LocalSendServer(
         routing {
             // 协议 §5.1：Web Share 浏览器入口页，展示待共享文件并允许逐个下载与复制文本
             get("/") {
-                val rawIp = call.request.origin.remoteHost
-                val remoteIp = rawIp.removePrefix("::ffff:").removePrefix("/").trim()
-                val userAgent = call.request.headers[HttpHeaders.UserAgent] ?: ""
                 val copy = WebShareCopy.fromAcceptLanguage(call.request.headers[HttpHeaders.AcceptLanguage])
-                val model = WebShareCopy.browserModel(userAgent, copy)
-                val webDevice =
-                    Device(
-                        alias = copy.webAliasFor(remoteIp),
-                        version = "2.1",
-                        deviceModel = model,
-                        deviceType = DeviceType.web,
-                        fingerprint = "web-$remoteIp",
-                        port = 0,
-                        protocol = if (getUseHttps()) "https" else "http",
-                        download = false,
-                        ip = remoteIp,
-                    )
-                onDeviceDiscovered(webDevice)
-
                 val shares = getShares()
                 val session = shares.firstOrNull()
                 val html = WebShareHtmlRenderer.buildWebShareHtml(getLocalDevice().alias, session, copy)
@@ -457,12 +441,19 @@ class LocalSendServer(
                 }
                 val requestedSessionId = call.request.queryParameters["sessionId"]
                 val session =
-                    shares.firstOrNull {
-                        requestedSessionId == null || it.sessionId == requestedSessionId
-                    } ?: run {
-                        call.respond(HttpStatusCode.Forbidden, "Session not found")
-                        return@post
+                    if (requestedSessionId == null) {
+                        shares.first()
+                    } else {
+                        // 与上游一致：下载会话按来源 IP 绑定，仅同一 IP 可复用已有 sessionId
+                        val boundIp = downloadSessionIps[requestedSessionId]
+                        val matched = shares.firstOrNull { it.sessionId == requestedSessionId }
+                        if (matched == null || (boundIp != null && !WebShareHtmlRenderer.isSameIp(remoteIp, boundIp))) {
+                            call.respond(HttpStatusCode.Forbidden, "Invalid sessionId.")
+                            return@post
+                        }
+                        matched
                     }
+                downloadSessionIps[session.sessionId] = remoteIp
                 val filesMap = session.files.associate { it.id to it.toDto() }
                 call.respond(
                     PrepareDownloadResponseDto(
@@ -476,19 +467,26 @@ class LocalSendServer(
             // 协议 §5.3：按 fileId 流式回传文件二进制
             get(LocalSendRoutes.DOWNLOAD) {
                 val sessionId = call.request.queryParameters["sessionId"]
-                val fileId = call.request.queryParameters["fileId"]
-                if (sessionId == null || fileId == null) {
-                    call.respond(HttpStatusCode.BadRequest, "Missing sessionId or fileId")
+                if (sessionId == null) {
+                    call.respond(HttpStatusCode.BadRequest, "Missing sessionId.")
                     return@get
                 }
+                val fileId = call.request.queryParameters["fileId"]
+                if (fileId == null) {
+                    call.respond(HttpStatusCode.BadRequest, "Missing fileId.")
+                    return@get
+                }
+                val remoteIp = call.request.origin.remoteHost
+                val boundIp = downloadSessionIps[sessionId]
                 val session = getShares().firstOrNull { it.sessionId == sessionId }
-                if (session == null) {
-                    call.respond(HttpStatusCode.NotFound, "Session not found")
+                // 与上游一致：无效会话/非绑定 IP 一律 403，不泄露会话内容
+                if (session == null || boundIp == null || !WebShareHtmlRenderer.isSameIp(remoteIp, boundIp)) {
+                    call.respond(HttpStatusCode.Forbidden, "Invalid sessionId.")
                     return@get
                 }
                 val file = session.files.firstOrNull { it.id == fileId }
                 if (file == null) {
-                    call.respond(HttpStatusCode.NotFound, "File not found in session")
+                    call.respond(HttpStatusCode.Forbidden, "Invalid fileId.")
                     return@get
                 }
                 val input = openShareStream(file)
@@ -496,12 +494,10 @@ class LocalSendServer(
                     call.respond(HttpStatusCode.NotFound, "File source unavailable")
                     return@get
                 }
-                call.response.header(
-                    HttpHeaders.ContentDisposition,
-                    "inline; filename=\"${file.name.replace("\"", "")}\"",
-                )
-                val contentType = ContentType.parse(file.mimeType.ifEmpty { "application/octet-stream" })
-                call.respondOutputStream(contentType = contentType, status = HttpStatusCode.OK) {
+                // 协议 §5.3：attachment + octet-stream，文件名百分号编码，浏览器按下载而非内联预览处理
+                call.response.header(HttpHeaders.ContentDisposition, attachmentContentDisposition(file.name))
+                call.response.header(HttpHeaders.ContentLength, file.size.toString())
+                call.respondOutputStream(contentType = ContentType.Application.OctetStream, status = HttpStatusCode.OK) {
                     input.use { src ->
                         val buffer = ByteArray(128 * 1024)
                         var bytesRead: Int
@@ -603,7 +599,7 @@ class LocalSendServer(
                 }
                 val request = call.receive<PrepareUploadRequestDto>()
                 if (request.files.isEmpty()) {
-                    call.respond(HttpStatusCode.BadRequest, "Invalid body")
+                    call.respond(HttpStatusCode.BadRequest, "No files provided")
                     return@post
                 }
                 val senderDevice = Device.fromDto(request.info, remoteIp)
@@ -704,29 +700,24 @@ class LocalSendServer(
                 val fileId = call.request.queryParameters["fileId"]
                 val token = call.request.queryParameters["token"]
 
-                if (sessionId == null || fileId == null) {
-                    call.respond(HttpStatusCode.BadRequest, "Missing sessionId or fileId")
+                if (sessionId == null || fileId == null || token == null) {
+                    call.respond(HttpStatusCode.BadRequest, "Missing parameters")
                     return@post
                 }
 
                 val session = activeSessions[sessionId]
-                if (session == null) {
-                    call.respond(HttpStatusCode.NotFound, "Session not found")
-                    return@post
-                }
-
                 val expectedToken = sessionTokens[sessionId]?.get(fileId)
                 val requestIp = call.request.origin.remoteHost
-                val isIpMatch = WebShareHtmlRenderer.isSameIp(requestIp, session.device.ip)
-                // 403：令牌缺失/错误，或来源 IP 与会话所属设备不一致均拒绝
-                if (token == null || expectedToken == null || token != expectedToken || !isIpMatch) {
+                val isIpMatch = session != null && WebShareHtmlRenderer.isSameIp(requestIp, session.device.ip)
+                val fileItem = session?.files?.firstOrNull { it.id == fileId }
+                // 与上游一致：未知会话/令牌不匹配/来源 IP 不符/文件不属于会话统一 403，不泄露会话是否存在
+                if (session == null || expectedToken == null || token != expectedToken || !isIpMatch || fileItem == null) {
                     call.respond(HttpStatusCode.Forbidden, "Invalid token or IP address")
                     return@post
                 }
-
-                val fileItem = session.files.firstOrNull { it.id == fileId }
-                if (fileItem == null) {
-                    call.respond(HttpStatusCode.NotFound, "File metadata not found in session")
+                // 已完成/已取消的文件拒绝重放；失败或中断中的文件保留重试能力
+                if (!isUploadFileAcceptable(fileItem.status)) {
+                    call.respond(HttpStatusCode.Forbidden, "Invalid token or IP address")
                     return@post
                 }
 
@@ -857,7 +848,8 @@ class LocalSendServer(
                     ).forEach { (name, value) ->
                         call.response.header(name, value)
                     }
-                    call.respond(HttpStatusCode.OK, mapOf("message" to "File uploaded successfully"))
+                    // 协议 §4.3：成功上传返回 200 空 body
+                    call.respond(HttpStatusCode.OK)
                 } catch (e: Throwable) {
                     pendingUploads.discardForFile(sessionId, fileId)
                     saveTargetWriter.deleteSavedFile(fileItem, saveTarget)
@@ -880,18 +872,41 @@ class LocalSendServer(
 
             post(LocalSendRoutes.CANCEL) {
                 val sessionId = call.request.queryParameters["sessionId"]
-                if (sessionId != null) {
-                    val session = activeSessions.remove(sessionId)
-                    if (session != null) {
-                        session.status = TransferStatus.Canceled
-                        session.endTime = System.currentTimeMillis()
-                        onSessionUpdated(session)
+                val remoteIp = call.request.origin.remoteHost
+
+                // 等待审批的会话：上游允许不带 sessionId，仅按来源 IP 匹配，取消应立即结束挂起的审批
+                val pending = findPendingCancelTarget(activeSessions.values, sessionId, remoteIp)
+                if (pending != null) {
+                    activeSessions.remove(pending.sessionId)
+                    sessionTokens.remove(pending.sessionId)
+                    pendingUploads.discardSession(pending.sessionId)
+                    pending.status = TransferStatus.Canceled
+                    pending.endTime = System.currentTimeMillis()
+                    pending.files.forEach { file ->
+                        if (file.status != TransferStatus.Completed) file.status = TransferStatus.Canceled
                     }
-                    sessionTokens.remove(sessionId)
-                    // 取消后不保留任何未确认的临时文件
-                    pendingUploads.discardSession(sessionId)
+                    onCancelReceived(pending.sessionId, remoteIp)
+                    onSessionUpdated(pending)
+                    call.respond(HttpStatusCode.OK)
+                    return@post
                 }
-                call.respond(HttpStatusCode.OK, mapOf("message" to "Session cancelled"))
+
+                val active = sessionId?.let { activeSessions[it] }
+                if (active != null && WebShareHtmlRenderer.isSameIp(remoteIp, active.device.ip)) {
+                    activeSessions.remove(active.sessionId)
+                    sessionTokens.remove(active.sessionId)
+                    pendingUploads.discardSession(active.sessionId)
+                    active.status = TransferStatus.Canceled
+                    active.endTime = System.currentTimeMillis()
+                    active.files.forEach { file ->
+                        if (file.status != TransferStatus.Completed) file.status = TransferStatus.Canceled
+                    }
+                    onSessionUpdated(active)
+                } else if (sessionId != null) {
+                    // 会话不在本机（对端取消其接收会话）：上游发 CancelReceived 事件，让应用停止对应的外发传输
+                    onCancelReceived(sessionId, remoteIp)
+                }
+                call.respond(HttpStatusCode.OK)
             }
 
             // 自定义扩展：发送方确认摘要一致后转正 / 不一致时丢弃临时文件
@@ -1155,4 +1170,26 @@ class LocalSendServer(
             )
         }
     }
+}
+
+/** 上传是否仍可写入：仅 Completed/Canceled 拒绝重放，Failed/InProgress 保留断线重试能力。 */
+internal fun isUploadFileAcceptable(status: TransferStatus): Boolean = status != TransferStatus.Completed && status != TransferStatus.Canceled
+
+/** pending（等待审批）取消匹配：来源 IP 必须一致；sessionId 为空时匹配该 IP 的任一 pending 会话。 */
+internal fun findPendingCancelTarget(
+    sessions: Collection<TransferSession>,
+    sessionId: String?,
+    remoteIp: String,
+): TransferSession? =
+    sessions.firstOrNull { session ->
+        session.status == TransferStatus.WaitingApproval &&
+            WebShareHtmlRenderer.isSameIp(remoteIp, session.device.ip) &&
+            (sessionId == null || session.sessionId == sessionId)
+    }
+
+/** 协议 §5.3：attachment + 百分号编码文件名（空格编码为 %20，去掉引号与路径分隔符）。 */
+internal fun attachmentContentDisposition(fileName: String): String {
+    val sanitized = fileName.replace('/', '-').replace("\"", "")
+    val encoded = URLEncoder.encode(sanitized, "UTF-8").replace("+", "%20")
+    return "attachment; filename=\"$encoded\""
 }
