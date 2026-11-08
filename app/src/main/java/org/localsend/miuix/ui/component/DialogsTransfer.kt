@@ -37,7 +37,6 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
@@ -50,56 +49,27 @@ fun SendTextDialog(
 ) {
     var text by remember(show) { mutableStateOf("") }
 
-    WindowDialog(
+    TextInputDialog(
         show = show,
         title = stringResource(R.string.dialog_send_text_title),
+        value = text,
+        onValueChange = { text = it },
+        label = stringResource(R.string.dialog_send_text_label),
+        confirmText = stringResource(R.string.dialog_send_text_btn_send),
+        singleLine = false,
+        minLines = 3,
+        maxLines = 6,
         onDismissRequest = onDismissRequest,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-        ) {
-            TextField(
-                value = text,
-                onValueChange = { text = it },
-                label = stringResource(R.string.dialog_send_text_label),
-                useLabelAsPlaceholder = true,
-                minLines = 3,
-                maxLines = 6,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Button(
-                    onClick = onDismissRequest,
-                    colors = ButtonDefaults.buttonColors(),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.btn_cancel))
-                }
-                Button(
-                    onClick = {
-                        val trimmed = text.trim()
-                        if (trimmed.isNotEmpty()) {
-                            onConfirm(trimmed)
-                            onDismissRequest()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColorsPrimary(),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.dialog_send_text_btn_send))
-                }
+        onConfirm = {
+            val trimmed = text.trim()
+            if (trimmed.isNotEmpty()) {
+                onConfirm(trimmed)
+                true
+            } else {
+                false
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable

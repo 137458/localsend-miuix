@@ -7,14 +7,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,18 +38,17 @@ import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.CertFingerprintDialog
 import org.localsend.miuix.ui.component.DialogButtonRow
 import org.localsend.miuix.ui.component.PinDialog
+import org.localsend.miuix.ui.component.TextInputDialog
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import org.localsend.miuix.util.AppLanguage
 import org.localsend.miuix.util.SettingsValidators
-import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -538,55 +535,25 @@ private fun AdvancedNetworkEditDialog(
     val context = LocalContext.current
     var value by remember(show, initialValue) { mutableStateOf(initialValue) }
 
-    WindowDialog(
+    TextInputDialog(
         show = show,
         title = title,
+        value = value,
+        onValueChange = { value = it },
+        label = title,
+        keyboardType = keyboardType,
+        maxLength = 200,
         onDismissRequest = onDismissRequest,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-        ) {
-            TextField(
-                value = value,
-                onValueChange = { newValue -> if (newValue.length <= 200) value = newValue },
-                label = title,
-                useLabelAsPlaceholder = true,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Button(
-                    onClick = onDismissRequest,
-                    colors = ButtonDefaults.buttonColors(),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.btn_cancel))
+        onConfirm = {
+            if (validate(value)) {
+                onSave(value)
+                true
+            } else {
+                if (invalidToastRes != null) {
+                    Toast.makeText(context, invalidToastRes, Toast.LENGTH_SHORT).show()
                 }
-                Button(
-                    onClick = {
-                        if (validate(value)) {
-                            onSave(value)
-                            onDismissRequest()
-                        } else if (invalidToastRes != null) {
-                            Toast.makeText(context, invalidToastRes, Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColorsPrimary(),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.btn_confirm))
-                }
+                false
             }
-        }
-    }
+        },
+    )
 }

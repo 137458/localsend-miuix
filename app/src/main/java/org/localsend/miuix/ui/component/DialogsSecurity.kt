@@ -1,13 +1,10 @@
 package org.localsend.miuix.ui.component
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,7 +19,6 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 
@@ -35,62 +31,21 @@ fun PinDialog(
 ) {
     var pin by remember(show, initialPin) { mutableStateOf(initialPin ?: "") }
 
-    WindowDialog(
+    TextInputDialog(
         show = show,
         title = stringResource(R.string.dialog_pin_title),
+        value = pin,
+        onValueChange = { pin = it },
+        label = stringResource(R.string.dialog_pin_label),
+        confirmText = stringResource(R.string.btn_save),
+        keyboardType = KeyboardType.Number,
+        description = stringResource(R.string.dialog_pin_desc),
         onDismissRequest = onDismissRequest,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.dialog_pin_desc),
-                style = MiuixTheme.textStyles.body2,
-                color = MiuixTheme.colorScheme.onSurfaceSecondary,
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            TextField(
-                value = pin,
-                onValueChange = { pin = it },
-                label = stringResource(R.string.dialog_pin_label),
-                useLabelAsPlaceholder = true,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Button(
-                    onClick = onDismissRequest,
-                    colors = ButtonDefaults.buttonColors(),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.btn_cancel))
-                }
-                Button(
-                    onClick = {
-                        val trimmed = pin.trim().ifEmpty { null }
-                        onConfirm(trimmed)
-                        onDismissRequest()
-                    },
-                    colors = ButtonDefaults.buttonColorsPrimary(),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.btn_save))
-                }
-            }
-        }
-    }
+        onConfirm = {
+            onConfirm(pin.trim().ifEmpty { null })
+            true
+        },
+    )
 }
 
 @Composable
@@ -102,57 +57,21 @@ fun TargetDevicePinDialog(
 ) {
     var pin by remember { mutableStateOf("") }
     if (show) {
-        WindowDialog(
+        TextInputDialog(
             show = true,
             title = stringResource(R.string.dialog_target_pin_title),
+            value = pin,
+            onValueChange = { pin = it },
+            label = stringResource(R.string.dialog_target_pin_label),
+            keyboardType = KeyboardType.Ascii,
+            description = stringResource(R.string.dialog_target_pin_desc, targetAlias),
+            descriptionColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             onDismissRequest = onDismissRequest,
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.dialog_target_pin_desc, targetAlias),
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                TextField(
-                    value = pin,
-                    onValueChange = { pin = it },
-                    label = stringResource(R.string.dialog_target_pin_label),
-                    useLabelAsPlaceholder = true,
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(
-                        onClick = onDismissRequest,
-                        colors = ButtonDefaults.buttonColors(),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.btn_cancel))
-                    }
-                    Button(
-                        onClick = {
-                            onConfirm(pin.trim())
-                            onDismissRequest()
-                        },
-                        colors = ButtonDefaults.buttonColorsPrimary(),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.btn_confirm))
-                    }
-                }
-            }
-        }
+            onConfirm = {
+                onConfirm(pin.trim())
+                true
+            },
+        )
     }
 }
 
