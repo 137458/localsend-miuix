@@ -24,7 +24,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.localsend.miuix.R
@@ -82,12 +82,12 @@ import top.yukonga.miuix.kmp.theme.ThemeController
 fun App(manager: LocalSendManager) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val settings by manager.settings.collectAsState()
-    val pendingIncomingSession by manager.pendingIncomingSession.collectAsState()
-    val sessionMessage by manager.sessionMessage.collectAsState()
-    val requestedTabIndex by manager.requestedTabIndex.collectAsState()
-    val recentManualIps by manager.recentManualIps.collectAsState()
-    val pendingTargetPinPrompt by manager.pendingTargetPinPrompt.collectAsState()
+    val settings by manager.settings.collectAsStateWithLifecycle()
+    val pendingIncomingSession by manager.pendingIncomingSession.collectAsStateWithLifecycle()
+    val sessionMessage by manager.sessionMessage.collectAsStateWithLifecycle()
+    val requestedTabIndex by manager.requestedTabIndex.collectAsStateWithLifecycle()
+    val recentManualIps by manager.recentManualIps.collectAsStateWithLifecycle()
+    val pendingTargetPinPrompt by manager.pendingTargetPinPrompt.collectAsStateWithLifecycle()
 
     // 传输提示（如"对方拒绝接收"）以 Toast 呈现，显示后即消费
     LaunchedEffect(sessionMessage) {
@@ -183,7 +183,7 @@ fun App(manager: LocalSendManager) {
     var availableUpdate by remember { mutableStateOf<UpdateCheckResult?>(null) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     val downloaderState = manager.updates.downloader.state
-    val updateDownloadState by downloaderState.collectAsState()
+    val updateDownloadState by downloaderState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         if (!settings.autoCheckUpdate) return@LaunchedEffect

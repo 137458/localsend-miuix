@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import org.localsend.miuix.BuildConfig
 import org.localsend.miuix.R
@@ -92,14 +92,14 @@ fun UpdateScreen(
     val topAppBarScrollBehavior = MiuixScrollBehavior()
     val lazyListState = rememberLazyListState()
 
-    val settings by manager.settings.collectAsState()
+    val settings by manager.settings.collectAsStateWithLifecycle()
 
     var releaseInfo by remember { mutableStateOf<UpdateCheckResult?>(null) }
     var isChecking by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
 
     val downloaderState = manager.updates.downloader.state
-    val downloadState by downloaderState.collectAsState()
+    val downloadState by downloaderState.collectAsStateWithLifecycle()
 
     val hasNew = releaseInfo?.hasUpdate == true
 

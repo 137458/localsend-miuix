@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -29,6 +28,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.network.NetworkUtils
@@ -61,13 +61,13 @@ fun ReceiveScreen(
     onOpenHistory: () -> Unit,
 ) {
     val context = LocalContext.current
-    val settings by manager.settings.collectAsState()
-    val activeSessions by manager.activeSessions.collectAsState()
+    val settings by manager.settings.collectAsStateWithLifecycle()
+    val activeSessions by manager.activeSessions.collectAsStateWithLifecycle()
     val incomingSessions = remember(activeSessions) { activeSessions.filter { it.isIncoming } }
 
     val localIps = remember { NetworkUtils.getLocalIpAddresses() }
     val primaryIp = localIps.firstOrNull() ?: "127.0.0.1"
-    val boundPort by manager.serverPort.collectAsState()
+    val boundPort by manager.serverPort.collectAsStateWithLifecycle()
     val displayPort = if (boundPort > 0) boundPort else settings.port
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberBlurBackdrop()

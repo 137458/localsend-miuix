@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.network.NetworkUtils
@@ -50,9 +50,9 @@ fun WebShareDialog(
     onDismissRequest: () -> Unit,
     manager: LocalSendManager,
 ) {
-    val shares by manager.shares.collectAsState()
-    val settings by manager.settings.collectAsState()
-    val selectedFiles by manager.selectedFiles.collectAsState()
+    val shares by manager.shares.collectAsStateWithLifecycle()
+    val settings by manager.settings.collectAsStateWithLifecycle()
+    val selectedFiles by manager.selectedFiles.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     val isSharing = shares.isNotEmpty()
@@ -62,7 +62,7 @@ fun WebShareDialog(
     }
     val scheme = if (settings.useHttps) "https" else "http"
     // 端口被占用时服务端会自动顺延，必须用真实监听端口生成链接，否则二维码/网址指向未监听的端口
-    val boundPort by manager.serverPort.collectAsState()
+    val boundPort by manager.serverPort.collectAsStateWithLifecycle()
     val port = boundPort.takeIf { it > 0 } ?: settings.port
     val shareUrl = "$scheme://$selectedIp:$port"
 

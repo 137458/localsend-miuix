@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.Device
@@ -95,10 +95,10 @@ fun SendScreen(
     onManualIp: () -> Unit,
 ) {
     val context = LocalContext.current
-    val selectedFiles by manager.selectedFiles.collectAsState()
-    val nearbyDevices by manager.nearbyDevices.collectAsState()
-    val favoriteDevices by manager.favoriteDevices.collectAsState()
-    val targetResendDevice by manager.targetResendDevice.collectAsState()
+    val selectedFiles by manager.selectedFiles.collectAsStateWithLifecycle()
+    val nearbyDevices by manager.nearbyDevices.collectAsStateWithLifecycle()
+    val favoriteDevices by manager.favoriteDevices.collectAsStateWithLifecycle()
+    val targetResendDevice by manager.targetResendDevice.collectAsStateWithLifecycle()
     val favoriteDeviceList =
         remember(favoriteDevices, nearbyDevices, targetResendDevice) {
             val list =
@@ -117,9 +117,9 @@ fun SendScreen(
             val resend = targetResendDevice
             if (resend != null) list.filterNot { it.matches(resend) } else list
         }
-    val isScanning by manager.isScanning.collectAsState()
-    val activeSessions by manager.activeSessions.collectAsState()
-    val shares by manager.shares.collectAsState()
+    val isScanning by manager.isScanning.collectAsStateWithLifecycle()
+    val activeSessions by manager.activeSessions.collectAsStateWithLifecycle()
+    val shares by manager.shares.collectAsStateWithLifecycle()
     val outgoingSessions = remember(activeSessions) { activeSessions.filter { !it.isIncoming } }
     val nonNearbySessions =
         remember(outgoingSessions, nearbyDevices, favoriteDeviceList) {
