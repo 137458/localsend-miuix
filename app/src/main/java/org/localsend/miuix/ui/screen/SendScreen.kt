@@ -53,6 +53,7 @@ import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.BlurredBar
+import org.localsend.miuix.ui.component.EmptyStateCard
 import org.localsend.miuix.ui.component.FilePreviewDialog
 import org.localsend.miuix.ui.component.FileThumbnail
 import org.localsend.miuix.ui.component.InlineTransferProgress
@@ -544,34 +545,13 @@ fun SendScreen(
 
                     if (nonFavoriteNearbyDevices.isEmpty() && nonNearbySessions.isEmpty() && !isScanning) {
                         item {
-                            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                                Column(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(24.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Icon(
-                                        imageVector = AppIcons.Wifi,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(36.dp),
-                                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = stringResource(R.string.send_searching_devices_title),
-                                        style = MiuixTheme.textStyles.body2,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = stringResource(R.string.send_searching_devices_hint),
-                                        style = MiuixTheme.textStyles.footnote1,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                    )
-                                }
-                            }
+                            EmptyStateCard(
+                                icon = AppIcons.Wifi,
+                                title = stringResource(R.string.send_searching_devices_title),
+                                hint = stringResource(R.string.send_searching_devices_hint),
+                                iconTint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                titleColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
                         }
                     } else {
                         items(nonFavoriteNearbyDevices, key = { if (it.fingerprint.isNotEmpty()) it.fingerprint else "${it.ip}:${it.port}" }) { device ->

@@ -42,6 +42,7 @@ import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.BlurredBar
+import org.localsend.miuix.ui.component.EmptyStateCard
 import org.localsend.miuix.ui.component.HistoryDetailDialog
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
@@ -130,28 +131,10 @@ fun HistoryScreen(
                 if (history.isEmpty()) {
                     item {
                         SmallTitle(text = stringResource(R.string.history_empty_title))
-                        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Icon(
-                                    imageVector = AppIcons.History,
-                                    contentDescription = null,
-                                    tint = MiuixTheme.colorScheme.onSurfaceSecondary,
-                                    modifier = Modifier.size(36.dp),
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = stringResource(R.string.history_empty_summary),
-                                    style = MiuixTheme.textStyles.body2,
-                                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                                )
-                            }
-                        }
+                        EmptyStateCard(
+                            icon = AppIcons.History,
+                            title = stringResource(R.string.history_empty_summary),
+                        )
                     }
                 } else {
                     items(history, key = { it.id }) { item ->
