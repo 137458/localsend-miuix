@@ -41,8 +41,9 @@ object TransferNotifier {
     const val CHANNEL_LIVE = "localsend_live_channel"
 
     const val NOTIF_ID_FOREGROUND_SERVICE = 1001
-    private const val NOTIF_ID_RECEIVE_BASE = 2000
-    private const val NOTIF_ID_SEND_BASE = 3000
+    private const val NOTIF_ID_RECEIVE_BASE = 500_000_000
+    private const val NOTIF_ID_SEND_BASE = 800_000_000
+    private const val NOTIF_ID_SUFFIX_MASK = 0x0FFFFFFF
 
     @Volatile
     private var allowed = false
@@ -205,7 +206,7 @@ object TransferNotifier {
     }
 
     /** 由会话 ID 派生的通知 ID 后缀，供接收/发送两个 ID 段共用。 */
-    private fun sessionNotifSuffix(sessionId: String): Int = (sessionId.hashCode() and 0x7FFF) % 100
+    private fun sessionNotifSuffix(sessionId: String): Int = sessionId.hashCode() and NOTIF_ID_SUFFIX_MASK
 
     private fun sessionNotifId(session: TransferSession): Int {
         val base = if (session.isIncoming) NOTIF_ID_RECEIVE_BASE else NOTIF_ID_SEND_BASE
