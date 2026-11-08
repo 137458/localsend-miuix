@@ -30,10 +30,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.decodeFromString
 import org.localsend.miuix.R
 import org.localsend.miuix.core.AppJson
-import org.localsend.miuix.core.LocalSendRoutes
 import org.localsend.miuix.core.NetworkConstants
 import org.localsend.miuix.discovery.DeviceDirectory
 import org.localsend.miuix.discovery.FavoriteDevice
@@ -41,7 +39,6 @@ import org.localsend.miuix.discovery.FavoriteStore
 import org.localsend.miuix.history.HistoryStore
 import org.localsend.miuix.model.AppSettings
 import org.localsend.miuix.model.Device
-import org.localsend.miuix.model.DeviceDto
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.HistoryFileEntry
@@ -54,10 +51,10 @@ import org.localsend.miuix.network.ChecksumPlan
 import org.localsend.miuix.network.DiscoveryService
 import org.localsend.miuix.network.FingerprintTrust
 import org.localsend.miuix.network.IncomingDecision
+import org.localsend.miuix.network.InfoProbe
 import org.localsend.miuix.network.LocalSendClient
 import org.localsend.miuix.network.LocalSendServer
 import org.localsend.miuix.network.NetworkUtils
-import org.localsend.miuix.network.SslHelper
 import org.localsend.miuix.network.TargetPinRequiredException
 import org.localsend.miuix.network.TlsStore
 import org.localsend.miuix.network.WebShareHtmlRenderer
@@ -66,12 +63,9 @@ import org.localsend.miuix.transfer.TransferOutcome
 import org.localsend.miuix.updates.UpdateDomain
 import org.localsend.miuix.util.AutoFinishPolicy
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.net.ssl.HttpsURLConnection
 
 class LocalSendManager(
     private val context: Context,
@@ -747,50 +741,26 @@ class LocalSendManager(
     ) {
         if (filesToSend.isEmpty()) return
         scope.launch(Dispatchers.IO) {
-            var targetDevice: Device? = null
-            for (proto in listOf("https", "http")) {
-                var conn: HttpURLConnection? = null
-                try {
-                    val url = "$proto://$ip:$port${LocalSendRoutes.INFO_V2}"
-                    conn =
-                        (URL(url).openConnection() as HttpURLConnection).apply {
-                            if (this is HttpsURLConnection) {
-                                sslSocketFactory = SslHelper.sslSocketFactory
-                                hostnameVerifier = SslHelper.trustAllHostnameVerifier
-                            }
-                            requestMethod = "GET"
-                            useCaches = false
-                            connectTimeout = 3000
-                            readTimeout = 3000
-                            setRequestProperty("Accept", "application/json")
-                        }
-                    if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                        val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                        val dto = json.decodeFromString<DeviceDto>(body)
-                        val observedFp = (conn as? HttpsURLConnection)?.let { SslHelper.certSha256(it) }.orEmpty()
-                        if (proto == "https" &&
-                            !org.localsend.miuix.network.CertificateBinding
-                                .dtoMatchesCert(dto.fingerprint, observedFp)
-                        ) {
-                            continue
-                        }
-                        targetDevice = Device.fromDto(dto, ip)
-                        if (targetDevice.protocol.equals("https", ignoreCase = true) && targetDevice.fingerprint.isNotBlank()) {
-                            FingerprintTrust.trust(targetDevice.fingerprint)
-                        }
-                        break
-                    }
-                } catch (ignored: Exception) {
-                } finally {
-                    try {
-                        conn?.disconnect()
-                    } catch (ignored: Exception) {
-                    }
-                }
+            val probedDevice =
+                InfoProbe.probe(
+                    targetIp = ip,
+                    port = port,
+                    json = json,
+                    localFingerprint = "",
+                    requireBodyFingerprintMatch = true,
+                    connectTimeoutMs = 3_000,
+                    readTimeoutMs = 3_000,
+                    followRedirects = true,
+                )
+            if (probedDevice != null &&
+                probedDevice.protocol.equals("https", ignoreCase = true) &&
+                probedDevice.fingerprint.isNotBlank()
+            ) {
+                FingerprintTrust.trust(probedDevice.fingerprint)
             }
 
             val finalDevice =
-                targetDevice ?: Device(
+                probedDevice ?: Device(
                     alias = context.getString(R.string.msg_device_alias_ip, ip),
                     fingerprint = "",
                     port = port,

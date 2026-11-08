@@ -3,14 +3,6 @@ package org.localsend.miuix.network
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.util.Log
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.timeout
-import io.ktor.client.request.get
-import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -32,10 +24,8 @@ import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.MulticastSocket
-import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import javax.net.ssl.HttpsURLConnection
 
 /** 监听端配置快照：组播组地址 + 发现超时，二者在绑定与设置读取两侧总是结伴出现。 */
 internal data class ListenerConfig(
@@ -141,20 +131,6 @@ class DiscoveryService(
     /** 当前在用的监听 socket：停止/重建前主动关闭，唤醒阻塞中的 receive，避免等空闲超时。 */
     @Volatile
     private var activeSocket: MulticastSocket? = null
-
-    private val httpClient by lazy {
-        HttpClient(CIO) {
-            followRedirects = false
-            install(ContentNegotiation) {
-                json(this@DiscoveryService.json)
-            }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 2000
-                connectTimeoutMillis = 1000
-                socketTimeoutMillis = 2000
-            }
-        }
-    }
 
     fun start() {
         acquireLocks()
@@ -380,16 +356,14 @@ class DiscoveryService(
             var connection: HttpURLConnection? = null
             try {
                 connection =
-                    (URL("${targetDevice.url}$route").openConnection() as HttpURLConnection).apply {
-                        if (this is HttpsURLConnection) {
-                            sslSocketFactory = if (pinned) FingerprintTrust.pinnedSslSocketFactory else SslHelper.sslSocketFactory
-                            hostnameVerifier = SslHelper.trustAllHostnameVerifier
-                        }
-                        requestMethod = "POST"
+                    LocalSendHttpClient.open(
+                        url = "${targetDevice.url}$route",
+                        method = "POST",
+                        connectTimeoutMs = 1_000,
+                        readTimeoutMs = 2_000,
+                        sslSocketFactory = if (pinned) FingerprintTrust.pinnedSslSocketFactory else SslHelper.sslSocketFactory,
+                    ) {
                         doOutput = true
-                        useCaches = false
-                        connectTimeout = 1000
-                        readTimeout = 2000
                         setRequestProperty("Content-Type", "application/json; charset=utf-8")
                     }
                 connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
@@ -403,72 +377,6 @@ class DiscoveryService(
                 if (pinned) FingerprintTrust.unpin(targetDevice.fingerprint)
             }
         }
-
-    /**
-     * HTTPS 探测：本地直接持有客户端证书，且以服务端证书 SHA-256 作为设备身份，
-     * 与上游保持一致（响应体 fingerprint 在 HTTPS 下不可作为身份依据）。
-     */
-    private suspend fun probeHttps(
-        targetIp: String,
-        localDevice: Device,
-    ): Device? =
-        withContext(Dispatchers.IO) {
-            for (route in listOf(LocalSendRoutes.INFO_V2, LocalSendRoutes.INFO_V1)) {
-                var connection: HttpsURLConnection? = null
-                try {
-                    connection =
-                        (URL("https://$targetIp:${NetworkConstants.DEFAULT_PORT}$route").openConnection() as HttpsURLConnection).apply {
-                            sslSocketFactory = SslHelper.sslSocketFactory
-                            hostnameVerifier = SslHelper.trustAllHostnameVerifier
-                            requestMethod = "GET"
-                            useCaches = false
-                            connectTimeout = 1000
-                            readTimeout = 2000
-                        }
-                    if (connection.responseCode != HttpURLConnection.HTTP_OK) continue
-                    val certFingerprint = SslHelper.certSha256(connection)
-                    if (certFingerprint.isBlank() || isSameFingerprint(certFingerprint, localDevice.fingerprint)) continue
-                    val text = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                    val dto = json.decodeFromString<DeviceDto>(text)
-                    return@withContext deviceFromHttpsProbe(dto, targetIp, certFingerprint)
-                } catch (ignored: Exception) {
-                    // 该协议/路由未响应，继续下一个候选
-                } finally {
-                    connection?.disconnect()
-                }
-            }
-            null
-        }
-
-    private suspend fun probeHttp(
-        targetIp: String,
-        localDevice: Device,
-    ): Device? {
-        for (route in listOf(LocalSendRoutes.INFO_V2, LocalSendRoutes.INFO_V1)) {
-            try {
-                val response =
-                    httpClient.get("http://$targetIp:${NetworkConstants.DEFAULT_PORT}$route") {
-                        timeout {
-                            // 单目标探测封顶：不受“发现超时”设置放大，
-                            // 避免 254×4 次探测被个别无响应目标拖长
-                            requestTimeoutMillis = SCAN_PROBE_TIMEOUT_MS
-                        }
-                    }
-                val dto = response.body<DeviceDto>()
-                if (!isSameFingerprint(dto.fingerprint, localDevice.fingerprint)) {
-                    return Device.fromDto(dto, targetIp)
-                }
-            } catch (ignored: Exception) {
-                // Target not responding on this route
-            }
-        }
-        return null
-    }
-
-    private fun isSameFingerprint(
-        left: String,
-        right: String,
-    ): Boolean = FingerprintTrust.normalize(left) == FingerprintTrust.normalize(right)
 
     /** 发起子网扫描并返回该轮任务；被新一轮扫描取代时返回的 Job 以取消态完成。 */
     fun scanSubnet(onScanProgress: ((current: Int, total: Int) -> Unit)? = null): Job {
@@ -496,7 +404,16 @@ class DiscoveryService(
                                     val targetIp = "$baseIp.$i"
                                     if (!localIps.contains(targetIp)) {
                                         // HTTPS 优先（LocalSend 默认），失败再退回 HTTP
-                                        val device = probeHttps(targetIp, localDevice) ?: probeHttp(targetIp, localDevice)
+                                        val device =
+                                            InfoProbe.probe(
+                                                targetIp = targetIp,
+                                                json = json,
+                                                localFingerprint = localDevice.fingerprint,
+                                                requireBodyFingerprintMatch = false,
+                                                connectTimeoutMs = 1000,
+                                                readTimeoutMs = SCAN_PROBE_TIMEOUT_MS.toInt(),
+                                                followRedirects = false,
+                                            )
                                         if (device != null) {
                                             onDeviceDiscovered(device)
                                             sendDirectResponse(device)
