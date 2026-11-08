@@ -199,17 +199,14 @@ class LocalSendClient(
                         FingerprintTrust.pin(targetDevice.fingerprint)
                         try {
                             connection =
-                                (URL(url).openConnection() as HttpURLConnection).apply {
-                                    if (this is HttpsURLConnection) {
-                                        sslSocketFactory = FingerprintTrust.pinnedSslSocketFactory
-                                        hostnameVerifier = SslHelper.trustAllHostnameVerifier
-                                    }
-                                    requestMethod = "POST"
+                                LocalSendHttpClient.open(
+                                    url = url,
+                                    method = "POST",
+                                    connectTimeoutMs = 10_000,
+                                    readTimeoutMs = 60_000,
+                                    followRedirects = false,
+                                ) {
                                     doOutput = true
-                                    useCaches = false
-                                    instanceFollowRedirects = false
-                                    connectTimeout = 10000
-                                    readTimeout = 60000
                                     setRequestProperty("Content-Type", "application/json; charset=utf-8")
                                     setRequestProperty("Accept", "application/json")
                                 }
@@ -798,16 +795,12 @@ class LocalSendClient(
                 FingerprintTrust.pin(targetDevice.fingerprint)
                 try {
                     connection =
-                        (URL(url).openConnection() as HttpURLConnection).apply {
-                            if (this is HttpsURLConnection) {
-                                sslSocketFactory = FingerprintTrust.pinnedSslSocketFactory
-                                hostnameVerifier = SslHelper.trustAllHostnameVerifier
-                            }
-                            requestMethod = "POST"
-                            useCaches = false
-                            connectTimeout = 5000
-                            readTimeout = 5000
-                        }
+                        LocalSendHttpClient.open(
+                            url = url,
+                            method = "POST",
+                            connectTimeoutMs = 5_000,
+                            readTimeoutMs = 5_000,
+                        )
                     val code = connection.responseCode
                     Log.d(TAG, "cancelUpload: returned HTTP $code")
                 } finally {
