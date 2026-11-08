@@ -1,3 +1,6 @@
+// Compose 1.7.6 未提供 LocalResources；本文件命中点均为 Toast / 回调等一次性提示。
+@file:Suppress("LocalContextGetResourceValueCall")
+
 package org.localsend.miuix.ui.screen
 
 import android.content.Context
@@ -122,15 +125,13 @@ fun HistoryScreen(
                     PaddingValues(
                         top = innerPadding.calculateTopPadding() + 8.dp,
                         bottom = innerPadding.calculateBottomPadding() + 16.dp,
-                        start = 12.dp,
-                        end = 12.dp,
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (history.isEmpty()) {
                     item {
                         SmallTitle(text = stringResource(R.string.history_empty_title))
-                        Card(modifier = Modifier.fillMaxWidth()) {
+                        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                             Column(
                                 modifier =
                                     Modifier
@@ -256,6 +257,7 @@ private fun HistoryItemCard(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 12.dp)
                 .clickable(onClick = onClick),
     ) {
         Row(

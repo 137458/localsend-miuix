@@ -31,7 +31,7 @@ fun TransferSessionCard(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             if (session.isTextMessage) {
                 TextMessageCardContent(session = session, onCancel = onCancel, onAccept = onAccept)

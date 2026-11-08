@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<lint>
-    <!-- Compose 1.7.6 未提供 LocalResources；本项目命中点集中在 Toast / 回调等一次性提示，
-         它们本就在触发时读取当前配置。常驻可见文案已改用 stringResource，此处保留检查但降级为警告 -->
-    <issue
-        id="LocalContextGetResourceValueCall"
-        severity="warning" />
-</lint>

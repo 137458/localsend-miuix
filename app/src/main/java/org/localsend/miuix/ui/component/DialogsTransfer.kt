@@ -1,3 +1,6 @@
+// Compose 1.7.6 未提供 LocalResources；本文件命中点均为 Toast / 回调等一次性提示。
+@file:Suppress("LocalContextGetResourceValueCall")
+
 package org.localsend.miuix.ui.component
 
 import android.content.Intent

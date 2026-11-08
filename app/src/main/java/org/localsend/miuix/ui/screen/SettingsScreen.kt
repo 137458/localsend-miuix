@@ -167,15 +167,13 @@ fun SettingsScreen(
                     PaddingValues(
                         top = innerPadding.calculateTopPadding() + 8.dp,
                         bottom = contentPadding.calculateBottomPadding() + 16.dp,
-                        start = 12.dp,
-                        end = 12.dp,
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // Section 1: General Settings
                 item {
                     SmallTitle(text = stringResource(R.string.settings_section_general))
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                         ArrowPreference(
                             title = stringResource(R.string.settings_pref_alias_title),
                             summary = settings.alias,
@@ -256,7 +254,7 @@ fun SettingsScreen(
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
                     SmallTitle(text = stringResource(R.string.settings_section_receive))
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                         SwitchPreference(
                             title = stringResource(R.string.receive_pref_quick_save_title),
                             summary = stringResource(R.string.settings_pref_quick_save_desc),
@@ -325,7 +323,7 @@ fun SettingsScreen(
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
                     SmallTitle(text = stringResource(R.string.settings_section_network_security))
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                         ArrowPreference(
                             title = stringResource(R.string.settings_pref_port_title),
                             summary = settings.port.toString(),
@@ -353,7 +351,7 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     SmallTitle(text = stringResource(R.string.settings_section_advanced_network))
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                         ArrowPreference(
                             title = stringResource(R.string.settings_pref_network_whitelist_title),
                             summary = settings.networkWhitelist.ifEmpty { "—" },
@@ -381,7 +379,7 @@ fun SettingsScreen(
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
                     SmallTitle(text = stringResource(R.string.settings_section_about))
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                         ArrowPreference(
                             title = stringResource(R.string.settings_pref_check_update_title),
                             summary = stringResource(R.string.settings_pref_check_update_summary, org.localsend.miuix.BuildConfig.VERSION_NAME),

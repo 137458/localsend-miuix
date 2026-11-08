@@ -1,3 +1,6 @@
+// Compose 1.7.6 未提供 LocalResources；本文件命中点均为 Toast / 回调等一次性提示。
+@file:Suppress("LocalContextGetResourceValueCall")
+
 package org.localsend.miuix.ui.screen
 
 import android.widget.Toast
@@ -234,15 +237,13 @@ fun SendScreen(
                         PaddingValues(
                             top = innerPadding.calculateTopPadding() + 8.dp,
                             bottom = contentPadding.calculateBottomPadding() + 16.dp,
-                            start = 12.dp,
-                            end = 12.dp,
                         ),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     // Section 1: Quick Action Grid (6 types)
                     item {
                         SmallTitle(text = stringResource(R.string.send_section_quick_pick))
-                        Card(modifier = Modifier.fillMaxWidth()) {
+                        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -271,7 +272,7 @@ fun SendScreen(
 
                     // Section 1.5: Web Share Trigger
                     item {
-                        Card(modifier = Modifier.fillMaxWidth()) {
+                        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                             ArrowPreference(
                                 title = if (shares.isNotEmpty()) stringResource(R.string.send_web_share_running_title) else stringResource(R.string.send_web_share_idle_title),
                                 summary = if (shares.isNotEmpty()) stringResource(R.string.send_web_share_running_summary, shares.first().files.size) else stringResource(R.string.send_web_share_idle_summary),
@@ -293,7 +294,7 @@ fun SendScreen(
                         item {
                             Spacer(modifier = Modifier.height(4.dp))
                             SmallTitle(text = stringResource(R.string.send_section_selected_files, selectedFiles.size))
-                            Card(modifier = Modifier.fillMaxWidth()) {
+                            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                                 Column(
                                     modifier =
                                         Modifier
@@ -444,7 +445,7 @@ fun SendScreen(
                         item {
                             Spacer(modifier = Modifier.height(4.dp))
                             SmallTitle(text = stringResource(R.string.history_action_resend))
-                            Card(modifier = Modifier.fillMaxWidth()) {
+                            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                                 Column(modifier = Modifier.fillMaxWidth()) {
                                     ArrowPreference(
                                         title = resendDev.alias,
@@ -515,7 +516,7 @@ fun SendScreen(
 
                     if (isScanning) {
                         item {
-                            Card(modifier = Modifier.fillMaxWidth()) {
+                            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                                 Column(
                                     modifier =
                                         Modifier
@@ -542,7 +543,7 @@ fun SendScreen(
 
                     if (nonFavoriteNearbyDevices.isEmpty() && nonNearbySessions.isEmpty() && !isScanning) {
                         item {
-                            Card(modifier = Modifier.fillMaxWidth()) {
+                            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                                 Column(
                                     modifier =
                                         Modifier
@@ -593,7 +594,7 @@ fun SendScreen(
                         // 针对手动输入 IP 发起、不在扫描列表中的目标设备，同样在同 Card 下内嵌进度
                         if (nonNearbySessions.isNotEmpty()) {
                             items(nonNearbySessions, key = { it.sessionId }) { session ->
-                                Card(modifier = Modifier.fillMaxWidth()) {
+                                Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                                     Column(modifier = Modifier.fillMaxWidth()) {
                                         BasicComponent(
                                             title = session.device.alias,
@@ -682,7 +683,7 @@ private fun DeviceItemCard(
         } else {
             ""
         }
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Column(modifier = Modifier.fillMaxWidth()) {
             ArrowPreference(
                 title = device.alias,
