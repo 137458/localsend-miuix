@@ -7,6 +7,7 @@ import org.localsend.miuix.core.JsonFileStore
 import org.localsend.miuix.core.NetworkConstants
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceType
+import org.localsend.miuix.model.isSameDevice
 import java.io.File
 
 @Serializable
@@ -21,12 +22,15 @@ data class FavoriteDevice(
     val download: Boolean = false,
     val customAlias: String? = null,
 ) {
-    fun matches(device: Device): Boolean {
-        if (fingerprint.isNotBlank() && device.fingerprint.isNotBlank()) {
-            return fingerprint.equals(device.fingerprint, ignoreCase = true)
-        }
-        return ip == device.ip && port == device.port
-    }
+    fun matches(device: Device): Boolean =
+        isSameDevice(
+            leftFingerprint = fingerprint,
+            leftIp = ip,
+            leftPort = port,
+            rightFingerprint = device.fingerprint,
+            rightIp = device.ip,
+            rightPort = device.port,
+        )
 
     fun toDevice(): Device =
         Device(

@@ -64,12 +64,19 @@ data class Device(
             announce = announce,
         )
 
-    fun matches(other: Device): Boolean {
-        if (fingerprint.isNotBlank() && other.fingerprint.isNotBlank()) {
-            return fingerprint.equals(other.fingerprint, ignoreCase = true)
-        }
-        return ip == other.ip && port == other.port
-    }
+    fun matches(other: Device): Boolean =
+        isSameDevice(
+            leftFingerprint = fingerprint,
+            leftIp = ip,
+            leftPort = port,
+            rightFingerprint = other.fingerprint,
+            rightIp = other.ip,
+            rightPort = other.port,
+        )
+
+    /** 列表 key 使用的身份串，与 [matches] 判定一致。 */
+    val identityKey: String
+        get() = deviceIdentityKey(fingerprint, ip, port)
 
     val url: String
         get() = "$protocol://$ip:$port"

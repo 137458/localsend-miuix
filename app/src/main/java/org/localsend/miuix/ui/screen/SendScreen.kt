@@ -488,7 +488,7 @@ fun SendScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                             SmallTitle(text = stringResource(R.string.send_favorites_title))
                         }
-                        items(favoriteDeviceList, key = { "fav_" + (if (it.fingerprint.isNotEmpty()) it.fingerprint else "${it.ip}:${it.port}") }) { device ->
+                        items(favoriteDeviceList, key = { "fav_" + it.identityKey }) { device ->
                             DeviceItemCard(
                                 device = device,
                                 isFavorite = true,
@@ -552,7 +552,7 @@ fun SendScreen(
                             )
                         }
                     } else {
-                        items(nonFavoriteNearbyDevices, key = { if (it.fingerprint.isNotEmpty()) it.fingerprint else "${it.ip}:${it.port}" }) { device ->
+                        items(nonFavoriteNearbyDevices, key = { it.identityKey }) { device ->
                             DeviceItemCard(
                                 device = device,
                                 isFavorite = false,
