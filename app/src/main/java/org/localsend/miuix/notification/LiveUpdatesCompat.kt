@@ -11,6 +11,7 @@ import androidx.core.graphics.drawable.toBitmap
 import org.localsend.miuix.R
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferSession
+import org.localsend.miuix.transfer.RemainingTime
 
 /**
  * 原生 Android 实时通知（Live Updates）与 HyperOS 焦点通知适配器。
@@ -205,14 +206,12 @@ object LiveUpdatesCompat {
 
         val speedStr = FileItem.formatSpeed(session.speed, compact = true)
 
-        val remainingBytes = (session.totalBytes - session.transferredBytes).coerceAtLeast(0L)
-        val etaSec = if (session.speed > 0) remainingBytes / session.speed else 0L
         val etaStr =
-            when {
-                etaSec <= 0L -> ""
-                etaSec < 60L -> "${etaSec}s"
-                etaSec < 3600L -> "${etaSec / 60L}m"
-                else -> "${etaSec / 3600L}h"
+            when (val eta = RemainingTime.of(session.status, session.speed, session.totalBytes, session.transferredBytes)) {
+                is RemainingTime.Seconds -> if (eta.value > 0L) "${eta.value}s" else ""
+                is RemainingTime.Minutes -> "${eta.minutes}m"
+                is RemainingTime.Hours -> "${eta.hours}h"
+                else -> ""
             }
 
         val prefix =
@@ -231,21 +230,22 @@ object LiveUpdatesCompat {
     private fun formatCompactEta(
         session: TransferSession,
         context: Context,
-    ): String {
-        if (session.status != org.localsend.miuix.model.TransferStatus.InProgress) return ""
-        if (session.speed <= 0 || session.totalBytes <= 0) return ""
-        val remainingBytes = (session.totalBytes - session.transferredBytes).coerceAtLeast(0L)
-        if (remainingBytes == 0L) return context.getString(R.string.live_almost_done)
-        val seconds = remainingBytes / session.speed
-        return when {
-            seconds <= 0L -> context.getString(R.string.live_almost_done)
-            seconds < 60 -> context.getString(R.string.live_remaining_seconds, seconds)
-            seconds < 3600 -> {
-                val min = seconds / 60
-                val sec = seconds % 60
-                if (sec == 0L) context.getString(R.string.live_remaining_minutes, min) else context.getString(R.string.live_remaining_min_sec, min, sec)
-            }
-            else -> context.getString(R.string.live_remaining_hours, seconds / 3600)
+    ): String =
+        when (val eta = RemainingTime.of(session.status, session.speed, session.totalBytes, session.transferredBytes)) {
+            RemainingTime.Hidden, RemainingTime.Calculating -> ""
+            RemainingTime.AlmostDone -> context.getString(R.string.live_almost_done)
+            is RemainingTime.Seconds ->
+                if (eta.value <= 0L) {
+                    context.getString(R.string.live_almost_done)
+                } else {
+                    context.getString(R.string.live_remaining_seconds, eta.value)
+                }
+            is RemainingTime.Minutes ->
+                if (eta.seconds == 0L) {
+                    context.getString(R.string.live_remaining_minutes, eta.minutes)
+                } else {
+                    context.getString(R.string.live_remaining_min_sec, eta.minutes, eta.seconds)
+                }
+            is RemainingTime.Hours -> context.getString(R.string.live_remaining_hours, eta.hours)
         }
-    }
 }
