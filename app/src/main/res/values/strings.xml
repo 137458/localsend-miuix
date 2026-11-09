@@ -60,17 +60,12 @@
     <!-- 接收主页面 -->
     <string name="receive_title">接收</string>
     <string name="receive_section_local_device">本机设备</string>
-    <string name="receive_pref_alias_summary">设备别名 (点击修改)</string>
-    <string name="receive_pref_all_ips_summary">所有网卡 IP: %1$s (点击复制)</string>
-    <string name="receive_pref_ip_port_summary">局域网 IPv4 地址与服务端口 (点击复制)</string>
     <string name="receive_section_options">接收选项</string>
     <string name="receive_pref_quick_save_title">快速保存</string>
-    <string name="receive_pref_quick_save_summary">自动接收同局域网所有设备的传输请求，无需每次手动确认</string>
     <string name="receive_pref_auto_copy_title">自动复制文本</string>
-    <string name="receive_pref_auto_copy_summary">收到纯文本消息时自动写入系统剪贴板</string>
+    <string name="receive_pref_auto_copy_summary">收到文本消息时自动复制</string>
     <string name="receive_section_incoming_count">正在接收 (%1$d)</string>
-    <string name="receive_waiting_idle">等待接收中...</string>
-    <string name="receive_waiting_hint">确保发送端连接在同一 Wi-Fi 或局域网</string>
+    <string name="receive_waiting_idle">等待接收</string>
 
     <!-- 发送主页面 -->
     <string name="send_title">发送</string>
@@ -91,19 +86,16 @@
     <string name="send_quick_action_apps">应用</string>
     <string name="send_quick_action_text">纯文本</string>
     <string name="send_quick_action_clipboard">剪贴板</string>
-    <string name="send_web_share_running_title">Web 共享正在运行中</string>
-    <string name="send_web_share_idle_title">通过浏览器链接分享 (Web Share)</string>
-    <string name="send_web_share_running_summary">已有 %1$d 项正在局域网共享，点击查看链接与二维码</string>
-    <string name="send_web_share_idle_summary">无需客户端，任何浏览器扫描二维码或访问链接即可接收</string>
-    <string name="send_section_selected_files">待发送内容 (%1$d)</string>
-    <string name="send_selected_summary_header">共 %1$d 项 (%2$s)</string>
+    <string name="send_web_share_running_title">网页快传 · 共享中 (%1$d 项)</string>
+    <string name="send_web_share_idle_title">网页快传</string>
+    <string name="send_section_selected_files">待发送内容</string>
+    <string name="send_selected_summary_header">%1$d 项 · %2$s</string>
     <string name="send_type_text_message">纯文本消息</string>
-    <string name="send_expand_files">展开其余 %1$d 项文件</string>
+    <string name="send_expand_files">展开其余 %1$d 项</string>
     <string name="send_collapse_files">收起待发送列表</string>
     <string name="send_section_nearby_devices">附近设备 (%1$d)</string>
-    <string name="send_scanning_subnet_hint">正在全网段并发探测设备中...</string>
-    <string name="send_searching_devices_title">正在搜索同一局域网下的 LocalSend 设备...</string>
-    <string name="send_searching_devices_hint">下拉即可刷新或点击右上角广播</string>
+    <string name="send_scanning_subnet_hint">正在搜索设备…</string>
+    <string name="send_searching_devices_title">未发现设备</string>
     <string name="send_device_multi_subnet_tag">" (+%1$d个网段)"</string>
 
     <!-- 设置主页面 -->
@@ -113,19 +105,18 @@
     <string name="settings_pref_device_type_title">设备类型</string>
     <string name="settings_pref_theme_title">应用主题</string>
     <string name="settings_pref_vibrate_title">传输完成震动反馈</string>
-    <string name="settings_pref_vibrate_summary">发送或接收完成时触发触感震动</string>
     <string name="settings_pref_notif_perm_title">系统通知与焦点通知权限</string>
-    <string name="settings_pref_notif_perm_enabled">已开启 (传输进度与焦点胶囊提示正常)</string>
-    <string name="settings_pref_notif_perm_disabled">未开启 (点击授权或前往系统设置开启通知)</string>
+    <string name="settings_pref_notif_perm_enabled">已开启</string>
+    <string name="settings_pref_notif_perm_disabled">未开启 · 点击授权</string>
     <string name="settings_pref_wide_nav_rail_title">宽屏侧边栏导航</string>
-    <string name="settings_pref_wide_nav_rail_summary">屏幕宽度充足时在左侧展示侧边栏，默认使用底栏</string>
+    <string name="settings_pref_wide_nav_rail_summary">宽屏时显示左侧侧边栏</string>
     <string name="settings_section_receive">接收设置</string>
-    <string name="settings_pref_quick_save_desc">自动接收同局域网所有设备的传输请求，无需每次手动确认</string>
-    <string name="settings_pref_auto_copy_desc">收到纯文本消息时自动复制到剪贴板</string>
+    <string name="settings_pref_quick_save_desc">自动接收同网段设备请求</string>
+    <string name="settings_pref_auto_copy_desc">收到文本消息时自动复制</string>
     <string name="settings_pref_save_text_as_file_title">将文本保存为文件</string>
-    <string name="settings_pref_save_text_as_file_desc">接收纯文本消息时在存储目录生成 .txt 文件，默认关闭仅复制并记录在历史</string>
+    <string name="settings_pref_save_text_as_file_desc">另存为 .txt，否则仅复制并记入历史</string>
     <string name="settings_pref_auto_categorize_title">按类型智能分类存储</string>
-    <string name="settings_pref_auto_categorize_desc">开启后接收的图片自动归入相册 Pictures，视频归入 Movies，其余保留在 Downloads</string>
+    <string name="settings_pref_auto_categorize_desc">图片→Pictures，视频→Movies，其余→Downloads</string>
     <string name="send_favorites_title">已收藏设备</string>
     <string name="send_action_favorite">收藏设备</string>
     <string name="send_action_unfavorite">取消收藏</string>
@@ -134,22 +125,22 @@
     <string name="dialog_incoming_selective_count">已选择 %1$d / %2$d 项</string>
     <string name="dialog_incoming_select_all">全选</string>
     <string name="settings_pref_save_history_title">保存传输历史</string>
-    <string name="settings_pref_save_history_desc">将完成和取消的传输记录存入历史页面</string>
+    <string name="settings_pref_save_history_desc">保存完成与取消的传输记录</string>
     <string name="settings_pref_download_path_title">文件保存目录</string>
     <string name="settings_custom_folder">自定义目录</string>
     <string name="settings_section_network_security">网络与安全</string>
     <string name="settings_pref_port_title">服务端口</string>
     <string name="settings_pref_https_title">启用 HTTPS (TLS 加密)</string>
-    <string name="settings_pref_https_summary">使用端到端自签名证书加密局域网通信</string>
+    <string name="settings_pref_https_summary">自签名证书加密局域网通信</string>
     <string name="settings_pref_pin_title">传输 PIN 码保护</string>
-    <string name="settings_pref_pin_disabled">未启用 (点击设置)</string>
+    <string name="settings_pref_pin_disabled">未启用</string>
     <string name="settings_pref_pin_enabled">已设置: ••••</string>
     <string name="settings_pref_cert_fp_title">TLS 证书指纹</string>
-    <string name="settings_pref_cert_fp_enabled">查看与重新生成 SHA-256 指纹</string>
-    <string name="settings_pref_cert_fp_disabled">HTTPS 开启后可用</string>
+    <string name="settings_pref_cert_fp_enabled">查看指纹</string>
+    <string name="settings_pref_cert_fp_disabled">开启 HTTPS 后可用</string>
     <string name="settings_section_about">关于</string>
     <string name="settings_pref_check_update_title">检查更新</string>
-    <string name="settings_pref_check_update_summary">当前版本 v%1$s (点击检查新版本)</string>
+    <string name="settings_pref_check_update_summary">当前版本 v%1$s</string>
     <string name="settings_pref_github_title">GitHub 开源主页</string>
     <string name="settings_pref_license_title">开源协议与标准</string>
     <string name="settings_pref_license_summary">LocalSend Protocol v2.1 • Apache 2.0 License</string>
@@ -169,9 +160,8 @@
     <!-- 传输历史页面 -->
     <string name="history_title">传输历史</string>
     <string name="history_empty_title">暂无传输记录</string>
-    <string name="history_empty_summary">完成、失败或取消的传输会显示在这里</string>
     <string name="history_dialog_clear_title">清空传输历史</string>
-    <string name="history_dialog_clear_msg">确定要清空全部 %1$d 条传输历史记录吗？此操作无法撤销。</string>
+    <string name="history_dialog_clear_msg">%1$d 条记录将被清除，无法撤销</string>
     <string name="history_item_from">接收自 %1$s</string>
     <string name="history_item_to">发送给 %1$s</string>
     <string name="history_files_count">%1$d 个文件</string>
@@ -189,20 +179,18 @@
     <string name="update_btn_download_now">立即下载更新</string>
     <string name="update_section_settings">更新设置</string>
     <string name="update_pref_auto_check_title">自动检查更新</string>
-    <string name="update_pref_auto_check_summary">每次启动应用时自动检查最新版本</string>
     <string name="update_pref_ignore_title">忽略此版本</string>
     <string name="update_pref_ignore_checking">正在检查...</string>
     <string name="update_pref_ignore_already_latest">当前已是最新版本</string>
     <string name="update_pref_ignore_ignored">已忽略版本 %1$s</string>
-    <string name="update_pref_ignore_desc">忽略新版本 %1$s 的更新提示</string>
+    <string name="update_pref_ignore_desc">忽略 %1$s 更新提示</string>
     <string name="update_section_channel">版本通道与操作</string>
     <string name="update_pref_manual_check_title">手动检查更新</string>
-    <string name="update_pref_manual_check_busy">正在检索远程版本信息...</string>
-    <string name="update_pref_manual_check_idle">点击从 GitHub Releases 检索最新版本</string>
-    <string name="update_pref_github_releases_summary">前往项目官方发布页面查看历史版本</string>
+    <string name="update_pref_manual_check_busy">正在检索…</string>
+    <string name="update_pref_manual_check_idle">点击检索最新版本</string>
     <string name="update_pref_os3_title">HyperOS 3 流光特效</string>
-    <string name="update_pref_os3_enabled">已开启 HyperOS 3 增强流光着色器</string>
-    <string name="update_pref_os3_disabled">当前使用 HyperOS 2 经典流光着色器</string>
+    <string name="update_pref_os3_enabled">HyperOS 3 增强流光</string>
+    <string name="update_pref_os3_disabled">HyperOS 2 经典流光</string>
 
     <!-- 弹窗组件 -->
     <string name="dialog_rename_title">修改设备名称</string>
@@ -218,45 +206,38 @@
     <string name="dialog_manual_ip_btn_send">连接并发送</string>
 
     <string name="dialog_send_text_title">发送纯文本</string>
-    <string name="dialog_send_text_label">输入或粘贴要发送的文本内容</string>
     <string name="dialog_send_text_btn_send">发送文本</string>
 
     <string name="dialog_pin_title">设置传输 PIN 码</string>
-    <string name="dialog_pin_desc">设置 PIN 码后，其它设备向您发送内容时必须输入相同的 PIN 码才能完成握手。留空则表示不启用 PIN 保护。</string>
+    <string name="dialog_pin_desc">对方发送时需输入此 PIN 码，留空即关闭</string>
     <string name="dialog_pin_label">PIN 码（留空关闭）</string>
 
-    <string name="dialog_target_pin_title">输入对端设备验证码</string>
-    <string name="dialog_target_pin_desc">目标设备 \"%1$s\" 设置了接收保护，请输入该设备配置的传输 PIN 码完成握手。</string>
+    <string name="dialog_target_pin_title">输入 PIN 码</string>
+    <string name="dialog_target_pin_desc">\"%1$s\" 已启用 PIN 保护</string>
     <string name="dialog_target_pin_label">传输 PIN 码</string>
 
     <string name="dialog_cert_title">TLS 安全证书指纹</string>
-    <string name="dialog_cert_desc">LocalSend 在 HTTPS 模式下使用本设备生成的自签名 X.509 证书进行端到端加密。对方设备可通过比对此 SHA-256 指纹确认未遭受中间人攻击。</string>
+    <string name="dialog_cert_desc">比对指纹可确认未被中间人替换</string>
     <string name="dialog_cert_label">SHA-256 指纹</string>
     <string name="dialog_cert_empty">未生成或 HTTPS 未启用</string>
     <string name="dialog_cert_btn_copy">复制指纹</string>
     <string name="dialog_cert_btn_regenerate">重新生成</string>
     <string name="dialog_cert_regen_confirm_title">重新生成安全证书</string>
-    <string name="dialog_cert_regen_confirm_msg">重新生成后证书指纹会发生变化，所有已记录旧指纹的设备在下次连接时都会校验失败并要求重新确认。确定要继续吗？</string>
+    <string name="dialog_cert_regen_confirm_msg">旧指纹将失效，已信任设备下次连接需重新确认</string>
 
     <string name="dialog_incoming_text_title">收到纯文本消息</string>
     <string name="dialog_incoming_files_title">收到传输请求</string>
-    <string name="dialog_incoming_from_device">来自设备: %1$s (%2$s)</string>
-    <string name="dialog_incoming_text_length">文本内容 (%1$d 字符)</string>
+    <string name="dialog_incoming_from_device">%1$s · %2$s</string>
+    <string name="dialog_incoming_text_length">%1$d 字符</string>
     <string name="dialog_incoming_files_summary">共 %1$d 个文件，大小 %2$s</string>
 
     <string name="sheet_add_content_title">添加发送内容</string>
     <string name="sheet_add_file_title">选择文件</string>
-    <string name="sheet_add_file_summary">从设备存储选择任意文件</string>
     <string name="sheet_add_folder_title">选择文件夹</string>
-    <string name="sheet_add_folder_summary">递归添加整个文件夹内的所有文件</string>
     <string name="sheet_add_media_title">选择媒体</string>
-    <string name="sheet_add_media_summary">从相册选择照片与视频</string>
     <string name="sheet_add_apps_title">选择应用 (APK)</string>
-    <string name="sheet_add_apps_summary">提取本机已安装应用的 APK 文件</string>
     <string name="sheet_add_text_title">输入纯文本</string>
-    <string name="sheet_add_text_summary">输入需要发送的文字或链接</string>
     <string name="sheet_add_clipboard_title">从剪贴板粘贴</string>
-    <string name="sheet_add_clipboard_summary">快速提取当前剪贴板文本或链接</string>
 
     <string name="app_picker_title">选择应用 (APK)</string>
     <string name="app_picker_search_label">搜索应用名称或包名...</string>
@@ -281,7 +262,7 @@
     <string name="history_detail_total_summary">%1$d 项 · %2$s</string>
     <string name="history_detail_text_content">文本内容</string>
     <string name="history_detail_btn_copy_text">复制完整文本</string>
-    <string name="history_detail_included_files">包含文件 (%1$d)</string>
+    <string name="history_detail_included_files">文件列表</string>
     <string name="history_detail_btn_delete_record">删除此记录</string>
 
     <string name="preview_video_tag">视频</string>
@@ -320,27 +301,21 @@
     <string name="session_transfer_complete_check">✓ 传输完成 (共 %1$d 个文件，%2$s)</string>
     <string name="session_file_list_title">文件清单 (%1$d/%2$d)</string>
 
-    <string name="webshare_dialog_title">通过浏览器链接分享 (Web Share)</string>
-    <string name="webshare_dialog_hint">同局域网设备扫描二维码或在浏览器访问下方地址即可互传</string>
-    <string name="webshare_url_label">网页访问地址</string>
-    <string name="webshare_current_shared_count">当前共享内容 (%1$d 项)</string>
+    <string name="webshare_dialog_title">网页快传</string>
+    <string name="webshare_current_shared_count">%1$d 项共享中</string>
     <string name="webshare_more_items">... 等共 %1$d 项</string>
-    <string name="webshare_ready_title">双向网页快传已就绪</string>
-    <string name="webshare_ready_desc_with_files">当前已选择 %1$d 项文件，可随时加入共享供对方下载；电脑/浏览器端也可以直接向手机回传文件。</string>
-    <string name="webshare_ready_desc_empty">对方在浏览器打开此链接可直接拖拽或选择文件回传到手机。如需共享文件给对方，请先在发送页添加内容。</string>
     <string name="webshare_btn_stop_share">停止共享</string>
     <string name="webshare_btn_share_selected">共享已选 %1$d 项</string>
-    <string name="webshare_https_warning">已开启 HTTPS：浏览器访问自签名证书链接会提示安全风险，建议临时关闭 HTTPS 后再使用网页快传</string>
-    <string name="webshare_network_interface">选择网络接口 (IP)</string>
+    <string name="webshare_https_warning">HTTPS 已开启，浏览器会提示证书风险，建议关闭后使用</string>
+    <string name="webshare_btn_copy_url">复制链接</string>
     <string name="webshare_copied_toast">链接已复制到剪贴板</string>
-    <string name="webshare_btn_share_url">分享链接</string>
 
     <string name="update_dialog_title">发现新版本</string>
     <string name="update_dialog_no_changelog">暂无详细更新日志</string>
     <string name="update_dialog_downloading">正在下载更新%1$s</string>
     <string name="update_dialog_ready_install">安装包已下载完成，点击下方按钮立即安装</string>
     <string name="update_dialog_download_failed">下载失败: %1$s</string>
-    <string name="update_dialog_network_hint">如网络连接不稳定，可点击下方\"浏览器下载\"通过网页获取安装包</string>
+    <string name="update_dialog_network_hint">网络不稳时可改用浏览器下载</string>
     <string name="update_dialog_btn_cancel_download">取消下载</string>
     <string name="update_dialog_btn_background_download">后台下载</string>
     <string name="update_dialog_btn_redownload">重新下载</string>
@@ -465,13 +440,11 @@
 
     <!-- 设置：传输收尾 -->
     <string name="settings_pref_auto_finish_title">传输完成后自动收起</string>
-    <string name="settings_pref_auto_finish_summary">传输完成后自动隐藏会话，保持界面清爽</string>
 
     <!-- 设置：快速保存与网页传输 -->
     <string name="receive_pref_quick_save_from_favorites_title">仅自动接收收藏设备</string>
-    <string name="receive_pref_quick_save_from_favorites_summary">开启快速保存时，仅自动接受已收藏设备的传输</string>
     <string name="settings_pref_web_share_auto_accept_title">网页传输自动接受</string>
-    <string name="settings_pref_web_share_auto_accept_summary">浏览器设备类型由发送方自报、可被伪装，开启后其文件将被自动接收，建议仅在可信网络开启</string>
+    <string name="settings_pref_web_share_auto_accept_summary">网页端身份可伪造，建议仅在可信网络开启</string>
 
     <!-- 设置：高级网络选项 -->
     <string name="settings_section_advanced_network">高级网络选项</string>

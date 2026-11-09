@@ -60,17 +60,12 @@
     <!-- Receive Screen -->
     <string name="receive_title">Receive</string>
     <string name="receive_section_local_device">This Device</string>
-    <string name="receive_pref_alias_summary">Device alias (tap to edit)</string>
-    <string name="receive_pref_all_ips_summary">All IP addresses: %1$s (tap to copy)</string>
-    <string name="receive_pref_ip_port_summary">Local IPv4 address and server port (tap to copy)</string>
     <string name="receive_section_options">Receive Options</string>
     <string name="receive_pref_quick_save_title">Quick Save</string>
-    <string name="receive_pref_quick_save_summary">Automatically accept transfer requests from local network without prompt</string>
     <string name="receive_pref_auto_copy_title">Auto Copy Text</string>
-    <string name="receive_pref_auto_copy_summary">Automatically copy received text messages to system clipboard</string>
+    <string name="receive_pref_auto_copy_summary">Auto copy received text messages</string>
     <string name="receive_section_incoming_count">Receiving (%1$d)</string>
-    <string name="receive_waiting_idle">Waiting to receive...</string>
-    <string name="receive_waiting_hint">Make sure the sender is connected to the same Wi-Fi or LAN</string>
+    <string name="receive_waiting_idle">Waiting to receive</string>
 
     <!-- Send Screen -->
     <string name="send_title">Send</string>
@@ -91,19 +86,16 @@
     <string name="send_quick_action_apps">Apps</string>
     <string name="send_quick_action_text">Text</string>
     <string name="send_quick_action_clipboard">Clipboard</string>
-    <string name="send_web_share_running_title">Web Share Active</string>
-    <string name="send_web_share_idle_title">Share via browser link (Web Share)</string>
-    <string name="send_web_share_running_summary">%1$d item(s) shared in LAN. Tap to view link &amp; QR code</string>
-    <string name="send_web_share_idle_summary">No app needed. Any browser can scan QR code or visit link to download</string>
-    <string name="send_section_selected_files">Selected Content (%1$d)</string>
-    <string name="send_selected_summary_header">%1$d items (%2$s)</string>
+    <string name="send_web_share_running_title">Web Share · Sharing (%1$d)</string>
+    <string name="send_web_share_idle_title">Web Share</string>
+    <string name="send_section_selected_files">Selected Content</string>
+    <string name="send_selected_summary_header">%1$d items · %2$s</string>
     <string name="send_type_text_message">Text Message</string>
-    <string name="send_expand_files">Expand remaining %1$d files</string>
+    <string name="send_expand_files">Expand %1$d more</string>
     <string name="send_collapse_files">Collapse file list</string>
     <string name="send_section_nearby_devices">Nearby Devices (%1$d)</string>
-    <string name="send_scanning_subnet_hint">Scanning subnet concurrently for devices...</string>
-    <string name="send_searching_devices_title">Searching for LocalSend devices in LAN...</string>
-    <string name="send_searching_devices_hint">Pull down to refresh or tap top-right broadcast button</string>
+    <string name="send_scanning_subnet_hint">Searching for devices...</string>
+    <string name="send_searching_devices_title">No devices found</string>
     <string name="send_device_multi_subnet_tag">" (+%1$d subnets)"</string>
 
     <!-- Settings Screen -->
@@ -113,19 +105,18 @@
     <string name="settings_pref_device_type_title">Device Type</string>
     <string name="settings_pref_theme_title">App Theme</string>
     <string name="settings_pref_vibrate_title">Vibration on Finish</string>
-    <string name="settings_pref_vibrate_summary">Vibrate when a file transfer finishes</string>
     <string name="settings_pref_notif_perm_title">Notifications &amp; Live Updates</string>
-    <string name="settings_pref_notif_perm_enabled">Enabled (Transfer progress &amp; capsule notifications active)</string>
-    <string name="settings_pref_notif_perm_disabled">Disabled (Tap to grant or open system settings)</string>
+    <string name="settings_pref_notif_perm_enabled">On</string>
+    <string name="settings_pref_notif_perm_disabled">Off · Tap to allow</string>
     <string name="settings_pref_wide_nav_rail_title">Wide Screen Side Navigation</string>
-    <string name="settings_pref_wide_nav_rail_summary">Display navigation rail on the side when screen is wide, defaults to bottom bar</string>
+    <string name="settings_pref_wide_nav_rail_summary">Show side rail on wide screens</string>
     <string name="settings_section_receive">Receive Settings</string>
-    <string name="settings_pref_quick_save_desc">Automatically accept transfer requests from local network without prompt</string>
-    <string name="settings_pref_auto_copy_desc">Automatically copy received text messages to clipboard</string>
+    <string name="settings_pref_quick_save_desc">Auto accept requests from same network</string>
+    <string name="settings_pref_auto_copy_desc">Auto copy received text messages</string>
     <string name="settings_pref_save_text_as_file_title">Save Text as File</string>
-    <string name="settings_pref_save_text_as_file_desc">Save received text messages as .txt files in the download folder; default is off</string>
+    <string name="settings_pref_save_text_as_file_desc">Save as .txt, otherwise just copy and log</string>
     <string name="settings_pref_auto_categorize_title">Smart Media Categorization</string>
-    <string name="settings_pref_auto_categorize_desc">Save photos to Pictures, videos to Movies, and others to Downloads</string>
+    <string name="settings_pref_auto_categorize_desc">Images→Pictures, videos→Movies, rest→Downloads</string>
     <string name="send_favorites_title">Favorite Devices</string>
     <string name="send_action_favorite">Add to Favorites</string>
     <string name="send_action_unfavorite">Remove from Favorites</string>
@@ -134,22 +125,22 @@
     <string name="dialog_incoming_selective_count">Selected %1$d of %2$d items</string>
     <string name="dialog_incoming_select_all">Select All</string>
     <string name="settings_pref_save_history_title">Save Transfer History</string>
-    <string name="settings_pref_save_history_desc">Keep logs of completed and cancelled transfers</string>
+    <string name="settings_pref_save_history_desc">Keep finished and canceled transfers</string>
     <string name="settings_pref_download_path_title">Download Directory</string>
     <string name="settings_custom_folder">Custom folder</string>
     <string name="settings_section_network_security">Network &amp; Security</string>
     <string name="settings_pref_port_title">Server Port</string>
     <string name="settings_pref_https_title">Enable HTTPS (TLS Encryption)</string>
-    <string name="settings_pref_https_summary">Encrypt local network transfers with self-signed certificate</string>
+    <string name="settings_pref_https_summary">Encrypt LAN traffic with a self-signed cert</string>
     <string name="settings_pref_pin_title">Transfer PIN Protection</string>
-    <string name="settings_pref_pin_disabled">Disabled (Tap to set)</string>
+    <string name="settings_pref_pin_disabled">Off</string>
     <string name="settings_pref_pin_enabled">Configured: ••••</string>
     <string name="settings_pref_cert_fp_title">TLS Certificate Fingerprint</string>
-    <string name="settings_pref_cert_fp_enabled">View and regenerate SHA-256 fingerprint</string>
-    <string name="settings_pref_cert_fp_disabled">Available when HTTPS is enabled</string>
+    <string name="settings_pref_cert_fp_enabled">View fingerprint</string>
+    <string name="settings_pref_cert_fp_disabled">Available when HTTPS is on</string>
     <string name="settings_section_about">About</string>
     <string name="settings_pref_check_update_title">Check for Updates</string>
-    <string name="settings_pref_check_update_summary">Current version v%1$s (Tap to check)</string>
+    <string name="settings_pref_check_update_summary">Version v%1$s</string>
     <string name="settings_pref_github_title">GitHub Repository</string>
     <string name="settings_pref_license_title">Open Source &amp; Standards</string>
     <string name="settings_pref_license_summary">LocalSend Protocol v2.1 • Apache 2.0 License</string>
@@ -169,9 +160,8 @@
     <!-- History Screen -->
     <string name="history_title">Transfer History</string>
     <string name="history_empty_title">No Transfer History</string>
-    <string name="history_empty_summary">Completed, failed, or cancelled transfers will appear here</string>
     <string name="history_dialog_clear_title">Clear Transfer History</string>
-    <string name="history_dialog_clear_msg">Are you sure you want to clear all %1$d transfer history records? This cannot be undone.</string>
+    <string name="history_dialog_clear_msg">%1$d records will be deleted permanently</string>
     <string name="history_item_from">Received from %1$s</string>
     <string name="history_item_to">Sent to %1$s</string>
     <string name="history_files_count">%1$d files</string>
@@ -189,20 +179,18 @@
     <string name="update_btn_download_now">Download Update Now</string>
     <string name="update_section_settings">Update Settings</string>
     <string name="update_pref_auto_check_title">Auto Check for Updates</string>
-    <string name="update_pref_auto_check_summary">Automatically check for latest release on startup</string>
     <string name="update_pref_ignore_title">Ignore this version</string>
     <string name="update_pref_ignore_checking">Checking...</string>
     <string name="update_pref_ignore_already_latest">Already the latest version</string>
     <string name="update_pref_ignore_ignored">Ignored version %1$s</string>
-    <string name="update_pref_ignore_desc">Ignore update prompt for version %1$s</string>
+    <string name="update_pref_ignore_desc">Ignore %1$s prompts</string>
     <string name="update_section_channel">Channel &amp; Actions</string>
     <string name="update_pref_manual_check_title">Manual Check</string>
-    <string name="update_pref_manual_check_busy">Fetching remote release info...</string>
-    <string name="update_pref_manual_check_idle">Tap to check latest release from GitHub</string>
-    <string name="update_pref_github_releases_summary">View all releases on GitHub</string>
+    <string name="update_pref_manual_check_busy">Fetching...</string>
+    <string name="update_pref_manual_check_idle">Tap to fetch latest release</string>
     <string name="update_pref_os3_title">HyperOS 3 Shimmer Shader</string>
-    <string name="update_pref_os3_enabled">HyperOS 3 enhanced shimmer shader active</string>
-    <string name="update_pref_os3_disabled">HyperOS 2 classic shimmer shader active</string>
+    <string name="update_pref_os3_enabled">HyperOS 3 shimmer</string>
+    <string name="update_pref_os3_disabled">HyperOS 2 shimmer</string>
 
     <!-- Dialogs -->
     <string name="dialog_rename_title">Edit Device Name</string>
@@ -218,45 +206,38 @@
     <string name="dialog_manual_ip_btn_send">Connect &amp; Send</string>
 
     <string name="dialog_send_text_title">Send Plain Text</string>
-    <string name="dialog_send_text_label">Type or paste text content to send</string>
     <string name="dialog_send_text_btn_send">Send Text</string>
 
     <string name="dialog_pin_title">Set Transfer PIN</string>
-    <string name="dialog_pin_desc">When set, other devices must enter this PIN to complete transfer handshake. Leave empty to disable PIN protection.</string>
+    <string name="dialog_pin_desc">Senders must enter this PIN; leave empty to disable</string>
     <string name="dialog_pin_label">PIN Code (leave empty to disable)</string>
 
-    <string name="dialog_target_pin_title">Enter Target PIN</string>
-    <string name="dialog_target_pin_desc">Target device \"%1$s\" requires PIN protection. Please enter its transfer PIN to continue.</string>
+    <string name="dialog_target_pin_title">Enter PIN</string>
+    <string name="dialog_target_pin_desc">\"%1$s\" is PIN protected</string>
     <string name="dialog_target_pin_label">Transfer PIN</string>
 
     <string name="dialog_cert_title">TLS Certificate Fingerprint</string>
-    <string name="dialog_cert_desc">In HTTPS mode, LocalSend uses a self-signed X.509 certificate for end-to-end encryption. Verify this SHA-256 fingerprint to prevent MITM attacks.</string>
+    <string name="dialog_cert_desc">Compare this fingerprint to rule out interception</string>
     <string name="dialog_cert_label">SHA-256 Fingerprint</string>
     <string name="dialog_cert_empty">Not generated or HTTPS disabled</string>
     <string name="dialog_cert_btn_copy">Copy Fingerprint</string>
     <string name="dialog_cert_btn_regenerate">Regenerate</string>
     <string name="dialog_cert_regen_confirm_title">Regenerate Security Certificate</string>
-    <string name="dialog_cert_regen_confirm_msg">Regenerating changes the certificate fingerprint. Every device that has recorded the old fingerprint will fail verification and ask for confirmation on the next connection. Continue?</string>
+    <string name="dialog_cert_regen_confirm_msg">Old fingerprint becomes invalid; trusted devices must confirm again</string>
 
     <string name="dialog_incoming_text_title">Incoming Text Message</string>
     <string name="dialog_incoming_files_title">Incoming Transfer Request</string>
-    <string name="dialog_incoming_from_device">From: %1$s (%2$s)</string>
-    <string name="dialog_incoming_text_length">Text content (%1$d chars)</string>
+    <string name="dialog_incoming_from_device">%1$s · %2$s</string>
+    <string name="dialog_incoming_text_length">%1$d chars</string>
     <string name="dialog_incoming_files_summary">%1$d file(s), total %2$s</string>
 
     <string name="sheet_add_content_title">Add Content to Send</string>
     <string name="sheet_add_file_title">Files</string>
-    <string name="sheet_add_file_summary">Select any files from storage</string>
     <string name="sheet_add_folder_title">Folder</string>
-    <string name="sheet_add_folder_summary">Add all files in folder recursively</string>
     <string name="sheet_add_media_title">Media</string>
-    <string name="sheet_add_media_summary">Pick photos and videos from gallery</string>
     <string name="sheet_add_apps_title">Apps (APK)</string>
-    <string name="sheet_add_apps_summary">Extract APKs of installed apps</string>
     <string name="sheet_add_text_title">Plain Text</string>
-    <string name="sheet_add_text_summary">Type text or paste links to send</string>
     <string name="sheet_add_clipboard_title">From Clipboard</string>
-    <string name="sheet_add_clipboard_summary">Quickly paste clipboard text or link</string>
 
     <string name="app_picker_title">Select Apps (APK)</string>
     <string name="app_picker_search_label">Search app name or package...</string>
@@ -281,7 +262,7 @@
     <string name="history_detail_total_summary">%1$d item(s) · %2$s</string>
     <string name="history_detail_text_content">Text Content</string>
     <string name="history_detail_btn_copy_text">Copy Full Text</string>
-    <string name="history_detail_included_files">Included Files (%1$d)</string>
+    <string name="history_detail_included_files">Files</string>
     <string name="history_detail_btn_delete_record">Delete Record</string>
 
     <string name="preview_video_tag">Video</string>
@@ -320,27 +301,21 @@
     <string name="session_transfer_complete_check">✓ Transfer complete (%1$d file(s), %2$s)</string>
     <string name="session_file_list_title">File List (%1$d/%2$d)</string>
 
-    <string name="webshare_dialog_title">Share via Browser Link (Web Share)</string>
-    <string name="webshare_dialog_hint">Devices on the same network can scan QR code or visit URL to transfer</string>
-    <string name="webshare_url_label">Web URL</string>
-    <string name="webshare_current_shared_count">Currently Shared (%1$d)</string>
-    <string name="webshare_more_items">... and %1$d more</string>
-    <string name="webshare_ready_title">Bi-directional Web Share Ready</string>
-    <string name="webshare_ready_desc_with_files">%1$d item(s) available for download. Browser can also send files back to phone.</string>
-    <string name="webshare_ready_desc_empty">Open link in browser to upload files directly to this phone. Add files in Send tab to share with browser.</string>
+    <string name="webshare_dialog_title">Web Share</string>
+    <string name="webshare_current_shared_count">%1$d items shared</string>
+    <string name="webshare_more_items">... %1$d items in total</string>
     <string name="webshare_btn_stop_share">Stop Sharing</string>
     <string name="webshare_btn_share_selected">Share Selected (%1$d)</string>
-    <string name="webshare_https_warning">HTTPS is on: browsers will warn about the self-signed certificate. Turn HTTPS off temporarily before using Web Share</string>
-    <string name="webshare_network_interface">Network Interface (IP)</string>
-    <string name="webshare_copied_toast">Link copied to clipboard</string>
-    <string name="webshare_btn_share_url">Share Link</string>
+    <string name="webshare_https_warning">HTTPS is on, browsers will flag the certificate. Turn it off to avoid</string>
+    <string name="webshare_btn_copy_url">Copy link</string>
+    <string name="webshare_copied_toast">Link copied</string>
 
     <string name="update_dialog_title">New Version Available</string>
     <string name="update_dialog_no_changelog">No detailed changelog provided</string>
     <string name="update_dialog_downloading">Downloading update%1$s</string>
     <string name="update_dialog_ready_install">APK downloaded. Tap below to install now.</string>
     <string name="update_dialog_download_failed">Download failed: %1$s</string>
-    <string name="update_dialog_network_hint">If connection is unstable, tap \"Browser Download\" to fetch APK via web.</string>
+    <string name="update_dialog_network_hint">Use Browser Download if the network is unstable</string>
     <string name="update_dialog_btn_cancel_download">Cancel Download</string>
     <string name="update_dialog_btn_background_download">Background</string>
     <string name="update_dialog_btn_redownload">Re-download</string>
@@ -465,13 +440,11 @@
 
     <!-- Settings: transfer finish -->
     <string name="settings_pref_auto_finish_title">Auto-collapse finished transfers</string>
-    <string name="settings_pref_auto_finish_summary">Hide finished sessions automatically to keep the list clean</string>
 
     <!-- Settings: quick save and web share -->
     <string name="receive_pref_quick_save_from_favorites_title">Favorites only</string>
-    <string name="receive_pref_quick_save_from_favorites_summary">With Quick Save on, auto-accept transfers from favorite devices only</string>
     <string name="settings_pref_web_share_auto_accept_title">Web Share auto-accept</string>
-    <string name="settings_pref_web_share_auto_accept_summary">The browser device type is self-reported by the sender and can be spoofed; enabling this auto-accepts their files. Use only on trusted networks</string>
+    <string name="settings_pref_web_share_auto_accept_summary">Browser identity can be spoofed; trusted networks only</string>
 
     <!-- Settings: advanced network -->
     <string name="settings_section_advanced_network">Advanced network</string>

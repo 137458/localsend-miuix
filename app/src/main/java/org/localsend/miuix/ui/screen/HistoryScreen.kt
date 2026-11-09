@@ -54,7 +54,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -130,10 +129,9 @@ fun HistoryScreen(
             ) {
                 if (history.isEmpty()) {
                     item {
-                        SmallTitle(text = stringResource(R.string.history_empty_title))
                         EmptyStateCard(
                             icon = AppIcons.History,
-                            title = stringResource(R.string.history_empty_summary),
+                            title = stringResource(R.string.history_empty_title),
                         )
                     }
                 } else {

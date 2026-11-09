@@ -54,7 +54,6 @@ fun SendTextDialog(
         title = stringResource(R.string.dialog_send_text_title),
         value = text,
         onValueChange = { text = it },
-        label = stringResource(R.string.dialog_send_text_label),
         confirmText = stringResource(R.string.dialog_send_text_btn_send),
         singleLine = false,
         minLines = 3,
@@ -344,7 +343,6 @@ fun AddContentBottomSheet(
             Card(modifier = Modifier.fillMaxWidth()) {
                 ArrowPreference(
                     title = stringResource(R.string.sheet_add_file_title),
-                    summary = stringResource(R.string.sheet_add_file_summary),
                     onClick = {
                         onDismissRequest()
                         onPickFiles()
@@ -352,7 +350,6 @@ fun AddContentBottomSheet(
                 )
                 ArrowPreference(
                     title = stringResource(R.string.sheet_add_folder_title),
-                    summary = stringResource(R.string.sheet_add_folder_summary),
                     onClick = {
                         onDismissRequest()
                         onPickFolder()
@@ -360,7 +357,6 @@ fun AddContentBottomSheet(
                 )
                 ArrowPreference(
                     title = stringResource(R.string.sheet_add_media_title),
-                    summary = stringResource(R.string.sheet_add_media_summary),
                     onClick = {
                         onDismissRequest()
                         onPickMedia()
@@ -368,7 +364,6 @@ fun AddContentBottomSheet(
                 )
                 ArrowPreference(
                     title = stringResource(R.string.sheet_add_apps_title),
-                    summary = stringResource(R.string.sheet_add_apps_summary),
                     onClick = {
                         onDismissRequest()
                         onPickApps()
@@ -376,7 +371,6 @@ fun AddContentBottomSheet(
                 )
                 ArrowPreference(
                     title = stringResource(R.string.sheet_add_text_title),
-                    summary = stringResource(R.string.sheet_add_text_summary),
                     onClick = {
                         onDismissRequest()
                         onSendText()
@@ -384,7 +378,6 @@ fun AddContentBottomSheet(
                 )
                 ArrowPreference(
                     title = stringResource(R.string.sheet_add_clipboard_title),
-                    summary = stringResource(R.string.sheet_add_clipboard_summary),
                     onClick = {
                         onDismissRequest()
                         onPasteClipboard()

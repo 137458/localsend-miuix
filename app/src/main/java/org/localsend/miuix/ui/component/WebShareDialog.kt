@@ -6,9 +6,9 @@ package org.localsend.miuix.ui.component
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,7 +43,10 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Copy
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
@@ -68,6 +71,12 @@ fun WebShareDialog(
     val boundPort by manager.serverPort.collectAsStateWithLifecycle()
     val port = boundPort.takeIf { it > 0 } ?: settings.port
     val shareUrl = "$scheme://$selectedIp:$port"
+    val copiedToast = stringResource(R.string.webshare_copied_toast)
+    val copyUrl = {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Web URL", shareUrl))
+        Toast.makeText(context, copiedToast, Toast.LENGTH_SHORT).show()
+    }
 
     WindowBottomSheet(
         show = show,
@@ -81,14 +90,6 @@ fun WebShareDialog(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = stringResource(R.string.webshare_dialog_hint),
-                style = MiuixTheme.textStyles.body2,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
-
             // QR Code Container with clean white background for scanning
             Box(
                 modifier =
@@ -107,7 +108,32 @@ fun WebShareDialog(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = shareUrl,
+                    style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.SemiBold),
+                    color = MiuixTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .clickable(onClick = copyUrl),
+                )
+                IconButton(onClick = copyUrl) {
+                    Icon(
+                        imageVector = MiuixIcons.Copy,
+                        contentDescription = stringResource(R.string.webshare_btn_copy_url),
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
 
             if (settings.useHttps) {
                 Text(
@@ -118,122 +144,44 @@ fun WebShareDialog(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 12.dp),
+                            .padding(top = 8.dp),
                 )
             }
 
             if (localIps.size > 1) {
-                Card(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp),
-                ) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.webshare_network_interface),
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            modifier = Modifier.padding(bottom = 6.dp),
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            localIps.forEach { ip ->
-                                val isSelected = ip == selectedIp
-                                val label =
-                                    when {
-                                        ip.startsWith("192.168.43.") -> "$ip (热点)"
-                                        ip == localIps.first() -> "$ip (推荐)"
-                                        else -> ip
-                                    }
-                                Button(
-                                    onClick = { selectedIp = ip },
-                                    colors = if (isSelected) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors(),
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    Text(
-                                        text = label,
-                                        style = MiuixTheme.textStyles.footnote1,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-            ) {
+                Spacer(modifier = Modifier.height(12.dp))
                 Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.webshare_url_label),
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = shareUrl,
-                            style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.SemiBold),
-                            color = MiuixTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    localIps.forEach { ip ->
+                        val isSelected = ip == selectedIp
+                        val label =
+                            when {
+                                ip.startsWith("192.168.43.") -> "$ip (热点)"
+                                ip == localIps.first() -> "$ip (推荐)"
+                                else -> ip
+                            }
                         Button(
-                            onClick = {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Web URL", shareUrl))
-                                Toast.makeText(context, context.getString(R.string.webshare_copied_toast), Toast.LENGTH_SHORT).show()
-                            },
-                            colors = ButtonDefaults.buttonColors(),
+                            onClick = { selectedIp = ip },
+                            colors = if (isSelected) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors(),
+                            modifier = Modifier.weight(1f),
                         ) {
-                            Text(stringResource(R.string.btn_copy))
-                        }
-                        Button(
-                            onClick = {
-                                val sendIntent =
-                                    Intent(Intent.ACTION_SEND).apply {
-                                        putExtra(Intent.EXTRA_TEXT, shareUrl)
-                                        type = "text/plain"
-                                    }
-                                val chooser = Intent.createChooser(sendIntent, null)
-                                context.startActivity(chooser)
-                            },
-                            colors = ButtonDefaults.buttonColorsPrimary(),
-                        ) {
-                            Text(stringResource(R.string.webshare_btn_share_url))
+                            Text(
+                                text = label,
+                                style = MiuixTheme.textStyles.footnote1,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
 
             if (isSharing) {
                 val currentShare = shares.first()
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier =
                             Modifier
@@ -278,33 +226,6 @@ fun WebShareDialog(
                                 modifier = Modifier.padding(top = 4.dp, start = 24.dp),
                             )
                         }
-                    }
-                }
-            } else {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.webshare_ready_title),
-                            style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold),
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text =
-                                if (selectedFiles.isNotEmpty()) {
-                                    stringResource(R.string.webshare_ready_desc_with_files, selectedFiles.size)
-                                } else {
-                                    stringResource(R.string.webshare_ready_desc_empty)
-                                },
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
                     }
                 }
             }

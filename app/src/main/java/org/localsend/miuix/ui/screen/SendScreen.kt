@@ -276,8 +276,7 @@ fun SendScreen(
                     item {
                         Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                             ArrowPreference(
-                                title = if (shares.isNotEmpty()) stringResource(R.string.send_web_share_running_title) else stringResource(R.string.send_web_share_idle_title),
-                                summary = if (shares.isNotEmpty()) stringResource(R.string.send_web_share_running_summary, shares.first().files.size) else stringResource(R.string.send_web_share_idle_summary),
+                                title = if (shares.isNotEmpty()) stringResource(R.string.send_web_share_running_title, shares.first().files.size) else stringResource(R.string.send_web_share_idle_title),
                                 startAction = {
                                     Icon(
                                         imageVector = Icons.Default.Language,
@@ -295,7 +294,7 @@ fun SendScreen(
                     if (selectedFiles.isNotEmpty()) {
                         item {
                             Spacer(modifier = Modifier.height(4.dp))
-                            SectionCard(title = stringResource(R.string.send_section_selected_files, selectedFiles.size)) {
+                            SectionCard(title = stringResource(R.string.send_section_selected_files)) {
                                 Column(
                                     modifier =
                                         Modifier
@@ -308,20 +307,15 @@ fun SendScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
+                                            // 条目数、体积与分类合成一行，避免头部堆叠三行重复报数
+                                            val summaryHeader =
+                                                stringResource(R.string.send_selected_summary_header, selectedFiles.size, FileItem.formatFileSize(totalSelectedSize))
                                             Text(
-                                                text = stringResource(R.string.send_selected_summary_header, selectedFiles.size, FileItem.formatFileSize(totalSelectedSize)),
+                                                text = if (categoryBreakdown.isEmpty()) summaryHeader else "$summaryHeader · ${categoryBreakdown.joinToString(" · ")}",
                                                 style = MiuixTheme.textStyles.headline1,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
                                             )
-                                            if (categoryBreakdown.isNotEmpty()) {
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = categoryBreakdown.joinToString(" · "),
-                                                    style = MiuixTheme.textStyles.footnote1,
-                                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                            }
                                         }
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -546,7 +540,6 @@ fun SendScreen(
                             EmptyStateCard(
                                 icon = AppIcons.Wifi,
                                 title = stringResource(R.string.send_searching_devices_title),
-                                hint = stringResource(R.string.send_searching_devices_hint),
                                 iconTint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 titleColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )

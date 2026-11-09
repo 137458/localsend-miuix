@@ -24,7 +24,7 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 internal fun DialogTextField(
     value: String,
     onValueChange: (String) -> Unit,
-    label: String,
+    label: String? = null,
     modifier: Modifier = Modifier,
     keyboardType: KeyboardType = KeyboardType.Text,
     singleLine: Boolean = true,
@@ -39,7 +39,7 @@ internal fun DialogTextField(
                 onValueChange(newValue)
             }
         },
-        label = label,
+        label = label ?: "",
         useLabelAsPlaceholder = true,
         singleLine = singleLine,
         minLines = minLines,
@@ -59,7 +59,7 @@ internal fun TextInputDialog(
     title: String,
     value: String,
     onValueChange: (String) -> Unit,
-    label: String,
+    label: String? = null,
     onDismissRequest: () -> Unit,
     onConfirm: () -> Boolean,
     confirmText: String = stringResource(R.string.btn_confirm),

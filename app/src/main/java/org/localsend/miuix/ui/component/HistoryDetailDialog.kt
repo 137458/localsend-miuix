@@ -137,19 +137,22 @@ fun HistoryDetailDialog(
                         )
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.history_detail_total),
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                        Text(
-                            text = stringResource(R.string.history_detail_total_summary, item.fileCount, item.formattedSize),
-                            style = MiuixTheme.textStyles.footnote1,
-                        )
+                    // 文本消息只有一个 file entry，条目数与体积对用户无意义，仅文件传输显示总量
+                    if (!item.isTextMessage) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.history_detail_total),
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                            Text(
+                                text = stringResource(R.string.history_detail_total_summary, item.fileCount, item.formattedSize),
+                                style = MiuixTheme.textStyles.footnote1,
+                            )
+                        }
                     }
                 }
             }
@@ -158,13 +161,6 @@ fun HistoryDetailDialog(
 
             // Section 2: Text Content or File List
             if (item.isTextMessage && !item.textContent.isNullOrEmpty()) {
-                Text(
-                    text = stringResource(R.string.history_detail_text_content),
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                )
-
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier =
@@ -221,7 +217,7 @@ fun HistoryDetailDialog(
                 }
             } else if (item.fileEntries.isNotEmpty()) {
                 Text(
-                    text = stringResource(R.string.history_detail_included_files, item.fileEntries.size),
+                    text = stringResource(R.string.history_detail_included_files),
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),

@@ -474,7 +474,6 @@ fun UpdateScreen(
                         SectionCard(title = stringResource(R.string.update_section_settings)) {
                             SwitchPreference(
                                 title = stringResource(R.string.update_pref_auto_check_title),
-                                summary = stringResource(R.string.update_pref_auto_check_summary),
                                 checked = settings.autoCheckUpdate,
                                 onCheckedChange = { checked ->
                                     manager.updateSettings { it.copy(autoCheckUpdate = checked) }
@@ -521,7 +520,6 @@ fun UpdateScreen(
 
                             ArrowPreference(
                                 title = "GitHub Releases",
-                                summary = stringResource(R.string.update_pref_github_releases_summary),
                                 onClick = {
                                     UpdateManager.openInBrowser(context, "https://github.com/137458/localsend-miuix/releases")
                                 },

@@ -116,7 +116,6 @@ fun ReceiveScreen(
                     SectionCard(title = stringResource(R.string.receive_section_local_device)) {
                         ArrowPreference(
                             title = settings.alias,
-                            summary = stringResource(R.string.receive_pref_alias_summary),
                             startAction = {
                                 Icon(
                                     imageVector = AppIcons.getDeviceIcon(settings.deviceType),
@@ -129,7 +128,7 @@ fun ReceiveScreen(
                         )
                         ArrowPreference(
                             title = "$primaryIp:$displayPort",
-                            summary = if (localIps.size > 1) stringResource(R.string.receive_pref_all_ips_summary, localIps.joinToString(", ")) else stringResource(R.string.receive_pref_ip_port_summary),
+                            summary = if (localIps.size > 1) localIps.joinToString(", ") else null,
                             onClick = {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 val clip = ClipData.newPlainText("LocalSend IP", "$primaryIp:$displayPort")
@@ -146,7 +145,7 @@ fun ReceiveScreen(
                     SectionCard(title = stringResource(R.string.receive_section_options)) {
                         SwitchPreference(
                             title = stringResource(R.string.receive_pref_quick_save_title),
-                            summary = stringResource(R.string.receive_pref_quick_save_summary),
+                            summary = stringResource(R.string.settings_pref_quick_save_desc),
                             checked = settings.quickSave,
                             onCheckedChange = { checked ->
                                 manager.updateSettings { it.copy(quickSave = checked) }
@@ -154,7 +153,6 @@ fun ReceiveScreen(
                         )
                         SwitchPreference(
                             title = stringResource(R.string.receive_pref_quick_save_from_favorites_title),
-                            summary = stringResource(R.string.receive_pref_quick_save_from_favorites_summary),
                             checked = settings.quickSaveFromFavorites,
                             onCheckedChange = { checked ->
                                 manager.updateSettings { it.copy(quickSaveFromFavorites = checked) }
@@ -190,7 +188,6 @@ fun ReceiveScreen(
                         EmptyStateCard(
                             icon = AppIcons.Wifi,
                             title = stringResource(R.string.receive_waiting_idle),
-                            hint = stringResource(R.string.receive_waiting_hint),
                             iconTint = MiuixTheme.colorScheme.primary,
                         )
                     }

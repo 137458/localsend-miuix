@@ -204,7 +204,6 @@ fun SettingsScreen(
                         )
                         SwitchPreference(
                             title = stringResource(R.string.settings_pref_vibrate_title),
-                            summary = stringResource(R.string.settings_pref_vibrate_summary),
                             checked = settings.vibrateOnComplete,
                             onCheckedChange = { checked ->
                                 manager.updateSettings { it.copy(vibrateOnComplete = checked) }
@@ -212,7 +211,6 @@ fun SettingsScreen(
                         )
                         SwitchPreference(
                             title = stringResource(R.string.settings_pref_auto_finish_title),
-                            summary = stringResource(R.string.settings_pref_auto_finish_summary),
                             checked = settings.autoFinish,
                             onCheckedChange = { checked ->
                                 manager.updateSettings { it.copy(autoFinish = checked) }
@@ -259,7 +257,6 @@ fun SettingsScreen(
                         )
                         SwitchPreference(
                             title = stringResource(R.string.receive_pref_quick_save_from_favorites_title),
-                            summary = stringResource(R.string.receive_pref_quick_save_from_favorites_summary),
                             checked = settings.quickSaveFromFavorites,
                             onCheckedChange = { checked ->
                                 manager.updateSettings { it.copy(quickSaveFromFavorites = checked) }
