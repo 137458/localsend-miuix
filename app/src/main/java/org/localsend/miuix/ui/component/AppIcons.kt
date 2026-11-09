@@ -20,6 +20,7 @@ import top.yukonga.miuix.kmp.icon.extended.Download
 import top.yukonga.miuix.kmp.icon.extended.Favorites
 import top.yukonga.miuix.kmp.icon.extended.File
 import top.yukonga.miuix.kmp.icon.extended.Folder
+import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.Image
 import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.Music
@@ -32,6 +33,7 @@ import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Settings
 
 object AppIcons {
+    val Home: ImageVector = MiuixIcons.Home
     val Send: ImageVector = MiuixIcons.Send
     val Receive: ImageVector = MiuixIcons.Download
     val Settings: ImageVector = MiuixIcons.Settings

@@ -3,6 +3,9 @@
 
 package org.localsend.miuix.ui.screen
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -22,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
@@ -51,6 +55,7 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferSession
+import org.localsend.miuix.network.NetworkUtils
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.EmptyStateCard
@@ -58,6 +63,7 @@ import org.localsend.miuix.ui.component.FilePreviewDialog
 import org.localsend.miuix.ui.component.FileThumbnail
 import org.localsend.miuix.ui.component.InlineTransferProgress
 import org.localsend.miuix.ui.component.SectionCard
+import org.localsend.miuix.ui.component.TransferSessionCard
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import org.localsend.miuix.util.ThumbnailHelper
@@ -86,10 +92,15 @@ import top.yukonga.miuix.kmp.icon.extended.Image
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+/**
+ * 首页（第 0 页）：本机状态、正在接收的传输、待发送队列、快速选择内容与附近设备。
+ * 发送与接收合并为一页：接收是被动能力，只在有任务时出现卡片，接收策略开关统一放在设置页。
+ */
 @Composable
-fun SendScreen(
+fun HomeScreen(
     manager: LocalSendManager,
     contentPadding: PaddingValues,
+    onOpenRenameDialog: () -> Unit,
     onOpenAddSheet: () -> Unit,
     onPickFiles: () -> Unit,
     onPickFolder: () -> Unit,
@@ -101,6 +112,7 @@ fun SendScreen(
     onManualIp: () -> Unit,
 ) {
     val context = LocalContext.current
+    val settings by manager.settings.collectAsStateWithLifecycle()
     val selectedFiles by manager.selectedFiles.collectAsStateWithLifecycle()
     val nearbyDevices by manager.nearbyDevices.collectAsStateWithLifecycle()
     val favoriteDevices by manager.favoriteDevices.collectAsStateWithLifecycle()
@@ -126,6 +138,7 @@ fun SendScreen(
     val isScanning by manager.isScanning.collectAsStateWithLifecycle()
     val activeSessions by manager.activeSessions.collectAsStateWithLifecycle()
     val shares by manager.shares.collectAsStateWithLifecycle()
+    val incomingSessions = remember(activeSessions) { activeSessions.filter { it.isIncoming } }
     val outgoingSessions = remember(activeSessions) { activeSessions.filter { !it.isIncoming } }
     val nonNearbySessions =
         remember(outgoingSessions, nearbyDevices, favoriteDeviceList) {
@@ -134,6 +147,13 @@ fun SendScreen(
                 allKnown.none { it.matches(session.device) }
             }
         }
+
+    // 本机监听地址：端口取自实际绑定值，改端口后立即跟随
+    val localIps = remember { NetworkUtils.getLocalIpAddresses() }
+    val primaryIp = localIps.firstOrNull() ?: "127.0.0.1"
+    val boundPort by manager.serverPort.collectAsStateWithLifecycle()
+    val displayPort = if (boundPort > 0) boundPort else settings.port
+
     val totalSelectedSize = remember(selectedFiles) { selectedFiles.sumOf { it.size } }
     // 只在这里算计数；文案用 stringResource 在组合期读取，切换系统语言后标签才会跟着刷新
     val categoryCounts =
@@ -168,7 +188,7 @@ fun SendScreen(
 
     LaunchedEffect(refreshRequest) {
         if (refreshRequest == 0) return@LaunchedEffect
-        // 由扫描完成信号驱动收起：正常结束、异常与“无可用网卡”早退都会回调完成态，
+        // 由扫描完成信号驱动收起：正常结束、异常与「无可用网卡」早退都会回调完成态，
         // 不再用固定 8 秒计时器兜底（那会掩盖扫描状态未复位的问题）
         manager.refreshDevicesAwait()
         isRefreshing = false
@@ -187,6 +207,15 @@ fun SendScreen(
     val backdrop = rememberBlurBackdrop()
     val colorScheme = MiuixTheme.colorScheme
 
+    val sendTo: (Device) -> Unit = { device ->
+        if (selectedFiles.isEmpty()) {
+            Toast.makeText(context, context.getString(R.string.toast_empty_selection_warn), Toast.LENGTH_SHORT).show()
+        } else {
+            manager.sendFilesTo(device)
+            Toast.makeText(context, context.getString(R.string.toast_initiating_transfer, device.alias), Toast.LENGTH_SHORT).show()
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -195,7 +224,7 @@ fun SendScreen(
                 scrollBehavior = scrollBehavior,
             ) {
                 TopAppBar(
-                    title = stringResource(R.string.send_title),
+                    title = stringResource(R.string.app_name),
                     scrollBehavior = scrollBehavior,
                     color = if (backdrop != null) Color.Transparent else colorScheme.surface,
                     actions = {
@@ -243,54 +272,54 @@ fun SendScreen(
                         ),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    // Section 1: Quick Action Grid (6 types)
+                    // Section 1: 本机状态（可被发现的地址 + 接收状态）
                     item {
-                        SectionCard(title = stringResource(R.string.send_section_quick_pick)) {
-                            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                ) {
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_files), icon = MiuixIcons.Folder, onClick = onPickFiles)
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_folder), icon = MiuixIcons.AddFolder, onClick = onPickFolder)
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_media), icon = MiuixIcons.Image, onClick = onPickMedia)
-                                }
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                ) {
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_apps), icon = Icons.Default.Android, onClick = onPickApps)
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_text), icon = Icons.Default.TextFields, onClick = onSendText)
-                                    QuickActionItem(
-                                        title = stringResource(R.string.send_quick_action_clipboard),
-                                        icon = Icons.AutoMirrored.Filled.Assignment,
-                                        onClick = onPasteClipboard,
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Section 1.5: Web Share Trigger
-                    item {
-                        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                        SectionCard(title = stringResource(R.string.receive_section_local_device)) {
                             ArrowPreference(
-                                title = if (shares.isNotEmpty()) stringResource(R.string.send_web_share_running_title, shares.first().files.size) else stringResource(R.string.send_web_share_idle_title),
+                                title = settings.alias,
                                 startAction = {
                                     Icon(
-                                        imageVector = Icons.Default.Language,
+                                        imageVector = AppIcons.getDeviceIcon(settings.deviceType),
                                         contentDescription = null,
-                                        tint = if (shares.isNotEmpty()) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceSecondary,
+                                        tint = MiuixTheme.colorScheme.primary,
                                         modifier = Modifier.size(24.dp),
                                     )
                                 },
-                                onClick = onOpenWebShare,
+                                onClick = onOpenRenameDialog,
+                            )
+                            ArrowPreference(
+                                title = "$primaryIp:$displayPort",
+                                summary = if (localIps.size > 1) localIps.joinToString(", ") else null,
+                                onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clip = ClipData.newPlainText("LocalSend IP", "$primaryIp:$displayPort")
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                                },
+                            )
+                            LocalStatusRow(
+                                receivingCount = incomingSessions.size,
+                                quickSave = settings.quickSave,
                             )
                         }
                     }
 
-                    // Section 2: Selected Content Queue（仅在选择内容后显示）
+                    // Section 2: 正在接收的传输（仅有任务时出现）
+                    if (incomingSessions.isNotEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            SmallTitle(text = stringResource(R.string.receive_section_incoming_count, incomingSessions.size))
+                        }
+                        items(incomingSessions, key = { it.sessionId }) { session ->
+                            TransferSessionCard(
+                                session = session,
+                                onCancel = { manager.cancelTransfer(session.sessionId) },
+                                onAccept = { manager.acceptAllIncomingTransfer(session.sessionId) },
+                            )
+                        }
+                    }
+
+                    // Section 3: 待发送内容队列（仅在选择内容后显示）
                     if (selectedFiles.isNotEmpty()) {
                         item {
                             Spacer(modifier = Modifier.height(4.dp))
@@ -311,7 +340,7 @@ fun SendScreen(
                                             val summaryHeader =
                                                 stringResource(R.string.send_selected_summary_header, selectedFiles.size, FileItem.formatFileSize(totalSelectedSize))
                                             Text(
-                                                text = if (categoryBreakdown.isEmpty()) summaryHeader else "$summaryHeader · ${categoryBreakdown.joinToString(" · ")}",
+                                                text = if (categoryBreakdown.isEmpty()) summaryHeader else summaryHeader + " · " + categoryBreakdown.joinToString(" · "),
                                                 style = MiuixTheme.textStyles.headline1,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
@@ -380,7 +409,7 @@ fun SendScreen(
                                                     Text(
                                                         text =
                                                             if (file.isTextMessage) {
-                                                                "${file.textContent?.take(30)?.replace("\n", " ") ?: ""} • ${file.formattedSize}"
+                                                                (file.textContent?.take(30)?.replace("\n", " ") ?: "") + " • " + file.formattedSize
                                                             } else {
                                                                 file.formattedSize
                                                             },
@@ -434,7 +463,54 @@ fun SendScreen(
                         }
                     }
 
-                    // Section 2.5: Resend Target Device
+                    // Section 4: 快速选择内容（6 类入口）
+                    item {
+                        SectionCard(title = stringResource(R.string.send_section_quick_pick)) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                ) {
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_files), icon = MiuixIcons.Folder, onClick = onPickFiles)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_folder), icon = MiuixIcons.AddFolder, onClick = onPickFolder)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_media), icon = MiuixIcons.Image, onClick = onPickMedia)
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                ) {
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_apps), icon = Icons.Default.Android, onClick = onPickApps)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_text), icon = Icons.Default.TextFields, onClick = onSendText)
+                                    QuickActionItem(
+                                        title = stringResource(R.string.send_quick_action_clipboard),
+                                        icon = Icons.AutoMirrored.Filled.Assignment,
+                                        onClick = onPasteClipboard,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Section 5: Web Share 入口
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                            ArrowPreference(
+                                title = if (shares.isNotEmpty()) stringResource(R.string.send_web_share_running_title, shares.first().files.size) else stringResource(R.string.send_web_share_idle_title),
+                                startAction = {
+                                    Icon(
+                                        imageVector = Icons.Default.Language,
+                                        contentDescription = null,
+                                        tint = if (shares.isNotEmpty()) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                },
+                                onClick = onOpenWebShare,
+                            )
+                        }
+                    }
+
+                    // Section 6: 历史一键重发的目标设备
                     if (targetResendDevice != null) {
                         val resendDev = targetResendDevice!!
                         item {
@@ -443,7 +519,7 @@ fun SendScreen(
                                 Column(modifier = Modifier.fillMaxWidth()) {
                                     ArrowPreference(
                                         title = resendDev.alias,
-                                        summary = "${resendDev.ip}:${resendDev.port} • " + (resendDev.deviceModel ?: resendDev.deviceType.value),
+                                        summary = resendDev.ip + ":" + resendDev.port + " • " + (resendDev.deviceModel ?: resendDev.deviceType.value),
                                         startAction = {
                                             Icon(
                                                 imageVector = AppIcons.getDeviceIcon(resendDev.deviceType),
@@ -462,13 +538,8 @@ fun SendScreen(
                                             }
                                         },
                                         onClick = {
-                                            if (selectedFiles.isEmpty()) {
-                                                Toast.makeText(context, context.getString(R.string.toast_empty_selection_warn), Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                manager.sendFilesTo(resendDev)
-                                                Toast.makeText(context, context.getString(R.string.toast_initiating_transfer, resendDev.alias), Toast.LENGTH_SHORT).show()
-                                                manager.clearTargetResendDevice()
-                                            }
+                                            manager.clearTargetResendDevice()
+                                            sendTo(resendDev)
                                         },
                                     )
                                 }
@@ -476,7 +547,7 @@ fun SendScreen(
                         }
                     }
 
-                    // Section 3: Favorite Devices
+                    // Section 7: 收藏设备
                     if (favoriteDeviceList.isNotEmpty()) {
                         item {
                             Spacer(modifier = Modifier.height(4.dp))
@@ -488,20 +559,13 @@ fun SendScreen(
                                 isFavorite = true,
                                 outgoingSessions = outgoingSessions,
                                 onToggleFavorite = { manager.toggleFavorite(device) },
-                                onSend = {
-                                    if (selectedFiles.isEmpty()) {
-                                        Toast.makeText(context, context.getString(R.string.toast_empty_selection_warn), Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        manager.sendFilesTo(device)
-                                        Toast.makeText(context, context.getString(R.string.toast_initiating_transfer, device.alias), Toast.LENGTH_SHORT).show()
-                                    }
-                                },
+                                onSend = { sendTo(device) },
                                 onCancelTransfer = { sessionId -> manager.cancelTransfer(sessionId) },
                             )
                         }
                     }
 
-                    // Section 4: Nearby Devices
+                    // Section 8: 附近设备
                     val totalDeviceCount = nonFavoriteNearbyDevices.size + nonNearbySessions.size
                     item {
                         Spacer(modifier = Modifier.height(4.dp))
@@ -551,14 +615,7 @@ fun SendScreen(
                                 isFavorite = false,
                                 outgoingSessions = outgoingSessions,
                                 onToggleFavorite = { manager.toggleFavorite(device) },
-                                onSend = {
-                                    if (selectedFiles.isEmpty()) {
-                                        Toast.makeText(context, context.getString(R.string.toast_empty_selection_warn), Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        manager.sendFilesTo(device)
-                                        Toast.makeText(context, context.getString(R.string.toast_initiating_transfer, device.alias), Toast.LENGTH_SHORT).show()
-                                    }
-                                },
+                                onSend = { sendTo(device) },
                                 onCancelTransfer = { sessionId -> manager.cancelTransfer(sessionId) },
                             )
                         }
@@ -570,7 +627,7 @@ fun SendScreen(
                                     Column(modifier = Modifier.fillMaxWidth()) {
                                         BasicComponent(
                                             title = session.device.alias,
-                                            summary = "${session.device.ip}:${session.device.port} • ${session.device.deviceModel ?: session.device.deviceType.value}",
+                                            summary = session.device.ip + ":" + session.device.port + " • " + (session.device.deviceModel ?: session.device.deviceType.value),
                                             startAction = {
                                                 Icon(
                                                     imageVector = AppIcons.getDeviceIcon(session.device.deviceType),
@@ -603,6 +660,45 @@ fun SendScreen(
                 manager.removeFile(fileToRemove.id)
             },
             onDismissRequest = { previewingIndex = -1 },
+        )
+    }
+}
+
+/** 本机接收状态行：左侧状态点 + 接收中/待接收文案，右侧展示当前接收策略。 */
+@Composable
+private fun LocalStatusRow(
+    receivingCount: Int,
+    quickSave: Boolean,
+) {
+    val receiving = receivingCount > 0
+    val statusColor = if (receiving) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(statusColor),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = if (receiving) stringResource(R.string.home_status_receiving, receivingCount) else stringResource(R.string.home_status_ready),
+            style = MiuixTheme.textStyles.footnote1,
+            color = statusColor,
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = if (quickSave) stringResource(R.string.home_receive_mode_auto) else stringResource(R.string.home_receive_mode_confirm),
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -659,7 +755,7 @@ private fun DeviceItemCard(
         Column(modifier = Modifier.fillMaxWidth()) {
             ArrowPreference(
                 title = device.alias,
-                summary = "${device.ip}:${device.port}$networkLabel • ${device.deviceModel ?: device.deviceType.value}",
+                summary = device.ip + ":" + device.port + networkLabel + " • " + (device.deviceModel ?: device.deviceType.value),
                 startAction = {
                     Icon(
                         imageVector = AppIcons.getDeviceIcon(device.deviceType),

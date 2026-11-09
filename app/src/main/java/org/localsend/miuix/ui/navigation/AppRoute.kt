@@ -10,16 +10,10 @@ import top.yukonga.miuix.kmp.nav.core.NavKey
 @Serializable
 sealed interface AppRoute : NavKey {
     /**
-     * 主框架路由：承载 LiquidGlassBottomBar 悬浮底栏与 接收/发送/设置 HorizontalPager。
+     * 主框架路由：承载 LiquidGlassBottomBar 悬浮底栏与 首页/传输历史/设置 HorizontalPager。
      */
     @Serializable
     data object Main : AppRoute
-
-    /**
-     * 独立传输历史页：支持 HyperOS 原生连续深度进退转场与左滑边缘返回手势（Swipe Dismiss）。
-     */
-    @Serializable
-    data object History : AppRoute
 
     /**
      * 软件更新页：检查最新版本、展示 Release 说明、下载并安装 APK。

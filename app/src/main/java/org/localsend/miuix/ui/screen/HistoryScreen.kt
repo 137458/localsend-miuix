@@ -57,7 +57,6 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Messages
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -68,7 +67,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun HistoryScreen(
     manager: LocalSendManager,
-    onBack: () -> Unit,
+    contentPadding: PaddingValues,
+    onOpenHome: () -> Unit,
 ) {
     val context = LocalContext.current
     val history by manager.transferHistory.collectAsStateWithLifecycle()
@@ -88,11 +88,6 @@ fun HistoryScreen(
                     title = stringResource(R.string.history_title),
                     scrollBehavior = scrollBehavior,
                     color = if (backdrop != null) Color.Transparent else colorScheme.surface,
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(imageVector = MiuixIcons.Back, contentDescription = stringResource(R.string.action_back))
-                        }
-                    },
                     actions = {
                         if (history.isNotEmpty()) {
                             IconButton(onClick = { showClearConfirmDialog = true }) {
@@ -123,7 +118,7 @@ fun HistoryScreen(
                 contentPadding =
                     PaddingValues(
                         top = innerPadding.calculateTopPadding() + 8.dp,
-                        bottom = innerPadding.calculateBottomPadding() + 16.dp,
+                        bottom = contentPadding.calculateBottomPadding() + 16.dp,
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -161,7 +156,7 @@ fun HistoryScreen(
                 val count = manager.resendHistoryItem(item)
                 if (count > 0) {
                     selectedItem = null
-                    onBack()
+                    onOpenHome()
                 } else {
                     Toast.makeText(context, context.getString(R.string.history_resend_empty_hint), Toast.LENGTH_SHORT).show()
                 }

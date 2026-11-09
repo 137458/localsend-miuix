@@ -20,7 +20,6 @@
     <string name="btn_decline">Decline</string>
     <string name="btn_accept">Accept</string>
     <string name="action_back">Back</string>
-    <string name="action_history">History</string>
     <string name="action_input_ip">Input IP</string>
     <string name="action_refresh">Refresh</string>
     <string name="action_cancel_transfer">Cancel Transfer</string>
@@ -28,8 +27,8 @@
     <string name="action_collapse">Collapse</string>
 
     <!-- Navigation Tabs -->
-    <string name="nav_tab_receive">Receive</string>
-    <string name="nav_tab_send">Send</string>
+    <string name="nav_tab_home">Home</string>
+    <string name="nav_tab_history">History</string>
     <string name="nav_tab_settings">Settings</string>
 
     <!-- Common Toasts and Feedback -->
@@ -57,18 +56,17 @@
     <string name="toast_check_update_failed">Failed to check for updates: %1$s</string>
     <string name="enumeration_separator">, </string>
 
-    <!-- Receive Screen -->
-    <string name="receive_title">Receive</string>
+    <!-- Home: local status and receiving -->
     <string name="receive_section_local_device">This Device</string>
-    <string name="receive_section_options">Receive Options</string>
+    <string name="receive_section_incoming_count">Receiving (%1$d)</string>
     <string name="receive_pref_quick_save_title">Quick Save</string>
     <string name="receive_pref_auto_copy_title">Auto Copy Text</string>
-    <string name="receive_pref_auto_copy_summary">Auto copy received text messages</string>
-    <string name="receive_section_incoming_count">Receiving (%1$d)</string>
-    <string name="receive_waiting_idle">Waiting to receive</string>
+    <string name="home_status_ready">Ready to receive</string>
+    <string name="home_status_receiving">Receiving %1$d transfer(s)</string>
+    <string name="home_receive_mode_auto">Quick save is on</string>
+    <string name="home_receive_mode_confirm">Manual accept required</string>
 
-    <!-- Send Screen -->
-    <string name="send_title">Send</string>
+    <!-- Home: pending content and nearby devices -->
     <string name="send_cat_images_count">%1$d images</string>
     <string name="send_cat_videos_count">%1$d videos</string>
     <string name="send_cat_audios_count">%1$d audios</string>

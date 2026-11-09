@@ -60,8 +60,7 @@ import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.navigation.AppRoute
 import org.localsend.miuix.ui.navigation.LocalTabGesturePosition
 import org.localsend.miuix.ui.screen.HistoryScreen
-import org.localsend.miuix.ui.screen.ReceiveScreen
-import org.localsend.miuix.ui.screen.SendScreen
+import org.localsend.miuix.ui.screen.HomeScreen
 import org.localsend.miuix.ui.screen.SettingsScreen
 import org.localsend.miuix.ui.screen.UpdateScreen
 import org.localsend.miuix.updates.UpdatePrompt
@@ -156,15 +155,15 @@ fun App(manager: LocalSendManager) {
         }
     }
 
-    // 3. Navigation Items（接收在第 0 页，发送在第 1 页，设置在第 2 页）
-    val tabReceive = stringResource(R.string.nav_tab_receive)
-    val tabSend = stringResource(R.string.nav_tab_send)
+    // 3. Navigation Items（首页在第 0 页，传输历史在第 1 页，设置在第 2 页）
+    val tabHome = stringResource(R.string.nav_tab_home)
+    val tabHistory = stringResource(R.string.nav_tab_history)
     val tabSettings = stringResource(R.string.nav_tab_settings)
     val navigationItems =
-        remember(tabReceive, tabSend, tabSettings) {
+        remember(tabHome, tabHistory, tabSettings) {
             listOf(
-                NavigationItem(tabReceive, AppIcons.Receive),
-                NavigationItem(tabSend, AppIcons.Send),
+                NavigationItem(tabHome, AppIcons.Home),
+                NavigationItem(tabHistory, AppIcons.History),
                 NavigationItem(tabSettings, AppIcons.Settings),
             )
         }
@@ -462,16 +461,10 @@ fun App(manager: LocalSendManager) {
                                     )
                                 when (page) {
                                     0 ->
-                                        ReceiveScreen(
+                                        HomeScreen(
                                             manager = manager,
                                             contentPadding = pagePadding,
                                             onOpenRenameDialog = { showRenameDialog = true },
-                                            onOpenHistory = { backStack.add(AppRoute.History) },
-                                        )
-                                    1 ->
-                                        SendScreen(
-                                            manager = manager,
-                                            contentPadding = pagePadding,
                                             onOpenAddSheet = { showAddContentSheet = true },
                                             onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
                                             onPickFolder = { folderPickerLauncher.launch(null) },
@@ -485,6 +478,12 @@ fun App(manager: LocalSendManager) {
                                             onPasteClipboard = pickClipboard,
                                             onOpenWebShare = { showWebShareDialog = true },
                                             onManualIp = { showManualIpDialog = true },
+                                        )
+                                    1 ->
+                                        HistoryScreen(
+                                            manager = manager,
+                                            contentPadding = pagePadding,
+                                            onOpenHome = { selectTab(0) },
                                         )
                                     2 ->
                                         SettingsScreen(
@@ -500,16 +499,6 @@ fun App(manager: LocalSendManager) {
                         }
                     }
                 }
-            }
-
-            // 独立传输历史页（通过 miuix-nav 连续深度推进展示，支持左滑边缘返回手势）
-            entry<AppRoute.History>(
-                swipeDismiss = NavSwipeDirection.LeftToRight,
-            ) {
-                HistoryScreen(
-                    manager = manager,
-                    onBack = { backStack.removeLastOrNull() },
-                )
             }
 
             // 独立软件更新页（通过 miuix-nav 连续深度推进展示，支持左滑边缘返回手势）

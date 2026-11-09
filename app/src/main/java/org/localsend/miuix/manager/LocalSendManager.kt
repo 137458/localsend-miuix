@@ -149,11 +149,11 @@ class LocalSendManager(
     private val _shares = MutableStateFlow<List<ShareSession>>(emptyList())
     val shares: StateFlow<List<ShareSession>> = _shares.asStateFlow()
 
-    // 外部 Intent（如分享或打开文件）驱动的主界面 Tab 切换请求（0: 接收, 1: 发送, 2: 设置），消费后置空
+    // 外部 Intent（如分享或打开文件）驱动的主界面 Tab 切换请求（0: 首页, 1: 传输历史, 2: 设置），消费后置空
     private val _requestedTabIndex = MutableStateFlow<Int?>(null)
     val requestedTabIndex: StateFlow<Int?> = _requestedTabIndex.asStateFlow()
 
-    // 传输历史一键重发时关联的目标设备，进入发送页时可置顶高亮并支持一键发起传输
+    // 传输历史一键重发时关联的目标设备，回到首页时可置顶展示并支持一键发起传输
     private val _targetResendDevice = MutableStateFlow<Device?>(null)
     val targetResendDevice: StateFlow<Device?> = _targetResendDevice.asStateFlow()
 
