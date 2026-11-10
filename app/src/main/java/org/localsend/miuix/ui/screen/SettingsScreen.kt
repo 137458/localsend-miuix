@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,6 +33,7 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.ui.MainActivity
+import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.CertFingerprintDialog
 import org.localsend.miuix.ui.component.DialogButtonRow
@@ -43,6 +45,9 @@ import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import org.localsend.miuix.util.AppLanguage
 import org.localsend.miuix.util.SettingsValidators
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
@@ -177,14 +182,28 @@ fun SettingsScreen(
                                 (context as? MainActivity)?.recreate()
                             },
                         )
+                        val deviceTypeEntry =
+                            DropdownEntry(
+                                items =
+                                    supportedDeviceTypes.mapIndexed { index, type ->
+                                        DropdownItem(
+                                            text = deviceTypeOptions.getOrElse(index) { type.name },
+                                            selected = index == currentDeviceTypeIndex,
+                                            icon = { modifier ->
+                                                Icon(
+                                                    imageVector = AppIcons.getDeviceIcon(type),
+                                                    contentDescription = null,
+                                                    tint = MiuixTheme.colorScheme.primary,
+                                                    modifier = modifier.size(24.dp),
+                                                )
+                                            },
+                                            onClick = { manager.updateSettings { it.copy(deviceType = type) } },
+                                        )
+                                    },
+                            )
                         WindowDropdownPreference(
+                            entry = deviceTypeEntry,
                             title = stringResource(R.string.settings_pref_device_type_title),
-                            items = deviceTypeOptions,
-                            selectedIndex = currentDeviceTypeIndex,
-                            onSelectedIndexChange = { index ->
-                                val newType = supportedDeviceTypes.getOrElse(index) { DeviceType.mobile }
-                                manager.updateSettings { it.copy(deviceType = newType) }
-                            },
                         )
                         WindowDropdownPreference(
                             title = stringResource(R.string.settings_pref_theme_title),

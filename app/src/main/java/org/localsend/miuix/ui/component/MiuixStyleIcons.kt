@@ -1,6 +1,7 @@
 package org.localsend.miuix.ui.component
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -18,6 +19,7 @@ import androidx.compose.ui.unit.dp
 object MiuixStyleIcons {
     private const val STROKE_WIDTH = 1.7f
     private const val FILLED_VIEWPORT = 35f
+    private const val ARCHIVE_VIEWPORT = 64f
 
     /** 以左上角、宽高与圆角半径追加一个圆角矩形，与 SVG 的 rect rx/ry 等价。 */
     private fun PathBuilder.roundedRect(
@@ -39,9 +41,12 @@ object MiuixStyleIcons {
         close()
     }
 
-    /** 以 35 单位网格容纳整幅填充型矢量，供设计方直接提供的图形使用。 */
+    /** 容纳整幅填充型矢量，供设计方直接提供的图形使用。 */
     private fun filledIcon(
         name: String,
+        viewport: Float = FILLED_VIEWPORT,
+        pathFillType: PathFillType = PathFillType.NonZero,
+        outlineWidth: Float = 0f,
         path: PathBuilder.() -> Unit,
     ): ImageVector {
         val builder =
@@ -49,10 +54,17 @@ object MiuixStyleIcons {
                 name = name,
                 defaultWidth = 24.dp,
                 defaultHeight = 24.dp,
-                viewportWidth = FILLED_VIEWPORT,
-                viewportHeight = FILLED_VIEWPORT,
+                viewportWidth = viewport,
+                viewportHeight = viewport,
             )
-        builder.addPath(pathData = PathBuilder().apply(path).nodes, fill = SolidColor(Color.Black))
+        builder.addPath(
+            pathData = PathBuilder().apply(path).nodes,
+            pathFillType = pathFillType,
+            fill = SolidColor(Color.Black),
+            stroke = if (outlineWidth > 0f) SolidColor(Color.Black) else null,
+            strokeLineWidth = outlineWidth,
+            strokeLineJoin = StrokeJoin.Round,
+        )
         return builder.build()
     }
 
@@ -132,31 +144,59 @@ object MiuixStyleIcons {
             close()
         }
 
-    /** 压缩包归档：带盖盒子与中央竖向拉链 */
+    /** 压缩包归档：文件柜造型，取自设计方提供的 64 单位网格填充矢量并等比缩至 0.86。 */
     val Archive: ImageVector =
-        icon(
+        filledIcon(
             name = "MiuixStyleIcons.Archive",
-            strokePath = {
-                moveTo(4.6f, 5.4f)
-                horizontalLineTo(19.4f)
-                moveTo(4.6f, 5.4f)
-                verticalLineTo(18.4f)
-                arcToRelative(2.6f, 2.6f, 0f, false, false, 2.6f, 2.6f)
-                horizontalLineToRelative(9.6f)
-                arcToRelative(2.6f, 2.6f, 0f, false, false, 2.6f, -2.6f)
-                verticalLineTo(5.4f)
-                moveTo(4.6f, 8.6f)
-                horizontalLineTo(19.4f)
-                moveTo(12f, 8.6f)
-                verticalLineTo(18.2f)
-                moveTo(10.2f, 11f)
-                horizontalLineTo(13.8f)
-                moveTo(10.2f, 14f)
-                horizontalLineTo(13.8f)
-                moveTo(10.2f, 17f)
-                horizontalLineTo(13.8f)
-            },
-        )
+            viewport = ARCHIVE_VIEWPORT,
+            pathFillType = PathFillType.EvenOdd,
+            outlineWidth = 1.09f,
+        ) {
+            moveTo(29.42f, 13.94f)
+            lineTo(34.58f, 13.94f)
+            curveTo(35.53f, 13.94f, 36.3f, 13.17f, 36.3f, 12.22f)
+            curveTo(36.3f, 11.27f, 35.53f, 10.5f, 34.58f, 10.5f)
+            lineTo(29.42f, 10.5f)
+            curveTo(28.47f, 10.5f, 27.7f, 11.27f, 27.7f, 12.22f)
+            curveTo(27.7f, 13.17f, 28.47f, 13.94f, 29.42f, 13.94f)
+            close()
+            moveTo(29.42f, 38.02f)
+            lineTo(34.58f, 38.02f)
+            curveTo(35.53f, 38.02f, 36.3f, 37.25f, 36.3f, 36.3f)
+            curveTo(36.3f, 35.35f, 35.53f, 34.58f, 34.58f, 34.58f)
+            lineTo(29.42f, 34.58f)
+            curveTo(28.47f, 34.58f, 27.7f, 35.35f, 27.7f, 36.3f)
+            curveTo(27.7f, 37.25f, 28.47f, 38.02f, 29.42f, 38.02f)
+            close()
+            moveTo(23.4f, 56.94f)
+            lineTo(40.6f, 56.94f)
+            curveTo(40.6f, 57.89f, 41.37f, 58.66f, 42.32f, 58.66f)
+            lineTo(47.48f, 58.66f)
+            curveTo(48.43f, 58.66f, 49.2f, 57.89f, 49.2f, 56.94f)
+            lineTo(49.21f, 56.94f)
+            curveTo(50.16f, 56.93f, 50.92f, 56.17f, 50.92f, 55.22f)
+            lineTo(50.92f, 7.06f)
+            curveTo(50.92f, 6.11f, 50.15f, 5.34f, 49.2f, 5.34f)
+            lineTo(14.8f, 5.34f)
+            curveTo(13.85f, 5.34f, 13.08f, 6.11f, 13.08f, 7.06f)
+            lineTo(13.08f, 55.22f)
+            curveTo(13.08f, 56.17f, 13.84f, 56.93f, 14.79f, 56.94f)
+            lineTo(14.8f, 56.94f)
+            curveTo(14.8f, 57.89f, 15.57f, 58.66f, 16.52f, 58.66f)
+            lineTo(21.68f, 58.66f)
+            curveTo(22.63f, 58.66f, 23.4f, 57.89f, 23.4f, 56.94f)
+            close()
+            moveTo(47.48f, 32.86f)
+            lineTo(47.48f, 53.5f)
+            lineTo(16.52f, 53.5f)
+            lineTo(16.52f, 32.86f)
+            close()
+            moveTo(47.48f, 29.42f)
+            lineTo(16.52f, 29.42f)
+            lineTo(16.52f, 8.78f)
+            lineTo(47.48f, 8.78f)
+            close()
+        }
 
     /** 视频文件 */
     val Movie: ImageVector =

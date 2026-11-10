@@ -1,6 +1,8 @@
 package org.localsend.miuix.ui.component
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import org.localsend.miuix.model.DeviceType
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Download
@@ -48,6 +50,13 @@ object AppIcons {
             DeviceType.web -> MiuixStyleIcons.Language
             DeviceType.headless, DeviceType.server -> MiuixStyleIcons.Storage
         }
+
+    /** 本机设备按真实屏幕形态显示：宽度 600dp 及以上视为平板，与对外宣称的设备类型设置解耦。 */
+    @Composable
+    fun localDeviceIcon(): ImageVector {
+        val configuration = LocalConfiguration.current
+        return if (configuration.screenWidthDp >= 600) MiuixStyleIcons.Tablet else MiuixIcons.Phone
+    }
 
     fun getFileIcon(
         mimeType: String,

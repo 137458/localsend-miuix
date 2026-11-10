@@ -272,7 +272,7 @@ fun HomeScreen(
                                 title = settings.alias,
                                 startAction = {
                                     Icon(
-                                        imageVector = AppIcons.getDeviceIcon(settings.deviceType),
+                                        imageVector = AppIcons.localDeviceIcon(),
                                         contentDescription = null,
                                         tint = MiuixTheme.colorScheme.primary,
                                         modifier = Modifier.size(24.dp),
