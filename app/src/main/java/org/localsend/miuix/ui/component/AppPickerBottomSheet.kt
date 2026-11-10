@@ -116,7 +116,7 @@ private fun AppIconImage(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = AppIcons.Android,
+                imageVector = AppIcons.App,
                 contentDescription = null,
                 tint = MiuixTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),

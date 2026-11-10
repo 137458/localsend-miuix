@@ -9,6 +9,7 @@ import top.yukonga.miuix.kmp.icon.extended.Favorites
 import top.yukonga.miuix.kmp.icon.extended.FavoritesFill
 import top.yukonga.miuix.kmp.icon.extended.File
 import top.yukonga.miuix.kmp.icon.extended.Folder
+import top.yukonga.miuix.kmp.icon.extended.GridView
 import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.Image
 import top.yukonga.miuix.kmp.icon.extended.Music
@@ -36,7 +37,7 @@ object AppIcons {
     val Favorite: ImageVector = MiuixIcons.FavoritesFill
     val FavoriteBorder: ImageVector = MiuixIcons.Favorites
     val Check: ImageVector = MiuixIcons.Ok
-    val Android: ImageVector = MiuixStyleIcons.Android
+    val App: ImageVector = MiuixIcons.GridView
     val Web: ImageVector = MiuixStyleIcons.Language
     val Paste: ImageVector = MiuixIcons.Paste
 
@@ -57,7 +58,7 @@ object AppIcons {
         val lowerMime = mimeType.lowercase()
         return when {
             // Android APK 安装包
-            lowerMime == "application/vnd.android.package-archive" || lowerName.endsWith(".apk") || lowerName.endsWith(".xapk") || lowerName.endsWith(".apks") -> MiuixStyleIcons.Android
+            lowerMime == "application/vnd.android.package-archive" || lowerName.endsWith(".apk") || lowerName.endsWith(".xapk") || lowerName.endsWith(".apks") -> App
 
             // 图片类型
             lowerMime.startsWith("image/") ||

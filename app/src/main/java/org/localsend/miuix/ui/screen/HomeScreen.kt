@@ -473,7 +473,7 @@ fun HomeScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                 ) {
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_apps), icon = AppIcons.Android, onClick = actions.onPickApps)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_apps), icon = AppIcons.App, onClick = actions.onPickApps)
                                     QuickActionItem(title = stringResource(R.string.send_quick_action_text), icon = AppIcons.Text, onClick = actions.onSendText)
                                     QuickActionItem(
                                         title = stringResource(R.string.send_quick_action_clipboard),

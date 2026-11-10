@@ -18,6 +18,26 @@ import androidx.compose.ui.unit.dp
 object MiuixStyleIcons {
     private const val STROKE_WIDTH = 1.7f
 
+    /** 以左上角、宽高与圆角半径追加一个圆角矩形，与 SVG 的 rect rx/ry 等价。 */
+    private fun PathBuilder.roundedRect(
+        left: Float,
+        top: Float,
+        width: Float,
+        height: Float,
+        radius: Float,
+    ) {
+        moveTo(left + radius, top)
+        horizontalLineTo(left + width - radius)
+        arcToRelative(radius, radius, 0f, false, true, radius, radius)
+        verticalLineTo(top + height - radius)
+        arcToRelative(radius, radius, 0f, false, true, -radius, radius)
+        horizontalLineTo(left + radius)
+        arcToRelative(radius, radius, 0f, false, true, -radius, -radius)
+        verticalLineTo(top + radius)
+        arcToRelative(radius, radius, 0f, false, true, radius, -radius)
+        close()
+    }
+
     private fun icon(
         name: String,
         strokePath: PathBuilder.() -> Unit,
@@ -47,55 +67,29 @@ object MiuixStyleIcons {
         return builder.build()
     }
 
-    /** Android 设备与 APK 安装包 */
-    val Android: ImageVector =
-        icon(
-            name = "MiuixStyleIcons.Android",
-            strokePath = {
-                moveTo(7f, 8.3f)
-                lineTo(5f, 4.5f)
-                moveTo(17f, 8.3f)
-                lineTo(19f, 4.5f)
-                moveTo(3.6f, 11.4f)
-                arcToRelative(3f, 3f, 0f, false, true, 3f, -3f)
-                horizontalLineToRelative(10.8f)
-                arcToRelative(3f, 3f, 0f, false, true, 3f, 3f)
-                verticalLineToRelative(4.8f)
-                arcToRelative(3f, 3f, 0f, false, true, -3f, 3f)
-                horizontalLineTo(6.6f)
-                arcToRelative(3f, 3f, 0f, false, true, -3f, -3f)
-                close()
-            },
-            fillPath = {
-                moveTo(7.1f, 14.9f)
-                arcToRelative(1.3f, 1.3f, 0f, false, true, 2.6f, 0f)
-                arcToRelative(1.3f, 1.3f, 0f, false, true, -2.6f, 0f)
-                close()
-                moveTo(14.3f, 14.9f)
-                arcToRelative(1.3f, 1.3f, 0f, false, true, 2.6f, 0f)
-                arcToRelative(1.3f, 1.3f, 0f, false, true, -2.6f, 0f)
-                close()
-            },
-        )
-
-    /** 压缩包归档 */
+    /** 压缩包归档：带盖盒子与中央竖向拉链 */
     val Archive: ImageVector =
         icon(
             name = "MiuixStyleIcons.Archive",
             strokePath = {
-                moveTo(3.2f, 6.6f)
-                horizontalLineTo(20.8f)
-                moveTo(5.2f, 6.6f)
-                verticalLineTo(17.6f)
-                arcToRelative(3f, 3f, 0f, false, false, 3f, 3f)
-                horizontalLineToRelative(7.6f)
-                arcToRelative(3f, 3f, 0f, false, false, 3f, -3f)
-                verticalLineTo(6.6f)
-                moveTo(11f, 9.7f)
-                horizontalLineToRelative(2f)
-                verticalLineToRelative(3.8f)
-                horizontalLineToRelative(-2f)
-                close()
+                moveTo(4.6f, 5.4f)
+                horizontalLineTo(19.4f)
+                moveTo(4.6f, 5.4f)
+                verticalLineTo(18.4f)
+                arcToRelative(2.6f, 2.6f, 0f, false, false, 2.6f, 2.6f)
+                horizontalLineToRelative(9.6f)
+                arcToRelative(2.6f, 2.6f, 0f, false, false, 2.6f, -2.6f)
+                verticalLineTo(5.4f)
+                moveTo(4.6f, 8.6f)
+                horizontalLineTo(19.4f)
+                moveTo(12f, 8.6f)
+                verticalLineTo(18.2f)
+                moveTo(10.2f, 11f)
+                horizontalLineTo(13.8f)
+                moveTo(10.2f, 14f)
+                horizontalLineTo(13.8f)
+                moveTo(10.2f, 17f)
+                horizontalLineTo(13.8f)
             },
         )
 
@@ -140,47 +134,27 @@ object MiuixStyleIcons {
             },
         )
 
-    /** 平板设备 */
+    /** 平板设备：竖屏机身与底部指示条 */
     val Tablet: ImageVector =
         icon(
             name = "MiuixStyleIcons.Tablet",
             strokePath = {
-                moveTo(7f, 2.6f)
-                arcToRelative(3f, 3f, 0f, false, false, -3f, 3f)
-                verticalLineToRelative(12.8f)
-                arcToRelative(3f, 3f, 0f, false, false, 3f, 3f)
-                horizontalLineToRelative(10f)
-                arcToRelative(3f, 3f, 0f, false, false, 3f, -3f)
-                verticalLineTo(5.6f)
-                arcToRelative(3f, 3f, 0f, false, false, -3f, -3f)
-                close()
-            },
-            fillPath = {
-                moveTo(10.9f, 16.8f)
-                arcToRelative(1.1f, 1.1f, 0f, false, true, 2.2f, 0f)
-                arcToRelative(1.1f, 1.1f, 0f, false, true, -2.2f, 0f)
-                close()
+                roundedRect(5.4f, 2.6f, 13.2f, 18.8f, 2.8f)
+                moveTo(9.9f, 18.3f)
+                horizontalLineTo(14.1f)
             },
         )
 
-    /** 桌面设备 */
+    /** 桌面设备：宽屏显示器与底座 */
     val Computer: ImageVector =
         icon(
             name = "MiuixStyleIcons.Computer",
             strokePath = {
-                moveTo(2.6f, 5.2f)
-                arcToRelative(2.6f, 2.6f, 0f, false, true, 2.6f, -2.6f)
-                horizontalLineToRelative(13.6f)
-                arcToRelative(2.6f, 2.6f, 0f, false, true, 2.6f, 2.6f)
-                verticalLineToRelative(8.2f)
-                arcToRelative(2.6f, 2.6f, 0f, false, true, -2.6f, 2.6f)
-                horizontalLineTo(5.2f)
-                arcToRelative(2.6f, 2.6f, 0f, false, true, -2.6f, -2.6f)
-                close()
-                moveTo(12f, 13.4f)
-                verticalLineTo(16.8f)
-                moveTo(7.8f, 20.4f)
-                horizontalLineTo(16.2f)
+                roundedRect(2.6f, 3.4f, 18.8f, 11.6f, 2.2f)
+                moveTo(12f, 15f)
+                verticalLineTo(18.2f)
+                moveTo(6.6f, 20.6f)
+                horizontalLineTo(17.4f)
             },
         )
 
@@ -189,31 +163,15 @@ object MiuixStyleIcons {
         icon(
             name = "MiuixStyleIcons.Storage",
             strokePath = {
-                moveTo(4.2f, 5.6f)
-                arcToRelative(2f, 2f, 0f, false, true, 2f, -2f)
-                horizontalLineToRelative(11.6f)
-                arcToRelative(2f, 2f, 0f, false, true, 2f, 2f)
-                verticalLineToRelative(1.8f)
-                arcToRelative(2f, 2f, 0f, false, true, -2f, 2f)
-                horizontalLineTo(6.2f)
-                arcToRelative(2f, 2f, 0f, false, true, -2f, -2f)
-                close()
-                moveTo(4.2f, 16.6f)
-                arcToRelative(2f, 2f, 0f, false, true, 2f, -2f)
-                horizontalLineToRelative(11.6f)
-                arcToRelative(2f, 2f, 0f, false, true, 2f, 2f)
-                verticalLineToRelative(1.8f)
-                arcToRelative(2f, 2f, 0f, false, true, -2f, 2f)
-                horizontalLineTo(6.2f)
-                arcToRelative(2f, 2f, 0f, false, true, -2f, -2f)
-                close()
+                roundedRect(4.2f, 3.6f, 15.6f, 5.8f, 2f)
+                roundedRect(4.2f, 14.6f, 15.6f, 5.8f, 2f)
             },
             fillPath = {
-                moveTo(6.35f, 6.1f)
+                moveTo(6.35f, 6.5f)
                 arcToRelative(1.05f, 1.05f, 0f, false, true, 2.1f, 0f)
                 arcToRelative(1.05f, 1.05f, 0f, false, true, -2.1f, 0f)
                 close()
-                moveTo(6.35f, 17.1f)
+                moveTo(6.35f, 17.5f)
                 arcToRelative(1.05f, 1.05f, 0f, false, true, 2.1f, 0f)
                 arcToRelative(1.05f, 1.05f, 0f, false, true, -2.1f, 0f)
                 close()
