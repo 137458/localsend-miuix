@@ -62,9 +62,11 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.ProgressiveBlur
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Messages
@@ -113,13 +115,19 @@ fun HistoryScreen(
             history.filterByTab(currentTab)
         }
 
+    // 无模糊能力时退化为实色底，避免滚动中的卡片穿透分段条
+    val filterStripBackground =
+        if (backdrop == null) Modifier.background(colorScheme.surface) else Modifier
+
     Scaffold(
         topBar = {
-            Column {
-                BlurredBar(
-                    backdrop = backdrop,
-                    scrollBehavior = scrollBehavior,
-                ) {
+            BlurredBar(
+                backdrop = backdrop,
+                scrollBehavior = scrollBehavior,
+                // 满额模糊覆盖标题区与分段条，到分段条底部再快速渐隐，整块头部连成一片
+                gradient = ProgressiveBlur.Top.copy(curve = 6f),
+            ) {
+                Column {
                     TopAppBar(
                         title = stringResource(R.string.history_title),
                         scrollBehavior = scrollBehavior,
@@ -150,26 +158,32 @@ fun HistoryScreen(
                             }
                         },
                     )
-                }
-                // 实色底：列表从顶栏下方穿过时，避免卡片从胶囊四周透出并压住顶栏的渐变模糊
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .background(colorScheme.surface)
-                            .padding(
-                                top = 4.dp,
-                                bottom = 6.dp,
-                                start = 16.dp,
-                                end = 16.dp,
-                            ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    TabRowWithContour(
-                        tabs = filterTabs,
-                        selectedTabIndex = selectedFilterIndex,
-                        onTabSelected = { selectedFilterIndex = it },
-                    )
+                    // 分段条并入顶栏模糊层，标题与胶囊连成一片渐变模糊；无模糊能力时退化为实色底，避免卡片穿透
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .then(filterStripBackground)
+                                .padding(
+                                    top = 4.dp,
+                                    bottom = 6.dp,
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TabRowWithContour(
+                            tabs = filterTabs,
+                            selectedTabIndex = selectedFilterIndex,
+                            onTabSelected = { selectedFilterIndex = it },
+                            // 轨道底色透明：分段条不遮挡顶栏渐变模糊；选中胶囊用浅灰实色以在毛玻璃上可见
+                            colors =
+                                TabRowDefaults.tabRowColors(
+                                    backgroundColor = Color.Transparent,
+                                    selectedBackgroundColor = colorScheme.surface,
+                                ),
+                        )
+                    }
                 }
             }
         },

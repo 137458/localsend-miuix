@@ -55,6 +55,7 @@ fun Modifier.blurBackdropSource(backdrop: LayerBackdrop?): Modifier = if (backdr
  * @param modifier 外部修饰符
  * @param blurEnabled 是否启用毛玻璃效果
  * @param scrollBehavior 顶栏滚动行为控制器，用于根据 contentOffset 动态驱动毛玻璃平滑淡入
+ * @param gradient 模糊沿 Y 轴的衰减曲线；顶栏内含常驻子内容（如分段条）时可调大 curve，让满额模糊覆盖到子内容底部再快速渐隐
  * @param content 顶栏主体内容（通常为设置了透明背景色的 TopAppBar 或 SmallTopAppBar）
  */
 @Composable
@@ -63,6 +64,7 @@ fun BlurredBar(
     modifier: Modifier = Modifier,
     blurEnabled: Boolean = true,
     scrollBehavior: ScrollBehavior? = null,
+    gradient: ProgressiveBlur = ProgressiveBlur.Top.copy(curve = 2.2f),
     content: @Composable () -> Unit,
 ) {
     Box(modifier = modifier) {
@@ -80,8 +82,8 @@ fun BlurredBar(
                         }.progressiveTextureBlur(
                             backdrop = backdrop,
                             shape = RectangleShape,
-                            // 顶部状态栏满额模糊向底部平滑渐隐至 0，curve = 2.2f 柔和过渡，绝无硬切割边缘
-                            gradient = ProgressiveBlur.Top.copy(curve = 2.2f),
+                            // 顶部状态栏满额模糊向底部平滑渐隐至 0，默认 curve = 2.2f 柔和过渡，绝无硬切割边缘
+                            gradient = gradient,
                             blurRadius = 10f,
                             colors =
                                 BlurDefaults.blurColors(
