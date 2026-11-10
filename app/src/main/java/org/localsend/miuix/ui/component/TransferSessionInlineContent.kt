@@ -11,10 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -36,6 +32,9 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Messages
+import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.extended.Report
+import top.yukonga.miuix.kmp.icon.extended.Timer
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -149,21 +148,21 @@ internal fun InlineFileTransferProgress(
             when (session.status) {
                 TransferStatus.Completed ->
                     Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                        imageVector = MiuixIcons.Ok,
                         contentDescription = null,
                         tint = MiuixTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp),
                     )
                 TransferStatus.Failed ->
                     Icon(
-                        imageVector = Icons.Default.Error,
+                        imageVector = MiuixIcons.Report,
                         contentDescription = null,
                         tint = MiuixTheme.colorScheme.error,
                         modifier = Modifier.size(16.dp),
                     )
                 TransferStatus.WaitingApproval ->
                     Icon(
-                        imageVector = Icons.Default.HourglassEmpty,
+                        imageVector = MiuixIcons.Timer,
                         contentDescription = null,
                         tint = MiuixTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp),

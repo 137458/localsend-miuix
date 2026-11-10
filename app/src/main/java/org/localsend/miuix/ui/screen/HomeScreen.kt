@@ -222,7 +222,7 @@ fun HomeScreen(
                     color = if (backdrop != null) Color.Transparent else colorScheme.surface,
                     actions = {
                         IconButton(onClick = actions.onManualIp) {
-                            Icon(imageVector = AppIcons.Dialpad, contentDescription = stringResource(R.string.action_input_ip))
+                            Icon(imageVector = AppIcons.Edit, contentDescription = stringResource(R.string.action_input_ip))
                         }
                         IconButton(
                             onClick = {
@@ -477,7 +477,7 @@ fun HomeScreen(
                                     QuickActionItem(title = stringResource(R.string.send_quick_action_text), icon = AppIcons.Text, onClick = actions.onSendText)
                                     QuickActionItem(
                                         title = stringResource(R.string.send_quick_action_clipboard),
-                                        icon = AppIcons.Clipboard,
+                                        icon = AppIcons.Paste,
                                         onClick = actions.onPasteClipboard,
                                     )
                                 }
@@ -595,7 +595,7 @@ fun HomeScreen(
                     if (nonFavoriteNearbyDevices.isEmpty() && nonNearbySessions.isEmpty() && !isScanning) {
                         item {
                             EmptyStateCard(
-                                icon = AppIcons.Wifi,
+                                icon = AppIcons.SearchDevice,
                                 title = stringResource(R.string.send_searching_devices_title),
                                 iconTint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 titleColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -761,7 +761,7 @@ private fun DeviceItemCard(
                 endActions = {
                     IconButton(onClick = onToggleFavorite) {
                         Icon(
-                            imageVector = if (isFavorite) AppIcons.Star else AppIcons.StarBorder,
+                            imageVector = if (isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
                             contentDescription = if (isFavorite) stringResource(R.string.send_action_unfavorite) else stringResource(R.string.send_action_favorite),
                             tint = if (isFavorite) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )

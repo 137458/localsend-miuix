@@ -15,10 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,6 +35,10 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.extended.Report
+import top.yukonga.miuix.kmp.icon.extended.Timer
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -190,7 +190,7 @@ internal fun FileDetailItem(
         when (file.status) {
             TransferStatus.Completed ->
                 Icon(
-                    imageVector = Icons.Default.CheckCircle,
+                    imageVector = MiuixIcons.Ok,
                     contentDescription = stringResource(R.string.status_completed),
                     tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp),
@@ -203,14 +203,14 @@ internal fun FileDetailItem(
                 )
             TransferStatus.Failed ->
                 Icon(
-                    imageVector = Icons.Default.Error,
+                    imageVector = MiuixIcons.Report,
                     contentDescription = stringResource(R.string.status_failed),
                     tint = MiuixTheme.colorScheme.error,
                     modifier = Modifier.size(18.dp),
                 )
             TransferStatus.WaitingApproval, TransferStatus.Canceled ->
                 Icon(
-                    imageVector = Icons.Default.HourglassEmpty,
+                    imageVector = MiuixIcons.Timer,
                     contentDescription = stringResource(R.string.status_waiting),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.size(16.dp),

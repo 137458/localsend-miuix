@@ -1,35 +1,32 @@
 package org.localsend.miuix.ui.component
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Computer
-import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tablet
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.ui.graphics.vector.ImageVector
 import org.localsend.miuix.model.DeviceType
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Copy
 import top.yukonga.miuix.kmp.icon.extended.Download
+import top.yukonga.miuix.kmp.icon.extended.Edit
 import top.yukonga.miuix.kmp.icon.extended.Favorites
+import top.yukonga.miuix.kmp.icon.extended.FavoritesFill
 import top.yukonga.miuix.kmp.icon.extended.File
 import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.Image
-import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.Music
+import top.yukonga.miuix.kmp.icon.extended.Notes
 import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.extended.Paste
 import top.yukonga.miuix.kmp.icon.extended.Phone
 import top.yukonga.miuix.kmp.icon.extended.Recent
 import top.yukonga.miuix.kmp.icon.extended.Refresh
-import top.yukonga.miuix.kmp.icon.extended.Scan
+import top.yukonga.miuix.kmp.icon.extended.SearchDevice
 import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Settings
 
@@ -39,20 +36,17 @@ object AppIcons {
     val Receive: ImageVector = MiuixIcons.Download
     val Settings: ImageVector = MiuixIcons.Settings
     val Refresh: ImageVector = MiuixIcons.Refresh
-    val Scan: ImageVector = MiuixIcons.Scan
+    val SearchDevice: ImageVector = MiuixIcons.SearchDevice
     val Folder: ImageVector = MiuixIcons.Folder
-    val Text: ImageVector = Icons.Default.TextFields
-    val Wifi: ImageVector = Icons.Default.Wifi
-    val Link: ImageVector = MiuixIcons.Link
-    val Copy: ImageVector = MiuixIcons.Copy
+    val Text: ImageVector = MiuixIcons.Notes
+    val Edit: ImageVector = MiuixIcons.Edit
     val History: ImageVector = MiuixIcons.Recent
-    val Star: ImageVector = MiuixIcons.Favorites
-    val StarBorder: ImageVector = Icons.Default.StarBorder
-    val Dialpad: ImageVector = Icons.Default.Dialpad
+    val Favorite: ImageVector = MiuixIcons.FavoritesFill
+    val FavoriteBorder: ImageVector = MiuixIcons.Favorites
     val Check: ImageVector = MiuixIcons.Ok
     val Android: ImageVector = Icons.Default.Android
     val Web: ImageVector = Icons.Default.Language
-    val Clipboard: ImageVector = Icons.AutoMirrored.Filled.Assignment
+    val Paste: ImageVector = MiuixIcons.Paste
 
     fun getDeviceIcon(type: DeviceType): ImageVector =
         when (type) {
@@ -146,7 +140,7 @@ object AppIcons {
                 lowerName.endsWith(".h") ||
                 lowerName.endsWith(".sh") ||
                 lowerName.endsWith(".bat") ||
-                lowerName.endsWith(".sql") -> Icons.Default.TextFields
+                lowerName.endsWith(".sql") -> MiuixIcons.Notes
 
             // 通用文档类型
             else -> MiuixIcons.File
