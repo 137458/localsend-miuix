@@ -22,5 +22,6 @@ LocalSend 协议（v2）兼容的 Android 原生重写版，Compose + Miuix（Hy
 | 业务场景 | 文档路径 | 核心内容 |
 |---|---|---|
 | **UI 规范审查** | `docs/research/miuix-0.9.4-rc01-ui-review.md` | Miuix 0.9.4-rc01 官方组件契约、偏差改写清单与落点速查 |
+| **TabRow 架构调研** | `docs/research/miuix-tabrow-implementation-research.md` | Miuix TabRow 与 TabRowWithContour 契约剖析、测量算法与落地建议 |
 | **全量质量评估** | `docs/research/quality-assessment-report.md` | 23 项缺陷矩阵（P0~P3）、根因定位与整改路线图 |
 | **对外更新日志** | `CHANGELOG.md` | 外部发布历史与版本变更记录（对外文档） |

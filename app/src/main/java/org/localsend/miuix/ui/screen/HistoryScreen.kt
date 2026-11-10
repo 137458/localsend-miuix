@@ -62,7 +62,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.TabRow
+import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -159,25 +159,23 @@ fun HistoryScreen(
                     .background(colorScheme.surface)
                     .blurBackdropSource(backdrop),
         ) {
-            if (history.isNotEmpty()) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                top = innerPadding.calculateTopPadding() + 4.dp,
-                                bottom = 4.dp,
-                                start = 16.dp,
-                                end = 16.dp,
-                            ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    TabRow(
-                        tabs = filterTabs,
-                        selectedTabIndex = selectedFilterIndex,
-                        onTabSelected = { selectedFilterIndex = it },
-                    )
-                }
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            top = innerPadding.calculateTopPadding() + 4.dp,
+                            bottom = 6.dp,
+                            start = 16.dp,
+                            end = 16.dp,
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                TabRowWithContour(
+                    tabs = filterTabs,
+                    selectedTabIndex = selectedFilterIndex,
+                    onTabSelected = { selectedFilterIndex = it },
+                )
             }
 
             LazyColumn(
@@ -187,7 +185,7 @@ fun HistoryScreen(
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding =
                     PaddingValues(
-                        top = if (history.isEmpty()) innerPadding.calculateTopPadding() + 8.dp else 4.dp,
+                        top = 4.dp,
                         bottom = contentPadding.calculateBottomPadding() + 16.dp,
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -208,6 +206,7 @@ fun HistoryScreen(
                     items(filteredHistory, key = { it.id }) { item ->
                         HistoryItemCard(
                             item = item,
+                            modifier = Modifier.animateItem(),
                             onClick = { selectedItem = item },
                             onLongClick = { itemToDelete = item },
                             onCopyText = { text ->
@@ -343,6 +342,7 @@ private fun HistoryItemCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onCopyText: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val primary = MiuixTheme.colorScheme.primary
@@ -379,7 +379,7 @@ private fun HistoryItemCard(
         onClick = onClick,
         onLongPress = onLongClick,
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp),
     ) {
