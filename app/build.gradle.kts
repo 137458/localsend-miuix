@@ -101,7 +101,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-util")
     implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material:material-icons-extended")
 
     // Miuix (HyperOS Compose UI Library, Nav & Blur Engine)
     val miuixVersion = "0.9.4"

@@ -20,8 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Android
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -118,7 +116,7 @@ private fun AppIconImage(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = Icons.Default.Android,
+                imageVector = AppIcons.Android,
                 contentDescription = null,
                 tint = MiuixTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),

@@ -1,13 +1,5 @@
 package org.localsend.miuix.ui.component
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Computer
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Tablet
 import androidx.compose.ui.graphics.vector.ImageVector
 import org.localsend.miuix.model.DeviceType
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -44,17 +36,17 @@ object AppIcons {
     val Favorite: ImageVector = MiuixIcons.FavoritesFill
     val FavoriteBorder: ImageVector = MiuixIcons.Favorites
     val Check: ImageVector = MiuixIcons.Ok
-    val Android: ImageVector = Icons.Default.Android
-    val Web: ImageVector = Icons.Default.Language
+    val Android: ImageVector = MiuixStyleIcons.Android
+    val Web: ImageVector = MiuixStyleIcons.Language
     val Paste: ImageVector = MiuixIcons.Paste
 
     fun getDeviceIcon(type: DeviceType): ImageVector =
         when (type) {
             DeviceType.mobile -> MiuixIcons.Phone
-            DeviceType.tablet -> Icons.Default.Tablet
-            DeviceType.desktop -> Icons.Default.Computer
-            DeviceType.web -> Icons.Default.Language
-            DeviceType.headless, DeviceType.server -> Icons.Default.Storage
+            DeviceType.tablet -> MiuixStyleIcons.Tablet
+            DeviceType.desktop -> MiuixStyleIcons.Computer
+            DeviceType.web -> MiuixStyleIcons.Language
+            DeviceType.headless, DeviceType.server -> MiuixStyleIcons.Storage
         }
 
     fun getFileIcon(
@@ -65,7 +57,7 @@ object AppIcons {
         val lowerMime = mimeType.lowercase()
         return when {
             // Android APK 安装包
-            lowerMime == "application/vnd.android.package-archive" || lowerName.endsWith(".apk") || lowerName.endsWith(".xapk") || lowerName.endsWith(".apks") -> Icons.Default.Android
+            lowerMime == "application/vnd.android.package-archive" || lowerName.endsWith(".apk") || lowerName.endsWith(".xapk") || lowerName.endsWith(".apks") -> MiuixStyleIcons.Android
 
             // 图片类型
             lowerMime.startsWith("image/") ||
@@ -88,7 +80,7 @@ object AppIcons {
                 lowerName.endsWith(".flv") ||
                 lowerName.endsWith(".wmv") ||
                 lowerName.endsWith(".webm") ||
-                lowerName.endsWith(".3gp") -> Icons.Default.Movie
+                lowerName.endsWith(".3gp") -> MiuixStyleIcons.Movie
 
             // 音频类型
             lowerMime.startsWith("audio/") ||
@@ -115,7 +107,7 @@ object AppIcons {
                 lowerName.endsWith(".tar") ||
                 lowerName.endsWith(".gz") ||
                 lowerName.endsWith(".bz2") ||
-                lowerName.endsWith(".xz") -> Icons.Default.Archive
+                lowerName.endsWith(".xz") -> MiuixStyleIcons.Archive
 
             // 文本与代码文档
             lowerMime.startsWith("text/") ||
