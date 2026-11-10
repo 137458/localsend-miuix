@@ -48,6 +48,8 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateCheckResult
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.FileItem
+import org.localsend.miuix.model.MainTabs
+import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.ui.component.AddContentBottomSheet
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.AppPickerBottomSheet
@@ -60,6 +62,7 @@ import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.navigation.AppRoute
 import org.localsend.miuix.ui.navigation.LocalTabGesturePosition
 import org.localsend.miuix.ui.screen.HistoryScreen
+import org.localsend.miuix.ui.screen.HomeActions
 import org.localsend.miuix.ui.screen.HomeScreen
 import org.localsend.miuix.ui.screen.SettingsScreen
 import org.localsend.miuix.ui.screen.UpdateScreen
@@ -86,10 +89,23 @@ fun App(manager: LocalSendManager) {
     val scope = rememberCoroutineScope()
     val settings by manager.settings.collectAsStateWithLifecycle()
     val pendingIncomingSession by manager.pendingIncomingSession.collectAsStateWithLifecycle()
+    val activeSessions by manager.activeSessions.collectAsStateWithLifecycle()
     val sessionMessage by manager.sessionMessage.collectAsStateWithLifecycle()
     val requestedTabIndex by manager.requestedTabIndex.collectAsStateWithLifecycle()
     val recentManualIps by manager.recentManualIps.collectAsStateWithLifecycle()
     val pendingTargetPinPrompt by manager.pendingTargetPinPrompt.collectAsStateWithLifecycle()
+
+    val incomingTaskCount =
+        remember(pendingIncomingSession, activeSessions) {
+            val activeIncoming =
+                activeSessions.filter {
+                    it.isIncoming &&
+                        (it.status == TransferStatus.WaitingApproval || it.status == TransferStatus.InProgress)
+                }
+            val pendingId = pendingIncomingSession?.sessionId
+            val hasPending = pendingIncomingSession != null && activeIncoming.none { it.sessionId == pendingId }
+            activeIncoming.size + (if (hasPending) 1 else 0)
+        }
 
     // 传输提示（如"对方拒绝接收"）以 Toast 呈现，显示后即消费
     LaunchedEffect(sessionMessage) {
@@ -342,6 +358,26 @@ fun App(manager: LocalSendManager) {
         }
     }
 
+    val homeActions =
+        remember {
+            HomeActions(
+                onOpenRenameDialog = { showRenameDialog = true },
+                onOpenAddSheet = { showAddContentSheet = true },
+                onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
+                onPickFolder = { folderPickerLauncher.launch(null) },
+                onPickMedia = {
+                    mediaPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                    )
+                },
+                onPickApps = { showAppPickerSheet = true },
+                onSendText = { showSendTextDialog = true },
+                onPasteClipboard = pickClipboard,
+                onOpenWebShare = { showWebShareDialog = true },
+                onManualIp = { showManualIpDialog = true },
+            )
+        }
+
     MiuixTheme(controller = themeController) {
         val surfaceColor = MiuixTheme.colorScheme.surface
         val backdrop =
@@ -410,8 +446,8 @@ fun App(manager: LocalSendManager) {
                                         onItemClick = selectTab,
                                         backdrop = backdrop,
                                         badge = { index ->
-                                            if (index == 0 && pendingIncomingSession != null) {
-                                                { Badge { Text("1") } }
+                                            if (index == MainTabs.HOME && incomingTaskCount > 0) {
+                                                { Badge { Text(incomingTaskCount.toString()) } }
                                             } else {
                                                 null
                                             }
@@ -460,32 +496,19 @@ fun App(manager: LocalSendManager) {
                                         bottom = innerPadding.calculateBottomPadding(),
                                     )
                                 when (page) {
-                                    0 ->
+                                    MainTabs.HOME ->
                                         HomeScreen(
                                             manager = manager,
                                             contentPadding = pagePadding,
-                                            onOpenRenameDialog = { showRenameDialog = true },
-                                            onOpenAddSheet = { showAddContentSheet = true },
-                                            onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
-                                            onPickFolder = { folderPickerLauncher.launch(null) },
-                                            onPickMedia = {
-                                                mediaPickerLauncher.launch(
-                                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                                                )
-                                            },
-                                            onPickApps = { showAppPickerSheet = true },
-                                            onSendText = { showSendTextDialog = true },
-                                            onPasteClipboard = pickClipboard,
-                                            onOpenWebShare = { showWebShareDialog = true },
-                                            onManualIp = { showManualIpDialog = true },
+                                            actions = homeActions,
                                         )
-                                    1 ->
+                                    MainTabs.HISTORY ->
                                         HistoryScreen(
                                             manager = manager,
                                             contentPadding = pagePadding,
-                                            onOpenHome = { selectTab(0) },
+                                            onOpenHome = { selectTab(MainTabs.HOME) },
                                         )
-                                    2 ->
+                                    MainTabs.SETTINGS ->
                                         SettingsScreen(
                                             manager = manager,
                                             contentPadding = pagePadding,

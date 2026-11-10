@@ -1,6 +1,7 @@
 package org.localsend.miuix.ui.component
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Computer
@@ -49,6 +50,9 @@ object AppIcons {
     val StarBorder: ImageVector = Icons.Default.StarBorder
     val Dialpad: ImageVector = Icons.Default.Dialpad
     val Check: ImageVector = MiuixIcons.Ok
+    val Android: ImageVector = Icons.Default.Android
+    val Web: ImageVector = Icons.Default.Language
+    val Clipboard: ImageVector = Icons.AutoMirrored.Filled.Assignment
 
     fun getDeviceIcon(type: DeviceType): ImageVector =
         when (type) {

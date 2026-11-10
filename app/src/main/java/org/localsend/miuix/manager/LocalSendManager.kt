@@ -42,6 +42,7 @@ import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.HistoryFileEntry
+import org.localsend.miuix.model.MainTabs
 import org.localsend.miuix.model.SaveTarget
 import org.localsend.miuix.model.ShareSession
 import org.localsend.miuix.model.TransferHistoryItem
@@ -470,7 +471,7 @@ class LocalSendManager(
                         textContent = item.textContent,
                     )
                 addFiles(listOf(fileItem))
-                requestNavigateToTab(1) // 切换到发送 Tab
+                requestNavigateToTab(MainTabs.HOME) // 切换到首页（含待发送队列）
                 return@withContext 1
             }
 
@@ -509,7 +510,7 @@ class LocalSendManager(
 
             if (validItems.isNotEmpty()) {
                 addFiles(validItems)
-                requestNavigateToTab(1) // 切换到发送 Tab
+                requestNavigateToTab(MainTabs.HOME) // 切换到首页（含待发送队列）
             }
             validItems.size
         }

@@ -15,6 +15,7 @@ import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import org.localsend.miuix.R
 import org.localsend.miuix.core.PreferenceKeys
 import org.localsend.miuix.manager.LocalSendManager
+import org.localsend.miuix.model.MainTabs
 import org.localsend.miuix.notification.TransferNotifier
 import org.localsend.miuix.util.AppLanguage
 
@@ -109,8 +110,8 @@ class MainActivity :
                 .extractShareItems(applicationContext, intent)
         if (items.isNotEmpty()) {
             manager.addFiles(items)
-            // 自动跳转至主界面的“发送”Tab（索引 1）
-            manager.requestNavigateToTab(1)
+            // 自动跳转至主界面的首页 Tab（包含待发送队列）
+            manager.requestNavigateToTab(MainTabs.HOME)
             val msg =
                 if (items.size == 1 && items[0].textContent != null) {
                     getString(R.string.toast_external_text_added)

@@ -307,6 +307,8 @@
     <string name="webshare_https_warning">HTTPS 已开启，浏览器会提示证书风险，建议关闭后使用</string>
     <string name="webshare_btn_copy_url">复制链接</string>
     <string name="webshare_copied_toast">链接已复制到剪贴板</string>
+    <string name="webshare_ip_tag_hotspot">%1$s (热点)</string>
+    <string name="webshare_ip_tag_recommended">%1$s (推荐)</string>
 
     <string name="update_dialog_title">发现新版本</string>
     <string name="update_dialog_no_changelog">暂无详细更新日志</string>

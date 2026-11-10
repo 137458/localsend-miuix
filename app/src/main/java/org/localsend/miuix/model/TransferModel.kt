@@ -3,6 +3,7 @@ package org.localsend.miuix.model
 import android.net.Uri
 import kotlinx.serialization.Serializable
 import org.localsend.miuix.transfer.RemainingTime
+import org.localsend.miuix.util.ThumbnailHelper
 import java.util.UUID
 
 @Serializable
@@ -282,4 +283,42 @@ data class TransferHistoryItem(
 ) {
     val formattedSize: String
         get() = FileItem.formatFileSize(totalSize)
+}
+
+/** 待发送文件列表按类型分类的统计结果。 */
+data class SelectedFilesCategoryCounts(
+    val images: Int,
+    val videos: Int,
+    val audios: Int,
+    val texts: Int,
+    val apks: Int,
+    val others: Int,
+)
+
+/** 统计待发送文件列表中各文件类型的数量，消除 UI 层对领域的重复刺探。 */
+fun List<FileItem>.countCategories(): SelectedFilesCategoryCounts {
+    var images = 0
+    var videos = 0
+    var audios = 0
+    var texts = 0
+    var apks = 0
+    var others = 0
+    for (item in this) {
+        when {
+            ThumbnailHelper.isImage(item) -> images++
+            ThumbnailHelper.isVideo(item) -> videos++
+            item.mimeType.startsWith("audio/") -> audios++
+            item.isTextMessage -> texts++
+            ThumbnailHelper.isApk(item) -> apks++
+            else -> others++
+        }
+    }
+    return SelectedFilesCategoryCounts(
+        images = images,
+        videos = videos,
+        audios = audios,
+        texts = texts,
+        apks = apks,
+        others = others,
+    )
 }

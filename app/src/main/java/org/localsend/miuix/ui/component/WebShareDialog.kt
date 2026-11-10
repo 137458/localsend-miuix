@@ -158,8 +158,8 @@ fun WebShareDialog(
                         val isSelected = ip == selectedIp
                         val label =
                             when {
-                                ip.startsWith("192.168.43.") -> "$ip (热点)"
-                                ip == localIps.first() -> "$ip (推荐)"
+                                ip.startsWith("192.168.43.") -> stringResource(R.string.webshare_ip_tag_hotspot, ip)
+                                ip == localIps.first() -> stringResource(R.string.webshare_ip_tag_recommended, ip)
                                 else -> ip
                             }
                         Button(

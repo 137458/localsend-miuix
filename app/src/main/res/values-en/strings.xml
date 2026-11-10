@@ -307,6 +307,8 @@
     <string name="webshare_https_warning">HTTPS is on, browsers will flag the certificate. Turn it off to avoid</string>
     <string name="webshare_btn_copy_url">Copy link</string>
     <string name="webshare_copied_toast">Link copied</string>
+    <string name="webshare_ip_tag_hotspot">%1$s (Hotspot)</string>
+    <string name="webshare_ip_tag_recommended">%1$s (Recommended)</string>
 
     <string name="update_dialog_title">New Version Available</string>
     <string name="update_dialog_no_changelog">No detailed changelog provided</string>

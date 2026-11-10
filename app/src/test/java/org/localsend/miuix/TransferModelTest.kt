@@ -11,6 +11,7 @@ import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.model.countCategories
 import org.localsend.miuix.transfer.RemainingTime
 
 class TransferModelTest {
@@ -192,5 +193,25 @@ class TransferModelTest {
 
         val waiting = session(listOf(file("a")), status = TransferStatus.WaitingApproval, speed = 100L, totalBytes = 1000L)
         assertEquals(RemainingTime.Hidden, waiting.remainingTime)
+    }
+
+    @Test
+    fun countCategoriesGroupsFileTypesCorrectly() {
+        val files =
+            listOf(
+                FileItem(name = "photo.jpg", mimeType = "image/jpeg"),
+                FileItem(name = "clip.mp4", mimeType = "video/mp4"),
+                FileItem(name = "song.mp3", mimeType = "audio/mpeg"),
+                FileItem(name = "note.txt", mimeType = "text/plain", textContent = "hello"),
+                FileItem(name = "app.apk", mimeType = "application/vnd.android.package-archive"),
+                FileItem(name = "doc.pdf", mimeType = "application/pdf"),
+            )
+        val counts = files.countCategories()
+        assertEquals(1, counts.images)
+        assertEquals(1, counts.videos)
+        assertEquals(1, counts.audios)
+        assertEquals(1, counts.texts)
+        assertEquals(1, counts.apks)
+        assertEquals(1, counts.others)
     }
 }

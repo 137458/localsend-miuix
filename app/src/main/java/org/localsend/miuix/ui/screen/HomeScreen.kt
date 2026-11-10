@@ -27,11 +27,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Assignment
-import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,6 +50,7 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.Device
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferSession
+import org.localsend.miuix.model.countCategories
 import org.localsend.miuix.network.NetworkUtils
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.BlurredBar
@@ -66,7 +62,6 @@ import org.localsend.miuix.ui.component.SectionCard
 import org.localsend.miuix.ui.component.TransferSessionCard
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
-import org.localsend.miuix.util.ThumbnailHelper
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -92,6 +87,20 @@ import top.yukonga.miuix.kmp.icon.extended.Image
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+/** 首页所有交互操作动作回调集合，收拢零散参数并消除 Data Clumps。 */
+data class HomeActions(
+    val onOpenRenameDialog: () -> Unit,
+    val onOpenAddSheet: () -> Unit,
+    val onPickFiles: () -> Unit,
+    val onPickFolder: () -> Unit,
+    val onPickMedia: () -> Unit,
+    val onPickApps: () -> Unit,
+    val onSendText: () -> Unit,
+    val onPasteClipboard: () -> Unit,
+    val onOpenWebShare: () -> Unit,
+    val onManualIp: () -> Unit,
+)
+
 /**
  * 首页（第 0 页）：本机状态、正在接收的传输、待发送队列、快速选择内容与附近设备。
  * 发送与接收合并为一页：接收是被动能力，只在有任务时出现卡片，接收策略开关统一放在设置页。
@@ -100,16 +109,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun HomeScreen(
     manager: LocalSendManager,
     contentPadding: PaddingValues,
-    onOpenRenameDialog: () -> Unit,
-    onOpenAddSheet: () -> Unit,
-    onPickFiles: () -> Unit,
-    onPickFolder: () -> Unit,
-    onPickMedia: () -> Unit,
-    onPickApps: () -> Unit,
-    onSendText: () -> Unit,
-    onPasteClipboard: () -> Unit,
-    onOpenWebShare: () -> Unit,
-    onManualIp: () -> Unit,
+    actions: HomeActions,
 ) {
     val context = LocalContext.current
     val settings by manager.settings.collectAsStateWithLifecycle()
@@ -156,30 +156,23 @@ fun HomeScreen(
 
     val totalSelectedSize = remember(selectedFiles) { selectedFiles.sumOf { it.size } }
     // 只在这里算计数；文案用 stringResource 在组合期读取，切换系统语言后标签才会跟着刷新
-    val categoryCounts =
-        remember(selectedFiles) {
-            intArrayOf(
-                selectedFiles.count { ThumbnailHelper.isImage(it) },
-                selectedFiles.count { ThumbnailHelper.isVideo(it) },
-                selectedFiles.count { it.mimeType.startsWith("audio/") },
-                selectedFiles.count { it.isTextMessage },
-                selectedFiles.count { ThumbnailHelper.isApk(it) },
-            ).let { counts -> counts + (selectedFiles.size - counts.sum()) }
-        }
-    val imagesLabel = stringResource(R.string.send_cat_images_count, categoryCounts[0])
-    val videosLabel = stringResource(R.string.send_cat_videos_count, categoryCounts[1])
-    val audiosLabel = stringResource(R.string.send_cat_audios_count, categoryCounts[2])
-    val textsLabel = stringResource(R.string.send_cat_texts_count, categoryCounts[3])
-    val apksLabel = stringResource(R.string.send_cat_apks_count, categoryCounts[4])
-    val othersLabel = stringResource(R.string.send_cat_others_count, categoryCounts[5])
+    val categoryCounts = remember(selectedFiles) { selectedFiles.countCategories() }
+    val imagesLabel = stringResource(R.string.send_cat_images_count, categoryCounts.images)
+    val videosLabel = stringResource(R.string.send_cat_videos_count, categoryCounts.videos)
+    val audiosLabel = stringResource(R.string.send_cat_audios_count, categoryCounts.audios)
+    val textsLabel = stringResource(R.string.send_cat_texts_count, categoryCounts.texts)
+    val apksLabel = stringResource(R.string.send_cat_apks_count, categoryCounts.apks)
+    val othersLabel = stringResource(R.string.send_cat_others_count, categoryCounts.others)
     val categoryBreakdown =
-        buildList {
-            if (categoryCounts[0] > 0) add(imagesLabel)
-            if (categoryCounts[1] > 0) add(videosLabel)
-            if (categoryCounts[2] > 0) add(audiosLabel)
-            if (categoryCounts[3] > 0) add(textsLabel)
-            if (categoryCounts[4] > 0) add(apksLabel)
-            if (categoryCounts[5] > 0) add(othersLabel)
+        remember(categoryCounts, imagesLabel, videosLabel, audiosLabel, textsLabel, apksLabel, othersLabel) {
+            buildList {
+                if (categoryCounts.images > 0) add(imagesLabel)
+                if (categoryCounts.videos > 0) add(videosLabel)
+                if (categoryCounts.audios > 0) add(audiosLabel)
+                if (categoryCounts.texts > 0) add(textsLabel)
+                if (categoryCounts.apks > 0) add(apksLabel)
+                if (categoryCounts.others > 0) add(othersLabel)
+            }
         }
 
     var isRefreshing by remember { mutableStateOf(false) }
@@ -228,7 +221,7 @@ fun HomeScreen(
                     scrollBehavior = scrollBehavior,
                     color = if (backdrop != null) Color.Transparent else colorScheme.surface,
                     actions = {
-                        IconButton(onClick = onManualIp) {
+                        IconButton(onClick = actions.onManualIp) {
                             Icon(imageVector = AppIcons.Dialpad, contentDescription = stringResource(R.string.action_input_ip))
                         }
                         IconButton(
@@ -285,7 +278,7 @@ fun HomeScreen(
                                         modifier = Modifier.size(24.dp),
                                     )
                                 },
-                                onClick = onOpenRenameDialog,
+                                onClick = actions.onOpenRenameDialog,
                             )
                             ArrowPreference(
                                 title = "$primaryIp:$displayPort",
@@ -356,7 +349,7 @@ fun HomeScreen(
                                                 Text(stringResource(R.string.btn_preview))
                                             }
                                             Button(
-                                                onClick = onOpenAddSheet,
+                                                onClick = actions.onOpenAddSheet,
                                                 colors = ButtonDefaults.buttonColors(),
                                                 modifier = Modifier.defaultMinSize(minWidth = 56.dp),
                                             ) {
@@ -471,21 +464,21 @@ fun HomeScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                 ) {
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_files), icon = MiuixIcons.Folder, onClick = onPickFiles)
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_folder), icon = MiuixIcons.AddFolder, onClick = onPickFolder)
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_media), icon = MiuixIcons.Image, onClick = onPickMedia)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_files), icon = MiuixIcons.Folder, onClick = actions.onPickFiles)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_folder), icon = MiuixIcons.AddFolder, onClick = actions.onPickFolder)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_media), icon = MiuixIcons.Image, onClick = actions.onPickMedia)
                                 }
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                 ) {
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_apps), icon = Icons.Default.Android, onClick = onPickApps)
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_text), icon = Icons.Default.TextFields, onClick = onSendText)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_apps), icon = AppIcons.Android, onClick = actions.onPickApps)
+                                    QuickActionItem(title = stringResource(R.string.send_quick_action_text), icon = AppIcons.Text, onClick = actions.onSendText)
                                     QuickActionItem(
                                         title = stringResource(R.string.send_quick_action_clipboard),
-                                        icon = Icons.AutoMirrored.Filled.Assignment,
-                                        onClick = onPasteClipboard,
+                                        icon = AppIcons.Clipboard,
+                                        onClick = actions.onPasteClipboard,
                                     )
                                 }
                             }
@@ -499,13 +492,13 @@ fun HomeScreen(
                                 title = if (shares.isNotEmpty()) stringResource(R.string.send_web_share_running_title, shares.first().files.size) else stringResource(R.string.send_web_share_idle_title),
                                 startAction = {
                                     Icon(
-                                        imageVector = Icons.Default.Language,
+                                        imageVector = AppIcons.Web,
                                         contentDescription = null,
                                         tint = if (shares.isNotEmpty()) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                         modifier = Modifier.size(24.dp),
                                     )
                                 },
-                                onClick = onOpenWebShare,
+                                onClick = actions.onOpenWebShare,
                             )
                         }
                     }
@@ -519,7 +512,7 @@ fun HomeScreen(
                                 Column(modifier = Modifier.fillMaxWidth()) {
                                     ArrowPreference(
                                         title = resendDev.alias,
-                                        summary = resendDev.ip + ":" + resendDev.port + " • " + (resendDev.deviceModel ?: resendDev.deviceType.value),
+                                        summary = resendDev.displaySummary,
                                         startAction = {
                                             Icon(
                                                 imageVector = AppIcons.getDeviceIcon(resendDev.deviceType),
@@ -627,7 +620,7 @@ fun HomeScreen(
                                     Column(modifier = Modifier.fillMaxWidth()) {
                                         BasicComponent(
                                             title = session.device.alias,
-                                            summary = session.device.ip + ":" + session.device.port + " • " + (session.device.deviceModel ?: session.device.deviceType.value),
+                                            summary = session.device.displaySummary,
                                             startAction = {
                                                 Icon(
                                                     imageVector = AppIcons.getDeviceIcon(session.device.deviceType),
@@ -714,6 +707,7 @@ private fun QuickActionItem(
             Modifier
                 .clip(RoundedCornerShape(12.dp))
                 .clickable(role = Role.Button, onClick = onClick)
+                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -755,7 +749,7 @@ private fun DeviceItemCard(
         Column(modifier = Modifier.fillMaxWidth()) {
             ArrowPreference(
                 title = device.alias,
-                summary = device.ip + ":" + device.port + networkLabel + " • " + (device.deviceModel ?: device.deviceType.value),
+                summary = device.displaySummaryWithExtra(networkLabel),
                 startAction = {
                     Icon(
                         imageVector = AppIcons.getDeviceIcon(device.deviceType),

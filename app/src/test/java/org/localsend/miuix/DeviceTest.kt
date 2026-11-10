@@ -89,4 +89,18 @@ class DeviceTest {
             Device(alias = "a", fingerprint = "f", ip = "10.0.0.9", port = 8443, protocol = "https").url,
         )
     }
+
+    @Test
+    fun displaySummaryFormatsIpPortAndModel() {
+        val withModel = Device(alias = "a", fingerprint = "f", ip = "192.168.1.10", port = 53317, deviceModel = "Pixel 8")
+        assertEquals("192.168.1.10:53317 • Pixel 8", withModel.displaySummary)
+
+        val withoutModel = Device(alias = "b", fingerprint = "f", ip = "192.168.1.11", port = 53318, deviceType = DeviceType.desktop)
+        assertEquals("192.168.1.11:53318 • desktop", withoutModel.displaySummary)
+
+        assertEquals(
+            "192.168.1.10:53317 (+1 个备用 IP) • Pixel 8",
+            withModel.displaySummaryWithExtra(" (+1 个备用 IP)"),
+        )
+    }
 }

@@ -81,6 +81,12 @@ data class Device(
     val url: String
         get() = "$protocol://$ip:$port"
 
+    /** UI 展示的摘要信息：`ip:port • model`（或未指定 model 时为 deviceType.value）。 */
+    val displaySummary: String
+        get() = "$ip:$port • ${deviceModel ?: deviceType.value}"
+
+    fun displaySummaryWithExtra(extra: String = ""): String = "$ip:$port$extra • ${deviceModel ?: deviceType.value}"
+
     companion object {
         fun fromDto(
             dto: DeviceDto,
