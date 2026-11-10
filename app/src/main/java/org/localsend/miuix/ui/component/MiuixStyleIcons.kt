@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
  */
 object MiuixStyleIcons {
     private const val STROKE_WIDTH = 1.7f
+    private const val FILLED_VIEWPORT = 35f
 
     /** 以左上角、宽高与圆角半径追加一个圆角矩形，与 SVG 的 rect rx/ry 等价。 */
     private fun PathBuilder.roundedRect(
@@ -36,6 +37,23 @@ object MiuixStyleIcons {
         verticalLineTo(top + radius)
         arcToRelative(radius, radius, 0f, false, true, radius, -radius)
         close()
+    }
+
+    /** 以 35 单位网格容纳整幅填充型矢量，供设计方直接提供的图形使用。 */
+    private fun filledIcon(
+        name: String,
+        path: PathBuilder.() -> Unit,
+    ): ImageVector {
+        val builder =
+            ImageVector.Builder(
+                name = name,
+                defaultWidth = 24.dp,
+                defaultHeight = 24.dp,
+                viewportWidth = FILLED_VIEWPORT,
+                viewportHeight = FILLED_VIEWPORT,
+            )
+        builder.addPath(pathData = PathBuilder().apply(path).nodes, fill = SolidColor(Color.Black))
+        return builder.build()
     }
 
     private fun icon(
@@ -66,6 +84,53 @@ object MiuixStyleIcons {
         }
         return builder.build()
     }
+
+    /** 安卓应用：圆顶机身、双天线与双眼，取自设计方提供的 35 单位网格矢量并等比缩至 0.95。 */
+    val Android: ImageVector =
+        filledIcon(name = "MiuixStyleIcons.Android") {
+            moveTo(30.81f, 27.49f)
+            horizontalLineToRelative(-26.6f)
+            arcToRelative(3.012f, 3.012f, 0f, false, true, -2.242f, -1.035f)
+            arcTo(3.448f, 3.448f, 0f, false, true, 1.141f, 23.785f)
+            curveTo(2.281f, 14.912f, 9.311f, 8.224f, 17.5f, 8.224f)
+            curveTo(25.689f, 8.224f, 32.7f, 14.874f, 33.859f, 23.785f)
+            arcToRelative(3.448f, 3.448f, 0f, false, true, -0.807f, 2.698f)
+            arcTo(3.012f, 3.012f, 0f, false, true, 30.81f, 27.49f)
+            close()
+            moveToRelative(-13.3f, -16.919f)
+            curveToRelative(-7.001f, 0f, -13.015f, 5.805f, -14.003f, 13.49f)
+            arcToRelative(1.064f, 1.064f, 0f, false, false, 0.238f, 0.827f)
+            arcToRelative(0.608f, 0.608f, 0f, false, false, 0.456f, 0.228f)
+            horizontalLineToRelative(26.6f)
+            arcToRelative(0.608f, 0.608f, 0f, false, false, 0.456f, -0.228f)
+            arcToRelative(1.064f, 1.064f, 0f, false, false, 0.238f, -0.826f)
+            curveTo(30.515f, 16.403f, 24.502f, 10.599f, 17.5f, 10.599f)
+            close()
+            moveTo(26.886f, 12.993f)
+            arcToRelative(1.112f, 1.112f, 0f, false, true, -0.57f, -0.152f)
+            arcToRelative(1.178f, 1.178f, 0f, false, true, -0.475f, -1.605f)
+            lineToRelative(1.682f, -3.106f)
+            arcToRelative(1.188f, 1.188f, 0f, true, true, 2.09f, 1.14f)
+            lineToRelative(-1.681f, 3.097f)
+            arcTo(1.197f, 1.197f, 0f, false, true, 26.886f, 12.993f)
+            close()
+            moveTo(8.171f, 12.993f)
+            arcToRelative(1.197f, 1.197f, 0f, false, true, -1.045f, -0.627f)
+            lineTo(5.445f, 9.269f)
+            arcTo(1.188f, 1.188f, 0f, true, true, 7.525f, 8.129f)
+            lineToRelative(1.682f, 3.107f)
+            arcToRelative(1.188f, 1.188f, 0f, false, true, -0.475f, 1.606f)
+            arcTo(1.14f, 1.14f, 0f, false, true, 8.171f, 12.993f)
+            close()
+            moveTo(11.125f, 20.555f)
+            arcToRelative(1.786f, 1.786f, 0f, false, false, 0f, -3.562f)
+            arcToRelative(1.786f, 1.786f, 0f, false, false, 0f, 3.563f)
+            close()
+            moveTo(23.723f, 20.631f)
+            arcToRelative(1.786f, 1.786f, 0f, false, false, 0f, -3.562f)
+            arcToRelative(1.786f, 1.786f, 0f, false, false, 0f, 3.563f)
+            close()
+        }
 
     /** 压缩包归档：带盖盒子与中央竖向拉链 */
     val Archive: ImageVector =

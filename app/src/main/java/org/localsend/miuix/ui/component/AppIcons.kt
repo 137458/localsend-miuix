@@ -9,7 +9,6 @@ import top.yukonga.miuix.kmp.icon.extended.Favorites
 import top.yukonga.miuix.kmp.icon.extended.FavoritesFill
 import top.yukonga.miuix.kmp.icon.extended.File
 import top.yukonga.miuix.kmp.icon.extended.Folder
-import top.yukonga.miuix.kmp.icon.extended.GridView
 import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.Image
 import top.yukonga.miuix.kmp.icon.extended.Music
@@ -37,7 +36,7 @@ object AppIcons {
     val Favorite: ImageVector = MiuixIcons.FavoritesFill
     val FavoriteBorder: ImageVector = MiuixIcons.Favorites
     val Check: ImageVector = MiuixIcons.Ok
-    val App: ImageVector = MiuixIcons.GridView
+    val App: ImageVector = MiuixStyleIcons.Android
     val Web: ImageVector = MiuixStyleIcons.Language
     val Paste: ImageVector = MiuixIcons.Paste
 

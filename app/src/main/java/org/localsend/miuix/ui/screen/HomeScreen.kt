@@ -459,26 +459,46 @@ fun HomeScreen(
                     // Section 4: 快速选择内容（6 类入口）
                     item {
                         SectionCard(title = stringResource(R.string.send_section_quick_pick)) {
-                            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                ) {
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_files), icon = MiuixIcons.Folder, onClick = actions.onPickFiles)
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_folder), icon = MiuixIcons.AddFolder, onClick = actions.onPickFolder)
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_media), icon = MiuixIcons.Image, onClick = actions.onPickMedia)
+                            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                                Row(modifier = Modifier.fillMaxWidth()) {
+                                    QuickActionItem(
+                                        title = stringResource(R.string.send_quick_action_files),
+                                        icon = MiuixIcons.Folder,
+                                        onClick = actions.onPickFiles,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    QuickActionItem(
+                                        title = stringResource(R.string.send_quick_action_folder),
+                                        icon = MiuixIcons.AddFolder,
+                                        onClick = actions.onPickFolder,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    QuickActionItem(
+                                        title = stringResource(R.string.send_quick_action_media),
+                                        icon = MiuixIcons.Image,
+                                        onClick = actions.onPickMedia,
+                                        modifier = Modifier.weight(1f),
+                                    )
                                 }
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                ) {
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_apps), icon = AppIcons.App, onClick = actions.onPickApps)
-                                    QuickActionItem(title = stringResource(R.string.send_quick_action_text), icon = AppIcons.Text, onClick = actions.onSendText)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(modifier = Modifier.fillMaxWidth()) {
+                                    QuickActionItem(
+                                        title = stringResource(R.string.send_quick_action_apps),
+                                        icon = AppIcons.App,
+                                        onClick = actions.onPickApps,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    QuickActionItem(
+                                        title = stringResource(R.string.send_quick_action_text),
+                                        icon = AppIcons.Text,
+                                        onClick = actions.onSendText,
+                                        modifier = Modifier.weight(1f),
+                                    )
                                     QuickActionItem(
                                         title = stringResource(R.string.send_quick_action_clipboard),
                                         icon = AppIcons.Paste,
                                         onClick = actions.onPasteClipboard,
+                                        modifier = Modifier.weight(1f),
                                     )
                                 }
                             }
@@ -701,10 +721,11 @@ private fun QuickActionItem(
     title: String,
     icon: ImageVector,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier =
-            Modifier
+            modifier
                 .clip(RoundedCornerShape(12.dp))
                 .clickable(role = Role.Button, onClick = onClick)
                 .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
