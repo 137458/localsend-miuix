@@ -115,69 +115,72 @@ fun HistoryScreen(
 
     Scaffold(
         topBar = {
-            BlurredBar(
-                backdrop = backdrop,
-                scrollBehavior = scrollBehavior,
-            ) {
-                TopAppBar(
-                    title = stringResource(R.string.history_title),
+            Column {
+                BlurredBar(
+                    backdrop = backdrop,
                     scrollBehavior = scrollBehavior,
-                    color = if (backdrop != null) Color.Transparent else colorScheme.surface,
-                    actions = {
-                        IconButton(
-                            onClick = {
-                                openDownloadFolder(
-                                    context = context,
-                                    downloadTreeUri = settings.downloadTreeUri,
-                                )
-                            },
-                        ) {
-                            Icon(
-                                imageVector = AppIcons.Folder,
-                                contentDescription = stringResource(R.string.history_action_open_folder),
-                                tint = colorScheme.onSurface,
-                            )
-                        }
-                        if (history.isNotEmpty()) {
-                            IconButton(onClick = { showClearConfirmDialog = true }) {
+                ) {
+                    TopAppBar(
+                        title = stringResource(R.string.history_title),
+                        scrollBehavior = scrollBehavior,
+                        color = if (backdrop != null) Color.Transparent else colorScheme.surface,
+                        actions = {
+                            IconButton(
+                                onClick = {
+                                    openDownloadFolder(
+                                        context = context,
+                                        downloadTreeUri = settings.downloadTreeUri,
+                                    )
+                                },
+                            ) {
                                 Icon(
-                                    imageVector = MiuixIcons.Delete,
-                                    contentDescription = stringResource(R.string.history_dialog_clear_title),
-                                    tint = colorScheme.error,
+                                    imageVector = AppIcons.Folder,
+                                    contentDescription = stringResource(R.string.history_action_open_folder),
+                                    tint = colorScheme.onSurface,
                                 )
                             }
-                        }
-                    },
-                )
+                            if (history.isNotEmpty()) {
+                                IconButton(onClick = { showClearConfirmDialog = true }) {
+                                    Icon(
+                                        imageVector = MiuixIcons.Delete,
+                                        contentDescription = stringResource(R.string.history_dialog_clear_title),
+                                        tint = colorScheme.error,
+                                    )
+                                }
+                            }
+                        },
+                    )
+                }
+                // 实色底：列表从顶栏下方穿过时，避免卡片从胶囊四周透出并压住顶栏的渐变模糊
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(colorScheme.surface)
+                            .padding(
+                                top = 4.dp,
+                                bottom = 6.dp,
+                                start = 16.dp,
+                                end = 16.dp,
+                            ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    TabRowWithContour(
+                        tabs = filterTabs,
+                        selectedTabIndex = selectedFilterIndex,
+                        onTabSelected = { selectedFilterIndex = it },
+                    )
+                }
             }
         },
     ) { innerPadding ->
-        Column(
+        Box(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .background(colorScheme.surface)
                     .blurBackdropSource(backdrop),
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            top = innerPadding.calculateTopPadding() + 4.dp,
-                            bottom = 6.dp,
-                            start = 16.dp,
-                            end = 16.dp,
-                        ),
-                contentAlignment = Alignment.Center,
-            ) {
-                TabRowWithContour(
-                    tabs = filterTabs,
-                    selectedTabIndex = selectedFilterIndex,
-                    onTabSelected = { selectedFilterIndex = it },
-                )
-            }
-
             LazyColumn(
                 modifier =
                     Modifier
@@ -185,7 +188,7 @@ fun HistoryScreen(
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding =
                     PaddingValues(
-                        top = 4.dp,
+                        top = innerPadding.calculateTopPadding() + 4.dp,
                         bottom = contentPadding.calculateBottomPadding() + 16.dp,
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
