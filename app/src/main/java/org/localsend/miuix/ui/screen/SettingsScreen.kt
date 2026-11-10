@@ -25,14 +25,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.localsend.miuix.R
 import org.localsend.miuix.core.ExternalLinks
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.DeviceType
-import org.localsend.miuix.notification.TransferNotifier
 import org.localsend.miuix.ui.MainActivity
 import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.CertFingerprintDialog
@@ -82,12 +80,6 @@ fun SettingsScreen(
     var showCertDialog by remember { mutableStateOf(false) }
     var showRegenerateConfirm by remember { mutableStateOf(false) }
     var editingAdvancedField by remember { mutableStateOf<AdvancedNetworkField?>(null) }
-    var isNotificationEnabled by remember { mutableStateOf(TransferNotifier.isNotificationsEnabled(context)) }
-
-    LifecycleResumeEffect(Unit) {
-        isNotificationEnabled = TransferNotifier.isNotificationsEnabled(context)
-        onPauseOrDispose {}
-    }
 
     val themeOptions =
         listOf(
@@ -216,30 +208,6 @@ fun SettingsScreen(
                                 manager.updateSettings { it.copy(autoFinish = checked) }
                             },
                         )
-                        ArrowPreference(
-                            title = stringResource(R.string.settings_pref_notif_perm_title),
-                            summary = if (isNotificationEnabled) stringResource(R.string.settings_pref_notif_perm_enabled) else stringResource(R.string.settings_pref_notif_perm_disabled),
-                            onClick = {
-                                val activity = context as? org.localsend.miuix.ui.MainActivity
-                                if (activity != null &&
-                                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
-                                    activity.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    activity.requestNecessaryPermissions()
-                                } else {
-                                    org.localsend.miuix.notification.TransferNotifier
-                                        .openNotificationSettings(context)
-                                }
-                            },
-                        )
-                        SwitchPreference(
-                            title = stringResource(R.string.settings_pref_wide_nav_rail_title),
-                            summary = stringResource(R.string.settings_pref_wide_nav_rail_summary),
-                            checked = settings.wideScreenNavigationRail,
-                            onCheckedChange = { checked ->
-                                manager.updateSettings { it.copy(wideScreenNavigationRail = checked) }
-                            },
-                        )
                     }
                 }
 
@@ -255,13 +223,15 @@ fun SettingsScreen(
                                 manager.updateSettings { it.copy(quickSave = checked) }
                             },
                         )
-                        SwitchPreference(
-                            title = stringResource(R.string.receive_pref_quick_save_from_favorites_title),
-                            checked = settings.quickSaveFromFavorites,
-                            onCheckedChange = { checked ->
-                                manager.updateSettings { it.copy(quickSaveFromFavorites = checked) }
-                            },
-                        )
+                        if (settings.quickSave) {
+                            SwitchPreference(
+                                title = stringResource(R.string.receive_pref_quick_save_from_favorites_title),
+                                checked = settings.quickSaveFromFavorites,
+                                onCheckedChange = { checked ->
+                                    manager.updateSettings { it.copy(quickSaveFromFavorites = checked) }
+                                },
+                            )
+                        }
                         SwitchPreference(
                             title = stringResource(R.string.receive_pref_auto_copy_title),
                             summary = stringResource(R.string.settings_pref_auto_copy_desc),
@@ -284,22 +254,6 @@ fun SettingsScreen(
                             checked = settings.autoCategorizeMedia,
                             onCheckedChange = { checked ->
                                 manager.updateSettings { it.copy(autoCategorizeMedia = checked) }
-                            },
-                        )
-                        SwitchPreference(
-                            title = stringResource(R.string.settings_pref_web_share_auto_accept_title),
-                            summary = stringResource(R.string.settings_pref_web_share_auto_accept_summary),
-                            checked = settings.webShareAutoAccept,
-                            onCheckedChange = { checked ->
-                                manager.updateSettings { it.copy(webShareAutoAccept = checked) }
-                            },
-                        )
-                        SwitchPreference(
-                            title = stringResource(R.string.settings_pref_save_history_title),
-                            summary = stringResource(R.string.settings_pref_save_history_desc),
-                            checked = settings.saveToHistory,
-                            onCheckedChange = { checked ->
-                                manager.updateSettings { it.copy(saveToHistory = checked) }
                             },
                         )
                         ArrowPreference(

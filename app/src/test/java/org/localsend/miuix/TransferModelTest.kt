@@ -12,6 +12,7 @@ import org.localsend.miuix.model.MAX_INLINE_TEXT_SIZE
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.model.countCategories
+import org.localsend.miuix.model.filterByTab
 import org.localsend.miuix.transfer.RemainingTime
 
 class TransferModelTest {
@@ -213,5 +214,44 @@ class TransferModelTest {
         assertEquals(1, counts.texts)
         assertEquals(1, counts.apks)
         assertEquals(1, counts.others)
+    }
+
+    @Test
+    fun filterByTabSeparatesIncomingAndOutgoingHistory() {
+        val incoming =
+            org.localsend.miuix.model.TransferHistoryItem(
+                id = "h1",
+                deviceAlias = "Sender",
+                deviceIp = "192.168.1.5",
+                isIncoming = true,
+                fileCount = 1,
+                totalSize = 100,
+                status = TransferStatus.Completed,
+                fileNames = listOf("in.png"),
+            )
+        val outgoing =
+            org.localsend.miuix.model.TransferHistoryItem(
+                id = "h2",
+                deviceAlias = "Receiver",
+                deviceIp = "192.168.1.6",
+                isIncoming = false,
+                fileCount = 1,
+                totalSize = 200,
+                status = TransferStatus.Completed,
+                fileNames = listOf("out.png"),
+            )
+        val list = listOf(incoming, outgoing)
+
+        val all = list.filterByTab(org.localsend.miuix.model.HistoryFilterTab.ALL)
+        assertEquals(2, all.size)
+        assertEquals(listOf("h1", "h2"), all.map { it.id })
+
+        val received = list.filterByTab(org.localsend.miuix.model.HistoryFilterTab.RECEIVE)
+        assertEquals(1, received.size)
+        assertEquals("h1", received.first().id)
+
+        val sent = list.filterByTab(org.localsend.miuix.model.HistoryFilterTab.SEND)
+        assertEquals(1, sent.size)
+        assertEquals("h2", sent.first().id)
     }
 }

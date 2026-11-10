@@ -285,6 +285,21 @@ data class TransferHistoryItem(
         get() = FileItem.formatFileSize(totalSize)
 }
 
+/** 传输历史列表分类筛选标签。 */
+enum class HistoryFilterTab {
+    ALL,
+    RECEIVE,
+    SEND,
+}
+
+/** 按标签类型筛选传输历史记录。 */
+fun List<TransferHistoryItem>.filterByTab(tab: HistoryFilterTab): List<TransferHistoryItem> =
+    when (tab) {
+        HistoryFilterTab.ALL -> this
+        HistoryFilterTab.RECEIVE -> filter { it.isIncoming }
+        HistoryFilterTab.SEND -> filter { !it.isIncoming }
+    }
+
 /** 待发送文件列表按类型分类的统计结果。 */
 data class SelectedFilesCategoryCounts(
     val images: Int,

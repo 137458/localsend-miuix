@@ -3,7 +3,11 @@
 
 package org.localsend.miuix.ui.screen
 
+import android.app.DownloadManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,8 +26,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,8 +44,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
+import org.localsend.miuix.model.HistoryFilterTab
 import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.model.filterByTab
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.EmptyStateCard
@@ -54,15 +62,18 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Messages
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
- * 传输历史页：支持文本消息与文件传输区分展示、一键复制文本、点击查看详情弹窗、单条记录删除。
+ * 传输历史页：支持分类标签（全部/接收/发送）筛选、直达保存目录、文本消息快速复制、
+ * 点击查看详情、长按快速删除单条记录、一键清空全部历史。
  */
 @Composable
 fun HistoryScreen(
@@ -72,11 +83,35 @@ fun HistoryScreen(
 ) {
     val context = LocalContext.current
     val history by manager.transferHistory.collectAsStateWithLifecycle()
+    val settings by manager.settings.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberBlurBackdrop()
     val colorScheme = MiuixTheme.colorScheme
+    val coroutineScope = rememberCoroutineScope()
+
+    var selectedFilterIndex by remember { mutableIntStateOf(0) }
     var selectedItem by remember { mutableStateOf<TransferHistoryItem?>(null) }
+    var itemToDelete by remember { mutableStateOf<TransferHistoryItem?>(null) }
     var showClearConfirmDialog by remember { mutableStateOf(false) }
+
+    val filterTabs =
+        listOf(
+            stringResource(R.string.history_tab_all),
+            stringResource(R.string.history_tab_receive),
+            stringResource(R.string.history_tab_send),
+        )
+
+    val currentTab =
+        when (selectedFilterIndex) {
+            1 -> HistoryFilterTab.RECEIVE
+            2 -> HistoryFilterTab.SEND
+            else -> HistoryFilterTab.ALL
+        }
+
+    val filteredHistory =
+        remember(history, currentTab) {
+            history.filterByTab(currentTab)
+        }
 
     Scaffold(
         topBar = {
@@ -89,12 +124,26 @@ fun HistoryScreen(
                     scrollBehavior = scrollBehavior,
                     color = if (backdrop != null) Color.Transparent else colorScheme.surface,
                     actions = {
+                        IconButton(
+                            onClick = {
+                                openDownloadFolder(
+                                    context = context,
+                                    downloadTreeUri = settings.downloadTreeUri,
+                                )
+                            },
+                        ) {
+                            Icon(
+                                imageVector = AppIcons.Folder,
+                                contentDescription = stringResource(R.string.history_action_open_folder),
+                                tint = colorScheme.onSurface,
+                            )
+                        }
                         if (history.isNotEmpty()) {
                             IconButton(onClick = { showClearConfirmDialog = true }) {
                                 Icon(
                                     imageVector = MiuixIcons.Delete,
                                     contentDescription = stringResource(R.string.history_dialog_clear_title),
-                                    tint = MiuixTheme.colorScheme.error,
+                                    tint = colorScheme.error,
                                 )
                             }
                         }
@@ -103,13 +152,34 @@ fun HistoryScreen(
             }
         },
     ) { innerPadding ->
-        Box(
+        Column(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .background(colorScheme.surface)
                     .blurBackdropSource(backdrop),
         ) {
+            if (history.isNotEmpty()) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                top = innerPadding.calculateTopPadding() + 4.dp,
+                                bottom = 4.dp,
+                                start = 16.dp,
+                                end = 16.dp,
+                            ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    TabRow(
+                        tabs = filterTabs,
+                        selectedTabIndex = selectedFilterIndex,
+                        onTabSelected = { selectedFilterIndex = it },
+                    )
+                }
+            }
+
             LazyColumn(
                 modifier =
                     Modifier
@@ -117,23 +187,29 @@ fun HistoryScreen(
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding =
                     PaddingValues(
-                        top = innerPadding.calculateTopPadding() + 8.dp,
+                        top = if (history.isEmpty()) innerPadding.calculateTopPadding() + 8.dp else 4.dp,
                         bottom = contentPadding.calculateBottomPadding() + 16.dp,
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (history.isEmpty()) {
+                if (filteredHistory.isEmpty()) {
                     item {
                         EmptyStateCard(
                             icon = AppIcons.History,
-                            title = stringResource(R.string.history_empty_title),
+                            title =
+                                when (selectedFilterIndex) {
+                                    1 -> stringResource(R.string.history_empty_receive)
+                                    2 -> stringResource(R.string.history_empty_send)
+                                    else -> stringResource(R.string.history_empty_title)
+                                },
                         )
                     }
                 } else {
-                    items(history, key = { it.id }) { item ->
+                    items(filteredHistory, key = { it.id }) { item ->
                         HistoryItemCard(
                             item = item,
                             onClick = { selectedItem = item },
+                            onLongClick = { itemToDelete = item },
                             onCopyText = { text ->
                                 manager.copyTextToClipboard(text)
                             },
@@ -143,8 +219,6 @@ fun HistoryScreen(
             }
         }
     }
-
-    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
     HistoryDetailDialog(
         item = selectedItem,
@@ -164,8 +238,58 @@ fun HistoryScreen(
         },
     )
 
+    if (itemToDelete != null) {
+        val target = itemToDelete!!
+        WindowDialog(
+            show = true,
+            title = stringResource(R.string.history_dialog_delete_title),
+            onDismissRequest = { itemToDelete = null },
+        ) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.history_dialog_delete_msg, target.deviceAlias),
+                    style = MiuixTheme.textStyles.body1,
+                    color = MiuixTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Button(
+                        onClick = { itemToDelete = null },
+                        colors = ButtonDefaults.buttonColors(),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.btn_cancel))
+                    }
+                    Button(
+                        onClick = {
+                            manager.deleteHistoryItem(target.id)
+                            itemToDelete = null
+                            Toast.makeText(context, context.getString(R.string.toast_history_item_deleted), Toast.LENGTH_SHORT).show()
+                        },
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                color = MiuixTheme.colorScheme.error,
+                                contentColor = MiuixTheme.colorScheme.onError,
+                            ),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.history_detail_btn_delete_record))
+                    }
+                }
+            }
+        }
+    }
+
     if (showClearConfirmDialog) {
-        top.yukonga.miuix.kmp.window.WindowDialog(
+        WindowDialog(
             show = true,
             title = stringResource(R.string.history_dialog_clear_title),
             onDismissRequest = { showClearConfirmDialog = false },
@@ -217,6 +341,7 @@ fun HistoryScreen(
 private fun HistoryItemCard(
     item: TransferHistoryItem,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     onCopyText: (String) -> Unit,
 ) {
     val context = LocalContext.current
@@ -225,11 +350,34 @@ private fun HistoryItemCard(
     val summary = MiuixTheme.colorScheme.onSurfaceVariantSummary
     val statusInfo =
         remember(primary, error, summary, item.status, context) {
-            statusInfo(context = context, status = item.status, primaryColor = primary, errorColor = error, summaryColor = summary)
+            statusInfo(
+                context = context,
+                status = item.status,
+                primaryColor = primary,
+                errorColor = error,
+                summaryColor = summary,
+            )
+        }
+
+    val iconVector =
+        if (item.isTextMessage) {
+            MiuixIcons.Messages
+        } else if (item.isIncoming) {
+            AppIcons.Receive
+        } else {
+            AppIcons.Send
+        }
+
+    val iconTint =
+        when (item.status) {
+            TransferStatus.Failed -> error
+            TransferStatus.Canceled -> summary
+            else -> primary
         }
 
     Card(
         onClick = onClick,
+        onLongPress = onLongClick,
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -243,16 +391,9 @@ private fun HistoryItemCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector =
-                    if (item.isTextMessage) {
-                        MiuixIcons.Messages
-                    } else if (item.isIncoming) {
-                        AppIcons.Receive
-                    } else {
-                        AppIcons.Send
-                    },
+                imageVector = iconVector,
                 contentDescription = null,
-                tint = primary,
+                tint = iconTint,
                 modifier = Modifier.size(24.dp),
             )
 
@@ -261,7 +402,12 @@ private fun HistoryItemCard(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (item.isIncoming) stringResource(R.string.history_item_from, item.deviceAlias) else stringResource(R.string.history_item_to, item.deviceAlias),
+                        text =
+                            if (item.isIncoming) {
+                                stringResource(R.string.history_item_from, item.deviceAlias)
+                            } else {
+                                stringResource(R.string.history_item_to, item.deviceAlias)
+                            },
                         style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.SemiBold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -287,7 +433,12 @@ private fun HistoryItemCard(
                 } else {
                     val separator = stringResource(R.string.enumeration_separator)
                     Text(
-                        text = if (item.fileNames.isNotEmpty()) item.fileNames.joinToString(separator) else stringResource(R.string.history_files_count, item.fileCount),
+                        text =
+                            if (item.fileNames.isNotEmpty()) {
+                                item.fileNames.joinToString(separator)
+                            } else {
+                                stringResource(R.string.history_files_count, item.fileCount)
+                            },
                         style = MiuixTheme.textStyles.body2,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -318,6 +469,41 @@ private fun HistoryItemCard(
                 }
             }
         }
+    }
+}
+
+private fun openDownloadFolder(
+    context: Context,
+    downloadTreeUri: String?,
+) {
+    var opened = false
+    if (!downloadTreeUri.isNullOrEmpty()) {
+        try {
+            val intent =
+                Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(Uri.parse(downloadTreeUri), DocumentsContract.Document.MIME_TYPE_DIR)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            context.startActivity(intent)
+            opened = true
+        } catch (_: Exception) {
+            opened = false
+        }
+    }
+    if (!opened) {
+        try {
+            val downloadsIntent =
+                Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            context.startActivity(downloadsIntent)
+            opened = true
+        } catch (_: Exception) {
+            opened = false
+        }
+    }
+    if (!opened) {
+        Toast.makeText(context, context.getString(R.string.toast_cannot_open_folder), Toast.LENGTH_SHORT).show()
     }
 }
 

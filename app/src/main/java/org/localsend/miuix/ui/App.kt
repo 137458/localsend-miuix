@@ -418,7 +418,7 @@ fun App(manager: LocalSendManager) {
             entry<AppRoute.Main> {
                 val configuration = LocalConfiguration.current
                 val isWideScreen = configuration.screenWidthDp >= 600
-                val useNavigationRail = isWideScreen && settings.wideScreenNavigationRail
+                val useNavigationRail = isWideScreen
 
                 Scaffold(
                     bottomBar = {

@@ -158,8 +158,17 @@
     <!-- 传输历史页面 -->
     <string name="history_title">传输历史</string>
     <string name="history_empty_title">暂无传输记录</string>
+    <string name="history_empty_receive">暂无接收记录</string>
+    <string name="history_empty_send">暂无发送记录</string>
     <string name="history_dialog_clear_title">清空传输历史</string>
     <string name="history_dialog_clear_msg">%1$d 条记录将被清除，无法撤销</string>
+    <string name="history_dialog_delete_title">删除记录</string>
+    <string name="history_dialog_delete_msg">确定要删除与“%1$s”的传输记录吗？</string>
+    <string name="history_action_open_folder">打开保存目录</string>
+    <string name="toast_cannot_open_folder">无法打开保存目录</string>
+    <string name="history_tab_all">全部</string>
+    <string name="history_tab_receive">接收</string>
+    <string name="history_tab_send">发送</string>
     <string name="history_item_from">接收自 %1$s</string>
     <string name="history_item_to">发送给 %1$s</string>
     <string name="history_files_count">%1$d 个文件</string>
