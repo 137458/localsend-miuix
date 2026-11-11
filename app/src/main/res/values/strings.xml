@@ -401,6 +401,7 @@
     <string name="eta_calculating">计算中...</string>
     <string name="eta_seconds">剩余约 %1$d秒</string>
     <string name="eta_minutes">剩余约 %1$d分%2$d秒</string>
+    <string name="eta_minutes_only">剩余约 %1$d分</string>
     <string name="eta_hours">剩余约 %1$d小时%2$d分</string>
 
     <string name="msg_web_share_published">已将 %1$d 项内容发布到 Web 共享，浏览器端刷新即可下载</string>

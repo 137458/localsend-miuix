@@ -12,6 +12,7 @@ import org.localsend.miuix.R
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.transfer.RemainingTime
+import org.localsend.miuix.transfer.coarsenedForDisplay
 
 /**
  * 原生 Android 实时通知（Live Updates）与 HyperOS 焦点通知适配器。
@@ -207,7 +208,7 @@ object LiveUpdatesCompat {
         val speedStr = FileItem.formatSpeed(session.speed, compact = true)
 
         val etaStr =
-            when (val eta = RemainingTime.of(session.status, session.speed, session.totalBytes, session.transferredBytes)) {
+            when (val eta = RemainingTime.of(session.status, session.speed, session.totalBytes, session.transferredBytes).coarsenedForDisplay()) {
                 is RemainingTime.Seconds -> if (eta.value > 0L) "${eta.value}s" else ""
                 is RemainingTime.Minutes -> "${eta.minutes}m"
                 is RemainingTime.Hours -> "${eta.hours}h"
@@ -231,7 +232,7 @@ object LiveUpdatesCompat {
         session: TransferSession,
         context: Context,
     ): String =
-        when (val eta = RemainingTime.of(session.status, session.speed, session.totalBytes, session.transferredBytes)) {
+        when (val eta = RemainingTime.of(session.status, session.speed, session.totalBytes, session.transferredBytes).coarsenedForDisplay()) {
             RemainingTime.Hidden, RemainingTime.Calculating -> ""
             RemainingTime.AlmostDone -> context.getString(R.string.live_almost_done)
             is RemainingTime.Seconds ->

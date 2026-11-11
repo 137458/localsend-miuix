@@ -54,6 +54,7 @@ import org.localsend.miuix.model.ShareSession
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.transfer.TransferOutcome
+import org.localsend.miuix.transfer.TransferRateMeter
 import org.localsend.miuix.transfer.isReceivedSizeConsistent
 import org.localsend.miuix.util.AcceptPolicy
 import org.localsend.miuix.util.Sha256
@@ -760,9 +761,10 @@ class LocalSendServer(
                             saveTargetWriter.openSaveStream(fileItem, saveTarget, deferCommit = deferredCommit) { getAutoCategorizeMedia() }.buffered(128 * 1024).use { fos ->
                                 val channel = call.receiveChannel()
                                 val buffer = ByteArray(128 * 1024)
-                                var lastTime = System.currentTimeMillis()
-                                var bytesSinceLast = 0L
-                                var smoothedSpeed = 0L
+                                // 每个文件独立一只速率表：窗口与低通状态不跨文件累积
+                                val rateMeter = TransferRateMeter()
+                                var lastPublishMs = System.currentTimeMillis()
+                                rateMeter.sample(lastPublishMs, 0L)
 
                                 while (!channel.isClosedForRead) {
                                     val read = channel.readAvailable(buffer, 0, buffer.size)
@@ -771,37 +773,36 @@ class LocalSendServer(
                                     textBuffer?.write(buffer, 0, read)
                                     digest?.update(buffer, 0, read)
                                     fileItem.bytesTransferred += read
-                                    session.transferredBytes = session.files.sumOf { it.bytesTransferred }
-                                    bytesSinceLast += read
 
                                     val now = System.currentTimeMillis()
                                     session.lastActiveTime = now
                                     if (session.status == TransferStatus.Canceled) {
                                         throw kotlinx.coroutines.CancellationException("Transfer session canceled by receiver")
                                     }
-                                    val delta = now - lastTime
-                                    if (delta >= 64) {
-                                        val instantSpeed = (bytesSinceLast * 1000) / delta
-                                        smoothedSpeed = if (smoothedSpeed == 0L) instantSpeed else (smoothedSpeed * 3 + instantSpeed) / 4
-                                        fileItem.speed = smoothedSpeed
-                                        session.speed = smoothedSpeed
+                                    // 进度与回调按 SAMPLE_INTERVAL_MS 节流：发布得越密，速率读数抖得越厉害
+                                    if (now - lastPublishMs >= TransferRateMeter.SAMPLE_INTERVAL_MS) {
+                                        lastPublishMs = now
+                                        val speed = rateMeter.sample(now, fileItem.bytesTransferred)
+                                        fileItem.speed = speed
+                                        session.speed = speed
+                                        session.transferredBytes = session.files.sumOf { it.bytesTransferred }
                                         if (fileItem.size > 0) {
                                             fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
                                         }
-                                        bytesSinceLast = 0
-                                        lastTime = now
                                         onSessionUpdated(session)
                                     }
                                 }
                                 fos.flush()
-                                if (bytesSinceLast > 0 || fileItem.bytesTransferred == fileItem.size) {
-                                    if (fileItem.size > 0) {
-                                        fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
-                                    }
-                                    fileItem.speed = smoothedSpeed
-                                    session.speed = smoothedSpeed
-                                    onSessionUpdated(session)
+                                // 收尾用全程平均速率：文件小到一个采样点都没有时也不会显示 0 B/s
+                                val finishedAt = System.currentTimeMillis()
+                                if (fileItem.size > 0) {
+                                    fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
                                 }
+                                val finalSpeed = rateMeter.finish(finishedAt, fileItem.bytesTransferred)
+                                fileItem.speed = finalSpeed
+                                session.speed = finalSpeed
+                                session.transferredBytes = session.files.sumOf { it.bytesTransferred }
+                                onSessionUpdated(session)
                             }
                             if (textBuffer != null && textBuffer.size() > 0) {
                                 fileItem.textContent = textBuffer.toString(Charsets.UTF_8.name())

@@ -15,6 +15,7 @@ import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.IntegrityStatus
 import org.localsend.miuix.model.PrepareUploadRequestDto
 import org.localsend.miuix.model.PrepareUploadResponseDto
+import org.localsend.miuix.transfer.TransferRateMeter
 import org.localsend.miuix.util.Sha256
 import java.io.File
 import java.io.InputStream
@@ -416,9 +417,11 @@ class LocalSendClient(
             val outputStream: OutputStream = connection.outputStream.buffered(128 * 1024)
             val buffer = ByteArray(128 * 1024)
             var bytesWritten = 0L
-            var lastTime = System.currentTimeMillis()
-            var bytesSinceLast = 0L
-            var smoothedSpeed = 0L
+            // 每个文件独立一只速率表：窗口与低通状态不跨文件累积
+            val rateMeter = TransferRateMeter()
+            // 基线取真正开始写 body 的时刻：建连与打开源流的耗时不应计入全程平均速率
+            var lastPublishMs = System.currentTimeMillis()
+            rateMeter.sample(lastPublishMs, 0L)
 
             var read: Int
             while (inputStream.read(buffer).also { read = it } != -1) {
@@ -429,23 +432,18 @@ class LocalSendClient(
                 // 摘要与写入套接字的字节严格同源：校验值覆盖的就是本次实际发送的内容
                 digest?.update(buffer, 0, read)
                 bytesWritten += read
-                bytesSinceLast += read
 
+                // 进度按 SAMPLE_INTERVAL_MS 节流发布：发布得越密，速率读数抖得越厉害
                 val now = System.currentTimeMillis()
-                val delta = now - lastTime
-                if (delta >= 64) {
-                    val instantSpeed = (bytesSinceLast * 1000) / delta
-                    smoothedSpeed = if (smoothedSpeed == 0L) instantSpeed else (smoothedSpeed * 3 + instantSpeed) / 4
-                    onProgress(bytesWritten, smoothedSpeed)
-                    bytesSinceLast = 0
-                    lastTime = now
+                if (now - lastPublishMs >= TransferRateMeter.SAMPLE_INTERVAL_MS) {
+                    lastPublishMs = now
+                    onProgress(bytesWritten, rateMeter.sample(now, bytesWritten))
                 }
             }
             outputStream.flush()
             outputStream.close()
-            if (bytesSinceLast > 0 || bytesWritten == fileItem.size) {
-                onProgress(bytesWritten, smoothedSpeed)
-            }
+            // 收尾用全程平均速率：文件小到一个采样点都没有时也不会显示 0 B/s
+            onProgress(bytesWritten, rateMeter.finish(System.currentTimeMillis(), bytesWritten))
 
             val responseCode = connection.responseCode
             val responseMsg = connection.responseMessage

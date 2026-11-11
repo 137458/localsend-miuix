@@ -883,6 +883,13 @@ class LocalSendManager(
 
     private var lastNotifTime = 0L
 
+    /**
+     * 进度通知最小刷新间隔。通知里的速度与剩余时间已按展示粒度收敛
+     * （见 RemainingTime.coarsenedForDisplay），1Hz 足以跟上文本变化，
+     * 同时把系统侧的进度通知重绘与状态栏/流体云刷新次数减半。
+     */
+    private val notificationRefreshIntervalMs = 1000L
+
     private fun updateTransferNotification(session: TransferSession) {
         if (isTerminal(session.status)) {
             TransferNotifier.notifyResult(context, session)
@@ -890,7 +897,7 @@ class LocalSendManager(
             TransferNotifier.notifyIncoming(context, session)
         } else {
             val now = System.currentTimeMillis()
-            if (now - lastNotifTime >= 500) {
+            if (now - lastNotifTime >= notificationRefreshIntervalMs) {
                 lastNotifTime = now
                 TransferNotifier.updateProgress(context, session)
             }

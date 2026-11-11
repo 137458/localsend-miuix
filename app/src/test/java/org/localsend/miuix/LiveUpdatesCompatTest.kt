@@ -1,6 +1,7 @@
 package org.localsend.miuix
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.localsend.miuix.model.Device
@@ -78,5 +79,27 @@ class LiveUpdatesCompatTest {
 
         val chipText = LiveUpdatesCompat.formatChipSpeedEta(session)
         assertEquals(LiveUpdatesCompat.CHIP_TEXT, chipText)
+    }
+
+    @Test
+    fun testFormatChipSpeedEta_minuteScaleIsCoarsenedToWholeMinutes() {
+        // 100MB 待传、1MB/s -> 精确 100s (Minutes(1,40))，展示粗化后只报整分钟 Minutes(2,0)
+        val session =
+            TransferSession(
+                sessionId = "s4",
+                device = testDevice,
+                isIncoming = false,
+                files = listOf(FileItem(name = "big.bin", size = 100L * 1024 * 1024)),
+                totalBytes = 100L * 1024 * 1024,
+                transferredBytes = 0L,
+                speed = 1L * 1024 * 1024,
+                status = TransferStatus.InProgress,
+            )
+
+        val chipText = LiveUpdatesCompat.formatChipSpeedEta(session)
+        assertTrue("Chip text should start with outgoing prefix: $chipText", chipText.startsWith(LiveUpdatesCompat.CHIP_OUT))
+        assertTrue("Chip eta should be coarsened to whole minutes: $chipText", chipText.endsWith(" 2m"))
+        assertFalse("Chip must not render a second-level eta: $chipText", Regex("\\d+s$").containsMatchIn(chipText))
+        assertTrue("Chip text should be compact (<= 12 chars): $chipText", chipText.length <= 12)
     }
 }

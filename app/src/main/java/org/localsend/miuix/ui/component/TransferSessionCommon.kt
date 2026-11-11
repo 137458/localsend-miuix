@@ -31,6 +31,7 @@ import org.localsend.miuix.model.IntegrityStatus
 import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.transfer.RemainingTime
+import org.localsend.miuix.transfer.coarsenedForDisplay
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
@@ -98,12 +99,17 @@ internal fun fileStatusColor(
 
 @Composable
 internal fun remainingTimeLabel(session: TransferSession): String =
-    when (val remaining = session.remainingTime) {
+    when (val remaining = session.remainingTime.coarsenedForDisplay()) {
         RemainingTime.Hidden -> ""
         RemainingTime.Calculating -> stringResource(R.string.eta_calculating)
         RemainingTime.AlmostDone -> stringResource(R.string.live_almost_done)
         is RemainingTime.Seconds -> stringResource(R.string.eta_seconds, remaining.value)
-        is RemainingTime.Minutes -> stringResource(R.string.eta_minutes, remaining.minutes, remaining.seconds)
+        is RemainingTime.Minutes ->
+            if (remaining.seconds == 0L) {
+                stringResource(R.string.eta_minutes_only, remaining.minutes)
+            } else {
+                stringResource(R.string.eta_minutes, remaining.minutes, remaining.seconds)
+            }
         is RemainingTime.Hours -> stringResource(R.string.eta_hours, remaining.hours, remaining.minutes)
     }
 
