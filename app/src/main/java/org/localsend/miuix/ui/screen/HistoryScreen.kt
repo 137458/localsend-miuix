@@ -69,7 +69,6 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.ProgressiveBlur
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
-import top.yukonga.miuix.kmp.icon.extended.Messages
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 
@@ -378,7 +377,7 @@ private fun HistoryItemCard(
 
     val iconVector =
         if (item.isTextMessage) {
-            MiuixIcons.Messages
+            AppIcons.Text
         } else if (item.isIncoming) {
             AppIcons.Receive
         } else {

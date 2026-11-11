@@ -11,13 +11,13 @@ import top.yukonga.miuix.kmp.icon.extended.Favorites
 import top.yukonga.miuix.kmp.icon.extended.FavoritesFill
 import top.yukonga.miuix.kmp.icon.extended.File
 import top.yukonga.miuix.kmp.icon.extended.Folder
+import top.yukonga.miuix.kmp.icon.extended.GridView
 import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.Image
 import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.icon.extended.Notes
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Paste
-import top.yukonga.miuix.kmp.icon.extended.Phone
 import top.yukonga.miuix.kmp.icon.extended.Recent
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.SearchDevice
@@ -38,13 +38,13 @@ object AppIcons {
     val Favorite: ImageVector = MiuixIcons.FavoritesFill
     val FavoriteBorder: ImageVector = MiuixIcons.Favorites
     val Check: ImageVector = MiuixIcons.Ok
-    val App: ImageVector = MiuixStyleIcons.Android
+    val App: ImageVector = MiuixIcons.GridView
     val Web: ImageVector = MiuixStyleIcons.Language
     val Paste: ImageVector = MiuixIcons.Paste
 
     fun getDeviceIcon(type: DeviceType): ImageVector =
         when (type) {
-            DeviceType.mobile -> MiuixIcons.Phone
+            DeviceType.mobile -> MiuixStyleIcons.Android
             DeviceType.tablet -> MiuixStyleIcons.Tablet
             DeviceType.desktop -> MiuixStyleIcons.Computer
             DeviceType.web -> MiuixStyleIcons.Language
@@ -55,7 +55,7 @@ object AppIcons {
     @Composable
     fun localDeviceIcon(): ImageVector {
         val configuration = LocalConfiguration.current
-        return if (configuration.screenWidthDp >= 600) MiuixStyleIcons.Tablet else MiuixIcons.Phone
+        return if (configuration.screenWidthDp >= 600) MiuixStyleIcons.Tablet else MiuixStyleIcons.Android
     }
 
     fun getFileIcon(
