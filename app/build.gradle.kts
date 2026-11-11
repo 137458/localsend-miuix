@@ -18,8 +18,8 @@ android {
         applicationId = "org.localsend.miuix.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12400
-        versionName = "1.24.0"
+        versionCode = 12401
+        versionName = "1.24.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
