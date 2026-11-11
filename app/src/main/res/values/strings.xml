@@ -198,8 +198,6 @@
     <string name="update_pref_os3_title">HyperOS 3 流光特效</string>
     <string name="update_pref_os3_enabled">HyperOS 3 增强流光</string>
     <string name="update_pref_os3_disabled">HyperOS 2 经典流光</string>
-    <string name="update_pref_debug_dialog_title">测试更新弹窗</string>
-    <string name="update_pref_debug_dialog_summary">用模拟版本数据预览弹窗，不触发下载（仅 Debug）</string>
 
     <!-- 弹窗组件 -->
     <string name="dialog_rename_title">修改设备名称</string>

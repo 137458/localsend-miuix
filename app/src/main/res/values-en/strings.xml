@@ -198,8 +198,6 @@
     <string name="update_pref_os3_title">HyperOS 3 Shimmer Shader</string>
     <string name="update_pref_os3_enabled">HyperOS 3 shimmer</string>
     <string name="update_pref_os3_disabled">HyperOS 2 shimmer</string>
-    <string name="update_pref_debug_dialog_title">Test Update Dialog</string>
-    <string name="update_pref_debug_dialog_summary">Preview the dialog with mock release data, no download (Debug only)</string>
 
     <!-- Dialogs -->
     <string name="dialog_rename_title">Edit Device Name</string>
