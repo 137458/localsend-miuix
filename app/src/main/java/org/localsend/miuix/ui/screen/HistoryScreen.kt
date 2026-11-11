@@ -66,7 +66,6 @@ import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.blur.ProgressiveBlur
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -123,8 +122,6 @@ fun HistoryScreen(
             BlurredBar(
                 backdrop = backdrop,
                 scrollBehavior = scrollBehavior,
-                // 满额模糊覆盖标题区与分段条，到分段条底部再快速渐隐，整块头部连成一片
-                gradient = ProgressiveBlur.Top.copy(curve = 6f),
             ) {
                 Column {
                     TopAppBar(
