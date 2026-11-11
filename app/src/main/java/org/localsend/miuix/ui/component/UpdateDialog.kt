@@ -147,19 +147,6 @@ fun UpdateDialog(
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
-
-                if (plan.showIgnore && onIgnore != null) {
-                    Text(
-                        text = stringResource(R.string.update_dialog_ignore_version),
-                        style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(DialogTokens.ChipCorner))
-                                .clickable(role = Role.Button) { onIgnore(releaseInfo.latestVersion) }
-                                .padding(vertical = 2.dp),
-                    )
-                }
             }
 
             DialogActionColumn {
@@ -181,6 +168,12 @@ fun UpdateDialog(
                     DialogTextAction(
                         text = stringResource(R.string.update_dialog_btn_cancel_download),
                         onClick = onCancelDownload,
+                    )
+                }
+                if (plan.showIgnore && onIgnore != null) {
+                    DialogTextAction(
+                        text = stringResource(R.string.update_dialog_ignore_version),
+                        onClick = { onIgnore(releaseInfo.latestVersion) },
                     )
                 }
                 DialogTextAction(text = plan.dismissText, onClick = onDismiss)
