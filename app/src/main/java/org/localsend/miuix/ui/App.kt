@@ -35,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -69,8 +68,6 @@ import org.localsend.miuix.ui.screen.UpdateScreen
 import org.localsend.miuix.updates.UpdatePrompt
 import top.yukonga.miuix.kmp.basic.Badge
 import top.yukonga.miuix.kmp.basic.NavigationItem
-import top.yukonga.miuix.kmp.basic.NavigationRail
-import top.yukonga.miuix.kmp.basic.NavigationRailItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -416,44 +413,38 @@ fun App(manager: LocalSendManager) {
             transition = NavTransitions.MiuixDefault,
         ) {
             entry<AppRoute.Main> {
-                val configuration = LocalConfiguration.current
-                val isWideScreen = configuration.screenWidthDp >= 600
-                val useNavigationRail = isWideScreen
-
                 Scaffold(
                     bottomBar = {
-                        if (!useNavigationRail) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(
-                                            bottom =
-                                                if (navBarBottomPadding != 0.dp) {
-                                                    8.dp + navBarBottomPadding
-                                                } else {
-                                                    20.dp
-                                                },
-                                        ),
-                                contentAlignment = Alignment.BottomCenter,
-                            ) {
-                                CompositionLocalProvider(
-                                    LocalTabGesturePosition provides tabGesturePosition,
-                                ) {
-                                    IosLiquidGlassNavigationBar(
-                                        items = navigationItems,
-                                        selectedIndex = pagerState.currentPage,
-                                        onItemClick = selectTab,
-                                        backdrop = backdrop,
-                                        badge = { index ->
-                                            if (index == MainTabs.HOME && incomingTaskCount > 0) {
-                                                { Badge { Text(incomingTaskCount.toString()) } }
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        bottom =
+                                            if (navBarBottomPadding != 0.dp) {
+                                                8.dp + navBarBottomPadding
                                             } else {
-                                                null
-                                            }
-                                        },
-                                    )
-                                }
+                                                20.dp
+                                            },
+                                    ),
+                            contentAlignment = Alignment.BottomCenter,
+                        ) {
+                            CompositionLocalProvider(
+                                LocalTabGesturePosition provides tabGesturePosition,
+                            ) {
+                                IosLiquidGlassNavigationBar(
+                                    items = navigationItems,
+                                    selectedIndex = pagerState.currentPage,
+                                    onItemClick = selectTab,
+                                    backdrop = backdrop,
+                                    badge = { index ->
+                                        if (index == MainTabs.HOME && incomingTaskCount > 0) {
+                                            { Badge { Text(incomingTaskCount.toString()) } }
+                                        } else {
+                                            null
+                                        }
+                                    },
+                                )
                             }
                         }
                     },
@@ -464,21 +455,6 @@ fun App(manager: LocalSendManager) {
                                 .fillMaxSize()
                                 .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
                     ) {
-                        if (useNavigationRail) {
-                            NavigationRail(
-                                modifier = Modifier.fillMaxHeight(),
-                                defaultWindowInsetsPadding = true,
-                            ) {
-                                navigationItems.forEachIndexed { index, item ->
-                                    NavigationRailItem(
-                                        selected = pagerState.currentPage == index,
-                                        onClick = { selectTab(index) },
-                                        icon = item.icon,
-                                        label = item.label,
-                                    )
-                                }
-                            }
-                        }
                         Box(
                             modifier =
                                 Modifier
