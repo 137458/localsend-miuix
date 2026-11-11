@@ -20,6 +20,7 @@ internal fun loadSettings(
     prefs: SharedPreferences,
     alias: String,
     defaultDownloadPath: String,
+    isTablet: Boolean = false,
 ): AppSettings =
     AppSettings(
         alias = alias,
@@ -34,7 +35,13 @@ internal fun loadSettings(
         saveToHistory = prefs.getBoolean(PreferenceKeys.KEY_SAVE_TO_HISTORY, true),
         autoFinish = prefs.getBoolean(PreferenceKeys.KEY_AUTO_FINISH, false),
         useHttps = prefs.getBoolean(PreferenceKeys.KEY_USE_HTTPS, false),
-        deviceType = DeviceType.fromString(prefs.getString(PreferenceKeys.KEY_DEVICE_TYPE, DeviceType.mobile.value)),
+        deviceType =
+            DeviceType.fromString(
+                prefs.getString(
+                    PreferenceKeys.KEY_DEVICE_TYPE,
+                    if (isTablet) DeviceType.tablet.value else DeviceType.mobile.value,
+                ),
+            ),
         download = prefs.getBoolean(PreferenceKeys.KEY_DOWNLOAD, false),
         webShareAutoAccept = prefs.getBoolean(PreferenceKeys.KEY_WEB_SHARE_AUTO_ACCEPT, false),
         pin = prefs.getString(PreferenceKeys.KEY_PIN, null),
@@ -48,7 +55,6 @@ internal fun loadSettings(
         autoCheckUpdate = prefs.getBoolean(PreferenceKeys.KEY_AUTO_CHECK_UPDATE, true),
         ignoredVersion = prefs.getString(PreferenceKeys.KEY_IGNORED_VERSION, null),
         isOs3Effect = prefs.getBoolean(PreferenceKeys.KEY_IS_OS3_EFFECT, true),
-        wideScreenNavigationRail = prefs.getBoolean(PreferenceKeys.KEY_WIDE_SCREEN_NAVIGATION_RAIL, false),
         saveTextAsFile = prefs.getBoolean(PreferenceKeys.KEY_SAVE_TEXT_AS_FILE, false),
         autoCategorizeMedia = prefs.getBoolean(PreferenceKeys.KEY_AUTO_CATEGORIZE_MEDIA, false),
     )
@@ -85,7 +91,6 @@ internal fun persistSettingsTo(
         .putBoolean(PreferenceKeys.KEY_AUTO_CHECK_UPDATE, s.autoCheckUpdate)
         .putString(PreferenceKeys.KEY_IGNORED_VERSION, s.ignoredVersion)
         .putBoolean(PreferenceKeys.KEY_IS_OS3_EFFECT, s.isOs3Effect)
-        .putBoolean(PreferenceKeys.KEY_WIDE_SCREEN_NAVIGATION_RAIL, s.wideScreenNavigationRail)
         .putBoolean(PreferenceKeys.KEY_SAVE_TEXT_AS_FILE, s.saveTextAsFile)
         .putBoolean(PreferenceKeys.KEY_AUTO_CATEGORIZE_MEDIA, s.autoCategorizeMedia)
         .apply()

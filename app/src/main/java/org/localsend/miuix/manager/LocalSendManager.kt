@@ -99,7 +99,11 @@ class LocalSendManager(
     // 从持久化恢复设置；别名首次生成后即固化，避免冷启动每次都随机更换。
     private val initialAlias = resolveInitialAlias(prefs)
 
-    private val _settings = MutableStateFlow(loadSettings(prefs, initialAlias, defaultDownloadPath))
+    // 设备类型从未被用户设置过时按真实屏幕形态取默认值：宽度 ≥600dp 视为平板（与 AppIcons.localDeviceIcon 阈值一致）
+    private val screenIsTablet = context.resources.configuration.screenWidthDp >= 600
+
+    private val _settings =
+        MutableStateFlow(loadSettings(prefs, initialAlias, defaultDownloadPath, isTablet = screenIsTablet))
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
     // 进程级更新域：下载状态跨弹窗/更新页共享，prompted 仅存内存

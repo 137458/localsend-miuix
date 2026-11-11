@@ -13,7 +13,6 @@ class AppSettingsTest {
         assertTrue(settings.autoCheckUpdate)
         assertNull(settings.ignoredVersion)
         assertTrue(settings.isOs3Effect)
-        assertEquals(false, settings.wideScreenNavigationRail)
     }
 
     @Test
@@ -24,11 +23,9 @@ class AppSettingsTest {
                 autoCheckUpdate = false,
                 ignoredVersion = "v1.2.3",
                 isOs3Effect = false,
-                wideScreenNavigationRail = true,
             )
         assertEquals(false, updated.autoCheckUpdate)
         assertEquals("v1.2.3", updated.ignoredVersion)
         assertEquals(false, updated.isOs3Effect)
-        assertEquals(true, updated.wideScreenNavigationRail)
     }
 }

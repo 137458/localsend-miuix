@@ -3,9 +3,11 @@ package org.localsend.miuix
 import android.content.SharedPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.localsend.miuix.core.PreferenceKeys
 import org.localsend.miuix.manager.loadSettings
 import org.localsend.miuix.manager.persistSettingsTo
 import org.localsend.miuix.model.AppSettings
+import org.localsend.miuix.model.DeviceType
 
 class SettingsMappingTest {
     private class FakeEditor(
@@ -133,5 +135,21 @@ class SettingsMappingTest {
         assertEquals("eth1", loaded.networkBlacklist)
         assertEquals(12, loaded.discoveryTimeout)
         assertEquals("ff02::1", loaded.multicastGroup)
+    }
+
+    @Test
+    fun loadSettingsDefaultsDeviceTypeByRealScreenShape() {
+        val tablet = loadSettings(FakeSharedPreferences(), alias = "Alias", defaultDownloadPath = "/tmp", isTablet = true)
+        assertEquals(DeviceType.tablet, tablet.deviceType)
+        val phone = loadSettings(FakeSharedPreferences(), alias = "Alias", defaultDownloadPath = "/tmp", isTablet = false)
+        assertEquals(DeviceType.mobile, phone.deviceType)
+    }
+
+    @Test
+    fun loadSettingsKeepsUserChosenDeviceTypeOnTablets() {
+        val prefs = FakeSharedPreferences()
+        prefs.values[PreferenceKeys.KEY_DEVICE_TYPE] = DeviceType.mobile.value
+        val loaded = loadSettings(prefs, alias = "Alias", defaultDownloadPath = "/tmp", isTablet = true)
+        assertEquals(DeviceType.mobile, loaded.deviceType)
     }
 }
