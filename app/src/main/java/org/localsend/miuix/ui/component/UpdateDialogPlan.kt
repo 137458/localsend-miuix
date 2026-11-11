@@ -6,7 +6,6 @@ import org.localsend.miuix.updates.UpdateDownloadState
 import kotlin.math.round
 
 internal const val UPDATE_NOTES_PREVIEW_LINES = 12
-internal const val UPDATE_NOTES_MAX_HEIGHT_DP = 240
 internal const val UPDATE_NOTES_FADE_DP = 40
 
 internal enum class UpdatePrimaryAction {

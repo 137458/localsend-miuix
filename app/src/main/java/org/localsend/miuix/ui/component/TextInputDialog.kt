@@ -1,22 +1,16 @@
 package org.localsend.miuix.ui.component
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 
 /** 弹窗输入框的统一外观：占位标签、行数、键盘类型与可选长度上限。 */
@@ -40,7 +34,9 @@ internal fun DialogTextField(
             }
         },
         label = label ?: "",
-        useLabelAsPlaceholder = true,
+        // 常驻浮动标签：值非空时标签缩小到输入框上方，而不是像占位符一样消失，
+        // 否则端口这类预填字段只剩一串数字、看不出含义。
+        useLabelAsPlaceholder = false,
         singleLine = singleLine,
         minLines = minLines,
         maxLines = maxLines,
@@ -52,6 +48,9 @@ internal fun DialogTextField(
 /**
  * 文本输入弹窗的统一骨架：标题、可选说明、输入框、可选附加内容与取消/确认按钮。
  * [onConfirm] 返回 true 时才关闭弹窗，返回 false 表示输入未通过校验、保持打开。
+ *
+ * 说明文案统一交给 WindowDialog 的 summary 居中展示，内容区只保留输入相关元素，
+ * 避免同一层级的说明文字在不同弹窗里出现两种排版。
  */
 @Composable
 internal fun TextInputDialog(
@@ -69,46 +68,40 @@ internal fun TextInputDialog(
     maxLines: Int = 1,
     maxLength: Int? = null,
     description: String? = null,
-    descriptionColor: Color = MiuixTheme.colorScheme.onSurfaceSecondary,
     extraContent: (@Composable () -> Unit)? = null,
 ) {
     WindowDialog(
         show = show,
         title = title,
+        summary = description,
         onDismissRequest = onDismissRequest,
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(DialogTokens.SectionGap),
         ) {
-            if (description != null) {
-                Text(
-                    text = description,
-                    style = MiuixTheme.textStyles.body2,
-                    color = descriptionColor,
+            // 输入区：输入框与附加内容同属一块，内部用 BlockGap 弱分隔。
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(DialogTokens.BlockGap),
+            ) {
+                DialogTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    label = label,
+                    keyboardType = keyboardType,
+                    singleLine = singleLine,
+                    minLines = minLines,
+                    maxLines = maxLines,
+                    maxLength = maxLength,
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+
+                if (extraContent != null) {
+                    extraContent()
+                }
             }
 
-            DialogTextField(
-                value = value,
-                onValueChange = onValueChange,
-                label = label,
-                keyboardType = keyboardType,
-                singleLine = singleLine,
-                minLines = minLines,
-                maxLines = maxLines,
-                maxLength = maxLength,
-            )
-
-            if (extraContent != null) {
-                extraContent()
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
+            // 动作区永远是最后一块，靠根 Column 的 SectionGap 与内容区分隔。
             DialogButtonRow(
                 secondaryText = stringResource(R.string.btn_cancel),
                 onSecondary = onDismissRequest,

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -54,26 +53,23 @@ fun HistoryDetailDialog(
     if (item == null) return
     val context = LocalContext.current
     val formattedTime = rememberUiTimeText("yyyy-MM-dd HH:mm:ss", item.timestamp)
+    val fileListMaxHeight = rememberDialogContentMaxHeight()
 
     WindowBottomSheet(
         show = show,
         onDismissRequest = onDismissRequest,
         title = if (item.isTextMessage) stringResource(R.string.history_detail_text_title) else stringResource(R.string.history_detail_file_title),
     ) {
+        // 内容区已由 WindowBottomSheet 提供 24dp 内边距，这里只负责区块节奏。
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(DialogTokens.SectionGap),
         ) {
-            // Section 1: Device & Status Info Card
-            Card(modifier = Modifier.fillMaxWidth()) {
+            // Section 1: 设备与状态信息卡
+            DialogCard {
                 Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(DialogTokens.BlockGap),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -107,93 +103,48 @@ fun HistoryDetailDialog(
                         )
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.history_detail_device_ip),
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                        Text(
-                            text = item.deviceIp,
-                            style = MiuixTheme.textStyles.footnote1,
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.history_detail_time),
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                        Text(
-                            text = formattedTime,
-                            style = MiuixTheme.textStyles.footnote1,
-                        )
-                    }
-
+                    DialogInfoRow(label = stringResource(R.string.history_detail_device_ip), value = item.deviceIp)
+                    DialogInfoRow(label = stringResource(R.string.history_detail_time), value = formattedTime)
                     // 文本消息只有一个 file entry，条目数与体积对用户无意义，仅文件传输显示总量
                     if (!item.isTextMessage) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                text = stringResource(R.string.history_detail_total),
-                                style = MiuixTheme.textStyles.footnote1,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            )
-                            Text(
-                                text = stringResource(R.string.history_detail_total_summary, item.fileCount, item.formattedSize),
-                                style = MiuixTheme.textStyles.footnote1,
-                            )
-                        }
+                        DialogInfoRow(
+                            label = stringResource(R.string.history_detail_total),
+                            value = stringResource(R.string.history_detail_total_summary, item.fileCount, item.formattedSize),
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Section 2: Text Content or File List
+            // Section 2: 文本内容或文件列表
             if (item.isTextMessage && !item.textContent.isNullOrEmpty()) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                val textContent = item.textContent
+                val detectedUrl = remember(textContent) { detectWebUrlInText(textContent) }
+                val copyText: () -> Unit = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Text", textContent))
+                    Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                }
+                DialogCard {
                     Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(DialogTokens.BlockGap),
                     ) {
-                        val detectedUrl =
-                            remember(item.textContent) { detectWebUrlInText(item.textContent) }
-
                         Text(
-                            text = item.textContent,
+                            text = textContent,
                             style = MiuixTheme.textStyles.body2,
                             modifier = Modifier.fillMaxWidth(),
                         )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
+                        // 卡片内的操作跟随文本、右对齐收紧，避免在说明卡里再出现一块整宽主按钮与底部动作区抢视线
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                            horizontalArrangement = Arrangement.spacedBy(DialogTokens.ActionGap, Alignment.End),
                         ) {
                             Button(
-                                onClick = {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("LocalSend Text", item.textContent))
-                                    Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
-                                },
+                                onClick = copyText,
                                 colors = if (detectedUrl != null) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary(),
                             ) {
                                 Text(stringResource(R.string.history_detail_btn_copy_text))
                             }
-
                             if (detectedUrl != null) {
                                 Button(
                                     onClick = {
@@ -216,76 +167,80 @@ fun HistoryDetailDialog(
                     }
                 }
             } else if (item.fileEntries.isNotEmpty()) {
-                Text(
-                    text = stringResource(R.string.history_detail_included_files),
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                )
-
-                LazyColumn(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 240.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(DialogTokens.BlockGap),
                 ) {
-                    items(item.fileEntries) { file ->
-                        Card(
-                            onClick = {
-                                file.uri?.let { uri ->
-                                    try {
-                                        val intent =
-                                            Intent(Intent.ACTION_VIEW).apply {
-                                                setDataAndType(uri, file.mimeType)
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                                            }
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, context.getString(R.string.toast_cannot_open_file), Toast.LENGTH_SHORT).show()
+                    Text(
+                        text = stringResource(R.string.history_detail_included_files),
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+
+                    LazyColumn(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = fileListMaxHeight),
+                        verticalArrangement = Arrangement.spacedBy(DialogTokens.BlockGap),
+                    ) {
+                        items(item.fileEntries) { file ->
+                            Card(
+                                onClick = {
+                                    file.uri?.let { uri ->
+                                        try {
+                                            val intent =
+                                                Intent(Intent.ACTION_VIEW).apply {
+                                                    setDataAndType(uri, file.mimeType)
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                }
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, context.getString(R.string.toast_cannot_open_file), Toast.LENGTH_SHORT).show()
+                                        }
                                     }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                                },
+                                modifier = Modifier.fillMaxWidth(),
                             ) {
-                                FileThumbnailContent(
-                                    name = file.name,
-                                    mimeType = file.mimeType,
-                                    uri = file.uri,
-                                    path = file.path,
-                                    isTextMessage = false,
-                                    stateKey = file.uriString ?: file.name,
-                                    size = 36.dp,
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = file.name,
-                                        style = MiuixTheme.textStyles.body2,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(DialogTokens.CardPadding),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    FileThumbnailContent(
+                                        name = file.name,
+                                        mimeType = file.mimeType,
+                                        uri = file.uri,
+                                        path = file.path,
+                                        isTextMessage = false,
+                                        stateKey = file.uriString ?: file.name,
+                                        size = 36.dp,
                                     )
-                                    Text(
-                                        text = FileItem.formatFileSize(file.size),
-                                        style = MiuixTheme.textStyles.footnote1,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                    )
-                                }
-                                // apk 条目提供“安装”直达按钮，失败以提示代替崩溃
-                                if (InstallHelper.isApk(file.name)) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Button(
-                                        onClick = { launchApkInstall(context, file.path, file.uriString) },
-                                        colors = ButtonDefaults.buttonColorsPrimary(),
-                                    ) {
-                                        Text(stringResource(R.string.btn_install_apk))
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = file.name,
+                                            style = MiuixTheme.textStyles.body2,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Text(
+                                            text = FileItem.formatFileSize(file.size),
+                                            style = MiuixTheme.textStyles.footnote1,
+                                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        )
+                                    }
+                                    // apk 条目提供“安装”直达按钮，失败以提示代替崩溃
+                                    if (InstallHelper.isApk(file.name)) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Button(
+                                            onClick = { launchApkInstall(context, file.path, file.uriString) },
+                                            colors = ButtonDefaults.buttonColorsPrimary(),
+                                        ) {
+                                            Text(stringResource(R.string.btn_install_apk))
+                                        }
                                     }
                                 }
                             }
@@ -294,45 +249,38 @@ fun HistoryDetailDialog(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Action Buttons (Delete / Close)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            // Section 3: 动作区，主操作独占一行，删除与关闭降级为文字按钮
+            DialogActionColumn {
                 if (onResend != null) {
                     Button(
                         onClick = { onResend(item) },
                         colors = ButtonDefaults.buttonColorsPrimary(),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(stringResource(R.string.history_action_resend))
                     }
+                } else {
+                    Button(
+                        onClick = onDismissRequest,
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.btn_close))
+                    }
                 }
 
-                Button(
+                DialogTextAction(
+                    text = stringResource(R.string.history_detail_btn_delete_record),
                     onClick = {
                         onDelete(item.id)
                         onDismissRequest()
                         Toast.makeText(context, context.getString(R.string.toast_history_item_deleted), Toast.LENGTH_SHORT).show()
                     },
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            color = MiuixTheme.colorScheme.error,
-                            contentColor = MiuixTheme.colorScheme.onError,
-                        ),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.history_detail_btn_delete_record))
-                }
+                    colors = dialogDangerTextColors(),
+                )
 
-                Button(
-                    onClick = onDismissRequest,
-                    colors = ButtonDefaults.buttonColors(),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.btn_close))
+                if (onResend != null) {
+                    DialogTextAction(text = stringResource(R.string.btn_close), onClick = onDismissRequest)
                 }
             }
         }

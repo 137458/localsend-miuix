@@ -4,9 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -31,7 +29,6 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 import java.io.File
@@ -40,7 +37,9 @@ import java.io.File
  * 整合版更新弹窗：一行版本跃迁摘要 + 可折叠说明 + 纵向主次动作。
  *
  * - 关闭弹窗不取消下载，状态由进程级单例持有，更新页可继续看到进度。
- * - 说明区是弹窗内唯一的滚动容器，限高 240dp，上下 40dp 羽化。
+ * - 说明区是弹窗内唯一的滚动容器：限高跟随 [rememberDialogContentMaxHeight]，
+ *   上下留 [UPDATE_NOTES_FADE_DP] 羽化，避免把 160/240dp 写死。
+ * - 动作区统一由 [DialogActionColumn] 收口：主操作独占一行，其余为文字按钮。
  */
 @Composable
 fun UpdateDialog(
@@ -64,6 +63,7 @@ fun UpdateDialog(
             updateDialogNotesFold(releaseInfo.changelog, expanded)
         }
     val scrollState = rememberScrollState()
+    val notesMaxHeight = rememberDialogContentMaxHeight(fraction = 0.4f, min = 160.dp, max = 360.dp)
 
     fun runPrimary() {
         when (plan.primaryAction) {
@@ -79,27 +79,30 @@ fun UpdateDialog(
         summary = plan.summary,
         onDismissRequest = onDismiss,
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(DialogTokens.SectionGap),
+        ) {
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(max = UPDATE_NOTES_MAX_HEIGHT_DP.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                        .heightIn(max = notesMaxHeight)
+                        .clip(RoundedCornerShape(DialogTokens.CardCorner))
+                        .background(MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f))
                         .verticalEdgeFade(
                             top = scrollState.canScrollBackward,
                             bottom = scrollState.canScrollForward,
                             fade = UPDATE_NOTES_FADE_DP.dp,
                         ).verticalScroll(scrollState)
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                        .padding(DialogTokens.CardPadding),
+                verticalArrangement = Arrangement.spacedBy(DialogTokens.BlockGap),
             ) {
                 if (plan.showProgress) {
                     plan.progressDetail?.let {
                         Text(
                             text = it,
-                            style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
+                            style = MiuixTheme.textStyles.footnote1,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                     }
@@ -109,7 +112,7 @@ fun UpdateDialog(
                 if (downloadState is UpdateDownloadState.Failed) {
                     Text(
                         text = downloadState.message,
-                        style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                        style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.Medium),
                         color = MiuixTheme.colorScheme.error,
                     )
                 }
@@ -124,15 +127,15 @@ fun UpdateDialog(
                         Text(
                             text =
                                 if (expanded) {
-                                    "收起说明"
+                                    stringResource(R.string.update_dialog_notes_collapse)
                                 } else {
-                                    "展开全部（还有 ${notes.hiddenLines} 行）"
+                                    stringResource(R.string.update_dialog_notes_expand, notes.hiddenLines)
                                 },
                             style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
                             color = MiuixTheme.colorScheme.primary,
                             modifier =
                                 Modifier
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(RoundedCornerShape(DialogTokens.ChipCorner))
                                     .clickable(role = Role.Button) { expanded = !expanded }
                                     .padding(vertical = 2.dp),
                         )
@@ -147,24 +150,19 @@ fun UpdateDialog(
 
                 if (plan.showIgnore && onIgnore != null) {
                     Text(
-                        text = "忽略此版本",
+                        text = stringResource(R.string.update_dialog_ignore_version),
                         style = MiuixTheme.textStyles.body2.copy(fontSize = 12.sp),
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         modifier =
                             Modifier
-                                .clip(RoundedCornerShape(6.dp))
+                                .clip(RoundedCornerShape(DialogTokens.ChipCorner))
                                 .clickable(role = Role.Button) { onIgnore(releaseInfo.latestVersion) }
                                 .padding(vertical = 2.dp),
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
+            DialogActionColumn {
                 Button(
                     onClick = { runPrimary() },
                     enabled = plan.primaryEnabled,
@@ -173,26 +171,19 @@ fun UpdateDialog(
                 ) {
                     Text(plan.primaryText)
                 }
-
                 if (plan.showBrowserFallback) {
-                    TextButton(
+                    DialogTextAction(
                         text = stringResource(R.string.update_dialog_btn_browser),
                         onClick = { onOpenBrowser(updateBrowserUrl(releaseInfo)) },
-                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 if (plan.showCancelDownload) {
-                    TextButton(
+                    DialogTextAction(
                         text = stringResource(R.string.update_dialog_btn_cancel_download),
                         onClick = onCancelDownload,
-                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                TextButton(
-                    text = plan.dismissText,
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                DialogTextAction(text = plan.dismissText, onClick = onDismiss)
             }
         }
     }

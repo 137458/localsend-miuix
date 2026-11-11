@@ -1,9 +1,11 @@
 package org.localsend.miuix.ui.component
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -11,13 +13,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import org.localsend.miuix.R
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
@@ -65,7 +67,6 @@ fun TargetDevicePinDialog(
             label = stringResource(R.string.dialog_target_pin_label),
             keyboardType = KeyboardType.Ascii,
             description = stringResource(R.string.dialog_target_pin_desc, targetAlias),
-            descriptionColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             onDismissRequest = onDismissRequest,
             onConfirm = {
                 onConfirm(pin.trim())
@@ -75,6 +76,10 @@ fun TargetDevicePinDialog(
     }
 }
 
+/**
+ * 证书指纹弹窗：说明走 WindowDialog 的 summary 槽位，指纹放在 [DialogCard] 里，
+ * 动作区按「主操作按钮 + 次级文字动作」纵向排列。
+ */
 @Composable
 fun CertFingerprintDialog(
     show: Boolean,
@@ -82,65 +87,52 @@ fun CertFingerprintDialog(
     onDismissRequest: () -> Unit,
     onRegenerate: () -> Unit,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
 
     WindowDialog(
         show = show,
         title = stringResource(R.string.dialog_cert_title),
+        summary = stringResource(R.string.dialog_cert_desc),
         onDismissRequest = onDismissRequest,
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(DialogTokens.SectionGap),
         ) {
-            Text(
-                text = stringResource(R.string.dialog_cert_desc),
-                style = MiuixTheme.textStyles.body2,
-                color = MiuixTheme.colorScheme.onSurfaceSecondary,
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = stringResource(R.string.dialog_cert_label),
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = fingerprint.ifEmpty { stringResource(R.string.dialog_cert_empty) },
-                        style = MiuixTheme.textStyles.body2.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
-                        color = MiuixTheme.colorScheme.primary,
-                    )
-                }
+            DialogCard {
+                Text(
+                    text = stringResource(R.string.dialog_cert_label),
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+                Text(
+                    text = fingerprint.ifEmpty { stringResource(R.string.dialog_cert_empty) },
+                    style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.Medium),
+                    color = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = DialogTokens.BlockGap),
+                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            DialogButtonRow(
-                secondaryText = stringResource(R.string.dialog_cert_btn_copy),
-                onSecondary = {
-                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Certificate Fingerprint", fingerprint))
-                },
-                primaryText = stringResource(R.string.dialog_cert_btn_regenerate),
-                onPrimary = { onRegenerate() },
-                primaryColors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.error, contentColor = MiuixTheme.colorScheme.onError),
-                spacing = 8.dp,
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(
-                onClick = onDismissRequest,
-                colors = ButtonDefaults.buttonColors(),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.btn_close))
+            DialogActionColumn {
+                Button(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Certificate Fingerprint", fingerprint))
+                    },
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.dialog_cert_btn_copy))
+                }
+                DialogTextAction(
+                    text = stringResource(R.string.dialog_cert_btn_regenerate),
+                    onClick = onRegenerate,
+                    colors = dialogDangerTextColors(),
+                )
+                DialogTextAction(
+                    text = stringResource(R.string.btn_close),
+                    onClick = onDismissRequest,
+                )
             }
         }
     }

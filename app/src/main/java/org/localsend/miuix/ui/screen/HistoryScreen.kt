@@ -50,6 +50,7 @@ import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.model.filterByTab
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.BlurredBar
+import org.localsend.miuix.ui.component.ConfirmDialog
 import org.localsend.miuix.ui.component.EmptyStateCard
 import org.localsend.miuix.ui.component.HistoryDetailDialog
 import org.localsend.miuix.ui.component.blurBackdropSource
@@ -69,7 +70,6 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
  * 传输历史页：支持分类标签（全部/接收/发送）筛选、直达保存目录、文本消息快速复制、
@@ -250,102 +250,40 @@ fun HistoryScreen(
         },
     )
 
+    // 删除单条记录不可撤销，走统一确认弹窗：说明进 summary，主操作使用错误色
     if (itemToDelete != null) {
         val target = itemToDelete!!
-        WindowDialog(
+        ConfirmDialog(
             show = true,
             title = stringResource(R.string.history_dialog_delete_title),
+            message = stringResource(R.string.history_dialog_delete_msg, target.deviceAlias),
+            confirmText = stringResource(R.string.history_detail_btn_delete_record),
+            onConfirm = {
+                manager.deleteHistoryItem(target.id)
+                itemToDelete = null
+                Toast.makeText(context, context.getString(R.string.toast_history_item_deleted), Toast.LENGTH_SHORT).show()
+            },
             onDismissRequest = { itemToDelete = null },
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.history_dialog_delete_msg, target.deviceAlias),
-                    style = MiuixTheme.textStyles.body1,
-                    color = MiuixTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Button(
-                        onClick = { itemToDelete = null },
-                        colors = ButtonDefaults.buttonColors(),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.btn_cancel))
-                    }
-                    Button(
-                        onClick = {
-                            manager.deleteHistoryItem(target.id)
-                            itemToDelete = null
-                            Toast.makeText(context, context.getString(R.string.toast_history_item_deleted), Toast.LENGTH_SHORT).show()
-                        },
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                color = MiuixTheme.colorScheme.error,
-                                contentColor = MiuixTheme.colorScheme.onError,
-                            ),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.history_detail_btn_delete_record))
-                    }
-                }
-            }
-        }
+            dismissText = stringResource(R.string.btn_cancel),
+            danger = true,
+        )
     }
 
+    // 清空历史同样不可撤销，与删除记录共用同一个确认弹窗骨架
     if (showClearConfirmDialog) {
-        WindowDialog(
+        ConfirmDialog(
             show = true,
             title = stringResource(R.string.history_dialog_clear_title),
+            message = stringResource(R.string.history_dialog_clear_msg, history.size),
+            confirmText = stringResource(R.string.btn_clear),
+            onConfirm = {
+                manager.clearHistory()
+                showClearConfirmDialog = false
+            },
             onDismissRequest = { showClearConfirmDialog = false },
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.history_dialog_clear_msg, history.size),
-                    style = MiuixTheme.textStyles.body1,
-                    color = MiuixTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Button(
-                        onClick = { showClearConfirmDialog = false },
-                        colors = ButtonDefaults.buttonColors(),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.btn_cancel))
-                    }
-                    Button(
-                        onClick = {
-                            manager.clearHistory()
-                            showClearConfirmDialog = false
-                        },
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                color = MiuixTheme.colorScheme.error,
-                                contentColor = MiuixTheme.colorScheme.onError,
-                            ),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.btn_clear))
-                    }
-                }
-            }
-        }
+            dismissText = stringResource(R.string.btn_cancel),
+            danger = true,
+        )
     }
 }
 

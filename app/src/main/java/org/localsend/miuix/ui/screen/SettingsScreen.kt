@@ -5,13 +5,10 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
@@ -36,7 +33,7 @@ import org.localsend.miuix.ui.MainActivity
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.CertFingerprintDialog
-import org.localsend.miuix.ui.component.DialogButtonRow
+import org.localsend.miuix.ui.component.ConfirmDialog
 import org.localsend.miuix.ui.component.PinDialog
 import org.localsend.miuix.ui.component.SectionCard
 import org.localsend.miuix.ui.component.TextInputDialog
@@ -44,19 +41,16 @@ import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import org.localsend.miuix.util.AppLanguage
 import org.localsend.miuix.util.SettingsValidators
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.DropdownEntry
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
 
 /** 高级网络选项中正在编辑的字段，null 表示无编辑弹窗。 */
 private enum class AdvancedNetworkField {
@@ -388,40 +382,20 @@ fun SettingsScreen(
 
     // 重新生成证书会让所有已记录该指纹的设备下次校验失败，属于破坏性操作，需二次确认
     if (showRegenerateConfirm) {
-        WindowDialog(
+        ConfirmDialog(
             show = true,
             title = stringResource(R.string.dialog_cert_regen_confirm_title),
+            message = stringResource(R.string.dialog_cert_regen_confirm_msg),
+            confirmText = stringResource(R.string.btn_confirm),
+            onConfirm = {
+                showRegenerateConfirm = false
+                showCertDialog = false
+                manager.regenerateCertificate()
+            },
             onDismissRequest = { showRegenerateConfirm = false },
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.dialog_cert_regen_confirm_msg),
-                    style = MiuixTheme.textStyles.body1,
-                    color = MiuixTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-                DialogButtonRow(
-                    secondaryText = stringResource(R.string.btn_cancel),
-                    onSecondary = { showRegenerateConfirm = false },
-                    primaryText = stringResource(R.string.btn_confirm),
-                    onPrimary = {
-                        showRegenerateConfirm = false
-                        showCertDialog = false
-                        manager.regenerateCertificate()
-                    },
-                    primaryColors =
-                        ButtonDefaults.buttonColors(
-                            color = MiuixTheme.colorScheme.error,
-                            contentColor = MiuixTheme.colorScheme.onError,
-                        ),
-                )
-            }
-        }
+            dismissText = stringResource(R.string.btn_cancel),
+            danger = true,
+        )
     }
 
     when (editingAdvancedField) {

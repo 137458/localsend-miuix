@@ -9,16 +9,14 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,7 +39,6 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.network.NetworkUtils
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -84,31 +81,22 @@ fun WebShareDialog(
         title = stringResource(R.string.webshare_dialog_title),
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(DialogTokens.SectionGap),
         ) {
-            // QR Code Container with clean white background for scanning
-            Box(
+            // 二维码需要纯白底与静区，白色背景属于扫码必需，不随主题变化
+            QrCodeImage(
+                content = shareUrl,
+                size = 196.dp,
+                darkColor = Color.Black,
+                lightColor = Color.White,
                 modifier =
                     Modifier
-                        .size(220.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(DialogTokens.CardCorner))
                         .background(Color.White)
-                        .padding(12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                QrCodeImage(
-                    content = shareUrl,
-                    size = 196.dp,
-                    darkColor = Color.Black,
-                    lightColor = Color.White,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
+                        .padding(DialogTokens.CardPadding),
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -135,138 +123,102 @@ fun WebShareDialog(
                 }
             }
 
-            if (settings.useHttps) {
-                Text(
-                    text = stringResource(R.string.webshare_https_warning),
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
+            if (localIps.size > 1) {
+                Row(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp),
-                )
-            }
-
-            if (localIps.size > 1) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(DialogTokens.BlockGap),
                 ) {
                     localIps.forEach { ip ->
-                        val isSelected = ip == selectedIp
                         val label =
                             when {
                                 ip.startsWith("192.168.43.") -> stringResource(R.string.webshare_ip_tag_hotspot, ip)
                                 ip == localIps.first() -> stringResource(R.string.webshare_ip_tag_recommended, ip)
                                 else -> ip
                             }
-                        Button(
+                        DialogChip(
+                            text = label,
                             onClick = { selectedIp = ip },
-                            colors = if (isSelected) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors(),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(
-                                text = label,
-                                style = MiuixTheme.textStyles.footnote1,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                            selected = ip == selectedIp,
+                        )
                     }
                 }
             }
 
+            if (settings.useHttps) {
+                Text(
+                    text = stringResource(R.string.webshare_https_warning),
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
             if (isSharing) {
                 val currentShare = shares.first()
-                Spacer(modifier = Modifier.height(12.dp))
-                Card(modifier = Modifier.fillMaxWidth()) {
+                DialogCard {
+                    Text(
+                        text = stringResource(R.string.webshare_current_shared_count, currentShare.files.size),
+                        style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold),
+                    )
                     Column(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                                .padding(top = DialogTokens.BlockGap),
+                        verticalArrangement = Arrangement.spacedBy(DialogTokens.BlockGap),
                     ) {
-                        Text(
-                            text = stringResource(R.string.webshare_current_shared_count, currentShare.files.size),
-                            style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold),
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
                         currentShare.files.take(5).forEach { file ->
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = if (file.isTextMessage) AppIcons.Text else AppIcons.getFileIcon(file.mimeType, file.name),
-                                    contentDescription = null,
-                                    tint = MiuixTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (file.isTextMessage) (file.textContent?.take(40) ?: stringResource(R.string.send_quick_action_text)) else "${file.name} (${file.formattedSize})",
-                                    style = MiuixTheme.textStyles.footnote1,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
+                            DialogInfoRow(
+                                label =
+                                    if (file.isTextMessage) {
+                                        file.textContent?.take(40) ?: stringResource(R.string.send_quick_action_text)
+                                    } else {
+                                        file.name
+                                    },
+                                value = file.formattedSize,
+                            )
                         }
                         if (currentShare.files.size > 5) {
                             Text(
                                 text = stringResource(R.string.webshare_more_items, currentShare.files.size),
                                 style = MiuixTheme.textStyles.footnote1,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                modifier = Modifier.padding(top = 4.dp, start = 24.dp),
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Button(
-                    onClick = onDismissRequest,
-                    colors = ButtonDefaults.buttonColors(),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.btn_close))
+            when {
+                isSharing -> {
+                    DialogButtonRow(
+                        secondaryText = stringResource(R.string.btn_close),
+                        onSecondary = onDismissRequest,
+                        primaryText = stringResource(R.string.webshare_btn_stop_share),
+                        onPrimary = { manager.stopShare() },
+                        primaryColors = dialogDangerButtonColors(),
+                    )
                 }
-
-                if (isSharing) {
+                selectedFiles.isNotEmpty() -> {
+                    DialogButtonRow(
+                        secondaryText = stringResource(R.string.btn_close),
+                        onSecondary = onDismissRequest,
+                        primaryText = stringResource(R.string.webshare_btn_share_selected, selectedFiles.size),
+                        onPrimary = { manager.startShare(selectedFiles) },
+                        primaryColors = ButtonDefaults.buttonColorsPrimary(),
+                    )
+                }
+                else -> {
                     Button(
-                        onClick = {
-                            manager.stopShare()
-                        },
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                color = MiuixTheme.colorScheme.error,
-                                contentColor = Color.White,
-                            ),
-                        modifier = Modifier.weight(1f),
+                        onClick = onDismissRequest,
+                        colors = ButtonDefaults.buttonColors(),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(stringResource(R.string.webshare_btn_stop_share))
-                    }
-                } else if (selectedFiles.isNotEmpty()) {
-                    Button(
-                        onClick = {
-                            manager.startShare(selectedFiles)
-                        },
-                        colors = ButtonDefaults.buttonColorsPrimary(),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.webshare_btn_share_selected, selectedFiles.size))
+                        Text(stringResource(R.string.btn_close))
                     }
                 }
             }
