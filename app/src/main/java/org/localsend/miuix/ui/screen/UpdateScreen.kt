@@ -59,6 +59,7 @@ import org.localsend.miuix.ui.component.updateProgressDetail
 import org.localsend.miuix.ui.component.updateProgressFraction
 import org.localsend.miuix.ui.effect.BgEffectBackground
 import org.localsend.miuix.ui.effect.isRuntimeShaderSupported
+import org.localsend.miuix.updates.UpdateDebugPreview
 import org.localsend.miuix.updates.UpdateDownloadState
 import org.localsend.miuix.updates.UpdatePrompt
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -99,6 +100,8 @@ fun UpdateScreen(
     var releaseInfo by remember { mutableStateOf<UpdateCheckResult?>(null) }
     var isChecking by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
+    // 测试入口注入的模拟快照：只在本次预览生效，关闭弹窗即丢弃，避免污染真实检查结果
+    var previewRelease by remember { mutableStateOf<UpdateCheckResult?>(null) }
 
     val downloaderState = manager.updates.downloader.state
     val downloadState by downloaderState.collectAsStateWithLifecycle()
@@ -535,6 +538,17 @@ fun UpdateScreen(
                                     },
                                 )
                             }
+
+                            if (BuildConfig.DEBUG) {
+                                ArrowPreference(
+                                    title = stringResource(R.string.update_pref_debug_dialog_title),
+                                    summary = stringResource(R.string.update_pref_debug_dialog_summary),
+                                    onClick = {
+                                        previewRelease = UpdateDebugPreview.sample(BuildConfig.VERSION_NAME)
+                                        showDialog = true
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -545,8 +559,11 @@ fun UpdateScreen(
         UpdateDialogHost(
             show = showDialog,
             manager = manager,
-            releaseInfo = releaseInfo,
-            onDismiss = { showDialog = false },
+            releaseInfo = previewRelease ?: releaseInfo,
+            onDismiss = {
+                showDialog = false
+                previewRelease = null
+            },
         )
     }
 }
