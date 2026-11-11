@@ -113,7 +113,7 @@ object LiveUpdatesCompat {
                         Notification.Action
                             .Builder(
                                 android.graphics.drawable.Icon
-                                    .createWithResource(context, android.R.drawable.ic_menu_close_clear_cancel),
+                                    .createWithResource(context, R.drawable.ic_stat_decline),
                                 context.getString(R.string.action_cancel_transfer),
                                 cancelIntent,
                             ).build(),
@@ -181,7 +181,7 @@ object LiveUpdatesCompat {
                 .setContentIntent(contentIntent)
                 .setProgress(100, session.progressPercent, session.totalBytes <= 0)
                 .addAction(
-                    android.R.drawable.ic_menu_close_clear_cancel,
+                    R.drawable.ic_stat_decline,
                     context.getString(R.string.action_cancel_transfer),
                     cancelIntent,
                 )
