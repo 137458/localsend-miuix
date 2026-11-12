@@ -114,7 +114,7 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-nav-android:$miuixVersion")
 
     // coUI-Kit (ColorOS Compose 皮肤方案；AAR 强制 minSdk 31，且强依赖 compose-bom-alpha:2026.08.01 与 foundation:1.12.0+)
-    implementation("io.github.itoseo:coui:0.0.1-alpha10")
+    implementation("io.github.itoseo:coui:0.0.1-alpha11")
 
     // Kotlinx Coroutines & Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")

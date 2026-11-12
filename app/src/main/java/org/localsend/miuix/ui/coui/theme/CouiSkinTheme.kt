@@ -3,6 +3,7 @@ package org.localsend.miuix.ui.coui.theme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import com.itos.coui.theme.CouiColor
 import com.itos.coui.theme.CouiColorScheme
@@ -15,10 +16,10 @@ import com.itos.coui.theme.CouiTheme as CouiKitTheme
 /**
  * ColorOS 色板：把 Miuix 皮肤色映射到 coUI-Kit 的 [CouiColorScheme]。
  *
- * 颜色真源仍只有 [Colors] 一处，切深浅或切动态取色时两套皮肤读同一份取值。
- * [CouiColorScheme.background] 是页面底色，[CouiColorScheme.surface]/[CouiColorScheme.container]
- * 是组件表面，[CouiColorScheme.card] 是分组列表卡片；materialTint 保持透明，
- * 让浮动栏与弹窗直接采样页面真实颜色，不再叠一层宿主染色。
+ * 颜色真源仍只有 [Colors] 一处，切深浅或切动态取色时两套皮肤读同一份取值：
+ * - [CouiColorScheme.background] 对齐 Miuix Scaffold 真实页面底色 `colors.surface`（浅 `#F7F7F7` / 深 `#000000`）；
+ * - [CouiColorScheme.card] 与 `surface` 对齐 `colors.surfaceContainer`（浅 `#FFFFFF` / 深 `#242424`），在暗黑模式下与 `#000000` 页面形成清晰层级；
+ * - [CouiColorScheme.container] 用于卡内嵌套容器（暗色 `#2D2D2D`、`surfaceContainerHighest`；浅色微调灰底），与卡片表面拉开层次。
  */
 internal fun couiColorSchemeOf(
     colors: Colors,
@@ -27,17 +28,22 @@ internal fun couiColorSchemeOf(
     CouiColorScheme(
         accent = colors.primary,
         onAccent = colors.onPrimary,
-        surface = colors.surface,
-        container = colors.surfaceContainer,
+        surface = colors.surfaceContainer,
+        container =
+            if (isDark) {
+                colors.surfaceContainerHighest
+            } else {
+                lerp(colors.surface, colors.surfaceContainerHigh, 0.55f)
+            },
         onSurface = colors.onSurface,
-        onSurfaceVariant = colors.onBackgroundVariant,
-        outlineVariant = colors.dividerLine,
+        onSurfaceVariant = colors.onSurfaceVariantSummary,
+        outlineVariant = if (isDark) colors.dividerLine else colors.dividerLine.copy(alpha = 0.7f),
         accentOnSurface = if (isDark) colors.onPrimaryVariant else colors.primary,
         menuSurface = colors.surfaceContainer,
         checkboxAccent = colors.primary,
         menuCheckboxAccent = if (isDark) colors.onPrimaryVariant else colors.primary,
-        background = colors.background,
-        card = if (isDark) colors.surfaceContainerHigh else colors.surface,
+        background = colors.surface,
+        card = colors.surfaceContainer,
     )
 
 /**
@@ -46,6 +52,10 @@ internal fun couiColorSchemeOf(
  */
 @Composable
 internal fun couiDangerColor(isDark: Boolean = CouiTheme.isDark): Color = if (isDark) CouiColor.Night.RED else CouiColor.Day.RED
+
+/** ColorOS 皮肤统一的在线/就绪强调色。 */
+@Composable
+internal fun couiSuccessColor(isDark: Boolean = CouiTheme.isDark): Color = if (isDark) CouiColor.Night.GREEN else CouiColor.Day.GREEN
 
 /**
  * ColorOS 皮肤的主题入口：色板与字阶由 [MiuixTheme] 派生，再交给 coUI-Kit 的 CouiTheme 下发。

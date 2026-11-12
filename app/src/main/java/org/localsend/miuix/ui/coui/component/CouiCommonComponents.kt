@@ -1,9 +1,14 @@
 package org.localsend.miuix.ui.coui.component
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
@@ -32,12 +37,15 @@ import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.theme.CouiTheme
 import com.itos.coui.topappbar.CouiTopAppBarDefaults
+import com.itos.coui.topappbar.TopAppBarButton
+import com.itos.coui.topappbar.TopAppBarButtonGroup
 import org.localsend.miuix.R
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.coui.theme.couiDangerColor
 import top.yukonga.miuix.kmp.basic.Icon
 import kotlin.math.roundToInt
 
+private const val COUI_TOP_BAR_BUTTON_MIN_SDK = 34
 private val CouiMinTouchTargetSize = 48.dp
 
 /**
@@ -132,6 +140,112 @@ internal fun CouiTopBarTitle(
 }
 
 /**
+ * 顶栏多个动作的胶囊分组：Android 14 及以上使用库原厂 [TopAppBarButtonGroup] 呈现连续玻璃胶囊底座，
+ * 低版本退回紧凑间距行。须置于 `TopAppBar` / `LargeTopAppBar` 栏内使用。
+ */
+@Composable
+internal fun CouiTopBarActionGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    if (Build.VERSION.SDK_INT >= COUI_TOP_BAR_BUTTON_MIN_SDK) {
+        CouiLibraryTopBarActionGroup(modifier = modifier, content = content)
+    } else {
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content,
+        )
+    }
+}
+
+@RequiresApi(COUI_TOP_BAR_BUTTON_MIN_SDK)
+@Composable
+private fun CouiLibraryTopBarActionGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    TopAppBarButtonGroup(modifier = modifier, content = content)
+}
+
+/**
+ * 顶栏专用图标动作：Android 14 及以上使用库原厂 [TopAppBarButton]（液态聚光与弹跳反馈），
+ * 低版本回退至平面圆形按压反馈 [CouiIconAction]。须置于 `TopAppBar` / `LargeTopAppBar` 栏内使用。
+ */
+@Composable
+internal fun CouiTopBarIconAction(
+    icon: ImageVector,
+    contentDescription: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color? = null,
+    enabled: Boolean = true,
+    showBadgeDot: Boolean = false,
+) {
+    if (Build.VERSION.SDK_INT >= COUI_TOP_BAR_BUTTON_MIN_SDK) {
+        CouiLibraryTopBarIconAction(
+            icon = icon,
+            contentDescription = contentDescription,
+            onClick = onClick,
+            modifier = modifier,
+            tint = tint,
+            enabled = enabled,
+            showBadgeDot = showBadgeDot,
+        )
+    } else {
+        CouiIconAction(
+            icon = icon,
+            contentDescription = contentDescription,
+            tint = tint ?: CouiTheme.colorScheme.onSurface,
+            onClick = onClick,
+            modifier = modifier,
+            showBadgeDot = showBadgeDot,
+        )
+    }
+}
+
+@RequiresApi(COUI_TOP_BAR_BUTTON_MIN_SDK)
+@Composable
+private fun CouiLibraryTopBarIconAction(
+    icon: ImageVector,
+    contentDescription: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color? = null,
+    enabled: Boolean = true,
+    showBadgeDot: Boolean = false,
+) {
+    val badgeColor = couiDangerColor()
+    TopAppBarButton(
+        modifier = modifier,
+        onClick = onClick,
+        enabled = enabled,
+    ) {
+        val iconTint = tint ?: CouiTheme.colorScheme.onSurface
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = iconTint,
+                modifier = Modifier.size(22.dp),
+            )
+            if (showBadgeDot) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 2.dp, y = (-2).dp)
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(badgeColor),
+                )
+            }
+        }
+    }
+}
+
+/**
  * 顶栏待接收任务红点入口：各主页面复用，统一无障碍文案与红点样式。
  */
 @Composable
@@ -140,7 +254,7 @@ internal fun CouiIncomingBadgeAction(
     onClick: () -> Unit,
 ) {
     if (incomingTaskCount <= 0) return
-    CouiIconAction(
+    CouiTopBarIconAction(
         icon = AppIcons.Receive,
         contentDescription = stringResource(R.string.receive_section_incoming_count, incomingTaskCount),
         tint = CouiTheme.colorScheme.accentOnSurface,
