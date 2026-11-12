@@ -1,8 +1,11 @@
 package org.localsend.miuix.ui.coui.component
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -10,8 +13,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.layout.CouiPageDefaults
 import com.itos.coui.layout.Item
@@ -23,6 +28,9 @@ import com.itos.coui.switch.Switch
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.ArrowUpDown
 
 // coUI-Kit 的 layout 包只提供 Group/Item/Divider/Footer 四个原语，没有 Preference 体系，
 // 行内标题、说明与取值需要页面自己拼。这里把三种文本收敛成统一入口，
@@ -167,7 +175,21 @@ internal fun <T> CouiChoiceRow(
         Item(
             title = { CouiRowTitle(title, enabled = enabled) },
             summary = couiSummaryOrNull(summary, enabled = enabled),
-            trailing = { CouiRowValue(value, enabled = enabled) },
+            trailing = {
+                val pageColors = CouiPageDefaults.themeColors()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    CouiRowValue(value, enabled = enabled)
+                    Icon(
+                        imageVector = MiuixIcons.Basic.ArrowUpDown,
+                        contentDescription = null,
+                        tint = if (enabled) pageColors.summary else pageColors.disabled,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            },
             enabled = enabled,
             onClick = { if (enabled) anchor.open { expanded = true } },
         )
