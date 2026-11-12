@@ -64,6 +64,7 @@ import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
 import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.coui.component.CouiSkinNavigationBar
+import org.localsend.miuix.ui.coui.page.CouiSettingsScreen
 import org.localsend.miuix.ui.coui.theme.CouiSkinTheme
 import org.localsend.miuix.ui.navigation.AppRoute
 import org.localsend.miuix.ui.navigation.LocalTabGesturePosition
@@ -534,14 +535,25 @@ fun App(manager: LocalSendManager) {
                                                 onOpenHome = { selectTab(MainTabs.HOME) },
                                             )
                                         MainTabs.SETTINGS ->
-                                            SettingsScreen(
-                                                manager = manager,
-                                                contentPadding = pagePadding,
-                                                onOpenRenameDialog = { showRenameDialog = true },
-                                                onOpenPortDialog = { showPortDialog = true },
-                                                onPickDirectory = { directoryPickerLauncher.launch(null) },
-                                                onNavigateToUpdate = { backStack.add(AppRoute.Update) },
-                                            )
+                                            if (uiSkin == UiSkin.COLOROS) {
+                                                CouiSettingsScreen(
+                                                    manager = manager,
+                                                    contentPadding = pagePadding,
+                                                    onOpenRenameDialog = { showRenameDialog = true },
+                                                    onOpenPortDialog = { showPortDialog = true },
+                                                    onPickDirectory = { directoryPickerLauncher.launch(null) },
+                                                    onNavigateToUpdate = { backStack.add(AppRoute.Update) },
+                                                )
+                                            } else {
+                                                SettingsScreen(
+                                                    manager = manager,
+                                                    contentPadding = pagePadding,
+                                                    onOpenRenameDialog = { showRenameDialog = true },
+                                                    onOpenPortDialog = { showPortDialog = true },
+                                                    onPickDirectory = { directoryPickerLauncher.launch(null) },
+                                                    onNavigateToUpdate = { backStack.add(AppRoute.Update) },
+                                                )
+                                            }
                                     }
                                 }
                             }
