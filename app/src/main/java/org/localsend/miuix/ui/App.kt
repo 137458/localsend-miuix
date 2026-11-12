@@ -43,6 +43,7 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.backdrop.couiBackdrop
 import com.itos.coui.backdrop.rememberCouiBackdrop
+import com.itos.coui.menu.ProvideCouiMenuBackdrop
 import com.itos.coui.navigation.CouiNavigationItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -403,325 +404,343 @@ fun App(manager: LocalSendManager) {
 
         val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-        // 6. miuix-nav 根导航栈管理
-        val backStack = rememberNavBackStack<AppRoute>(AppRoute.Main)
+        // coUI 菜单与材质弹窗依赖窗口级采样源（menu/CouiMenuBackdrop.kt:16-20）：菜单材质靠它取
+        // 模糊与边缘光，缺源时会静默退回不透明填色（menu/Menu.kt:175-196）。HyperOS 分支不进这层包装。
+        val appWindowContent: @Composable () -> Unit = {
+            // 6. miuix-nav 根导航栈管理
+            val backStack = rememberNavBackStack<AppRoute>(AppRoute.Main)
 
-        // 外部意图（分享/查看文件）驱动的页面自动跳转
-        LaunchedEffect(requestedTabIndex) {
-            val targetTab = requestedTabIndex ?: return@LaunchedEffect
-            while (backStack.size > 1) {
-                backStack.removeLastOrNull()
+            // 外部意图（分享/查看文件）驱动的页面自动跳转
+            LaunchedEffect(requestedTabIndex) {
+                val targetTab = requestedTabIndex ?: return@LaunchedEffect
+                while (backStack.size > 1) {
+                    backStack.removeLastOrNull()
+                }
+                if (pagerState.currentPage != targetTab) {
+                    pagerState.scrollToPage(targetTab)
+                }
+                manager.consumeRequestedTab()
             }
-            if (pagerState.currentPage != targetTab) {
-                pagerState.scrollToPage(targetTab)
-            }
-            manager.consumeRequestedTab()
-        }
 
-        // 二级页面返回手势及预测返回由 NavDisplay(onBack) 原生接管驱动
-        NavDisplay(
-            backStack = backStack,
-            onBack = { backStack.removeLastOrNull() },
-            transition = NavTransitions.MiuixDefault,
-        ) {
-            entry<AppRoute.Main> {
-                // 采样层自带不透明底色：页签转场期只录正文会让底栏回填区域露出透明像素
-                val couiPageBackground = MiuixTheme.colorScheme.background
-                val couiBackdrop =
-                    if (uiSkin == UiSkin.COLOROS) {
-                        key(couiPageBackground) {
-                            rememberCouiBackdrop(
-                                diagnosticName = "localsend-main",
-                                drawSource = {
-                                    drawRect(couiPageBackground)
-                                    drawContent()
-                                },
+            // 二级页面返回手势及预测返回由 NavDisplay(onBack) 原生接管驱动
+            NavDisplay(
+                backStack = backStack,
+                onBack = { backStack.removeLastOrNull() },
+                transition = NavTransitions.MiuixDefault,
+            ) {
+                entry<AppRoute.Main> {
+                    // 采样层自带不透明底色：页签转场期只录正文会让底栏回填区域露出透明像素
+                    val couiPageBackground = MiuixTheme.colorScheme.background
+                    val couiBackdrop =
+                        if (uiSkin == UiSkin.COLOROS) {
+                            key(couiPageBackground) {
+                                rememberCouiBackdrop(
+                                    diagnosticName = "localsend-main",
+                                    drawSource = {
+                                        drawRect(couiPageBackground)
+                                        drawContent()
+                                    },
+                                )
+                            }
+                        } else {
+                            null
+                        }
+                    // miuix-icons 0.9.4 只有 Cloud/Favorites/Folder/Notes 带 Fill 变体，Home/Recent/Settings
+                    // 都没有填充版：省略 selectedIcon 与传入同一图标等价，不在本层另造图形。
+                    val couiNavItems =
+                        remember(tabHome, tabHistory, tabSettings) {
+                            listOf(
+                                CouiNavigationItem(title = tabHome, icon = AppIcons.Home),
+                                CouiNavigationItem(title = tabHistory, icon = AppIcons.History),
+                                CouiNavigationItem(title = tabSettings, icon = AppIcons.Settings),
                             )
                         }
-                    } else {
-                        null
-                    }
-                val couiNavItems =
-                    remember(tabHome, tabHistory, tabSettings) {
-                        listOf(
-                            CouiNavigationItem(title = tabHome, icon = AppIcons.Home, selectedIcon = AppIcons.Home),
-                            CouiNavigationItem(title = tabHistory, icon = AppIcons.History, selectedIcon = AppIcons.History),
-                            CouiNavigationItem(title = tabSettings, icon = AppIcons.Settings, selectedIcon = AppIcons.Settings),
-                        )
-                    }
-                val mainEntry: @Composable () -> Unit = {
-                    Scaffold(
-                        bottomBar = {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(
-                                            bottom =
-                                                if (navBarBottomPadding != 0.dp) {
-                                                    8.dp + navBarBottomPadding
-                                                } else {
-                                                    20.dp
-                                                },
-                                        ),
-                                contentAlignment = Alignment.BottomCenter,
-                            ) {
-                                CompositionLocalProvider(
-                                    LocalTabGesturePosition provides tabGesturePosition,
+                    val mainEntry: @Composable () -> Unit = {
+                        Scaffold(
+                            bottomBar = {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(
+                                                bottom =
+                                                    if (navBarBottomPadding != 0.dp) {
+                                                        8.dp + navBarBottomPadding
+                                                    } else {
+                                                        20.dp
+                                                    },
+                                            ),
+                                    contentAlignment = Alignment.BottomCenter,
                                 ) {
-                                    if (couiBackdrop != null) {
-                                        CouiSkinNavigationBar(
-                                            items = couiNavItems,
-                                            selectedIndex = pagerState.currentPage,
-                                            onSelect = selectTab,
-                                            backdrop = couiBackdrop,
-                                        )
-                                    } else {
-                                        IosLiquidGlassNavigationBar(
-                                            items = navigationItems,
-                                            selectedIndex = pagerState.currentPage,
-                                            onItemClick = selectTab,
-                                            backdrop = backdrop,
-                                            badge = { index ->
-                                                if (index == MainTabs.HOME && incomingTaskCount > 0) {
-                                                    { Badge { Text(incomingTaskCount.toString()) } }
-                                                } else {
-                                                    null
-                                                }
-                                            },
-                                        )
+                                    CompositionLocalProvider(
+                                        LocalTabGesturePosition provides tabGesturePosition,
+                                    ) {
+                                        if (couiBackdrop != null) {
+                                            CouiSkinNavigationBar(
+                                                items = couiNavItems,
+                                                selectedIndex = pagerState.currentPage,
+                                                onSelect = selectTab,
+                                                backdrop = couiBackdrop,
+                                                badgeVisible = { index ->
+                                                    index == MainTabs.HOME && incomingTaskCount > 0
+                                                },
+                                            )
+                                        } else {
+                                            IosLiquidGlassNavigationBar(
+                                                items = navigationItems,
+                                                selectedIndex = pagerState.currentPage,
+                                                onItemClick = selectTab,
+                                                backdrop = backdrop,
+                                                badge = { index ->
+                                                    if (index == MainTabs.HOME && incomingTaskCount > 0) {
+                                                        { Badge { Text(incomingTaskCount.toString()) } }
+                                                    } else {
+                                                        null
+                                                    }
+                                                },
+                                            )
+                                        }
                                     }
                                 }
-                            }
-                        },
-                    ) { innerPadding ->
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    // 两套皮肤各用一套采样源：coUI 底栏采本层像素，HyperOS 玻璃底栏采样层互斥挂载，避免双份全屏采样
-                                    .then(
-                                        when {
-                                            couiBackdrop != null -> Modifier.couiBackdrop(couiBackdrop)
-                                            backdrop != null -> Modifier.layerBackdrop(backdrop)
-                                            else -> Modifier
-                                        },
-                                    ),
-                        ) {
-                            Box(
+                            },
+                        ) { innerPadding ->
+                            Row(
                                 modifier =
                                     Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
+                                        .fillMaxSize()
+                                        // 两套皮肤各用一套采样源：coUI 底栏采本层像素，HyperOS 玻璃底栏采样层互斥挂载，避免双份全屏采样
+                                        .then(
+                                            when {
+                                                couiBackdrop != null -> Modifier.couiBackdrop(couiBackdrop)
+                                                backdrop != null -> Modifier.layerBackdrop(backdrop)
+                                                else -> Modifier
+                                            },
+                                        ),
                             ) {
-                                HorizontalPager(
-                                    state = pagerState,
-                                    beyondViewportPageCount = 2,
-                                    modifier = Modifier.fillMaxSize(),
-                                ) { page ->
-                                    val pagePadding =
-                                        PaddingValues(
-                                            top = innerPadding.calculateTopPadding(),
-                                            bottom = innerPadding.calculateBottomPadding(),
-                                        )
-                                    when (page) {
-                                        MainTabs.HOME ->
-                                            if (uiSkin == UiSkin.COLOROS) {
-                                                CouiHomeScreen(
-                                                    manager = manager,
-                                                    contentPadding = pagePadding,
-                                                    actions = homeActions,
-                                                )
-                                            } else {
-                                                HomeScreen(
-                                                    manager = manager,
-                                                    contentPadding = pagePadding,
-                                                    actions = homeActions,
-                                                )
-                                            }
-                                        MainTabs.HISTORY ->
-                                            if (uiSkin == UiSkin.COLOROS) {
-                                                CouiHistoryScreen(
-                                                    manager = manager,
-                                                    contentPadding = pagePadding,
-                                                    onOpenHome = { selectTab(MainTabs.HOME) },
-                                                )
-                                            } else {
-                                                HistoryScreen(
-                                                    manager = manager,
-                                                    contentPadding = pagePadding,
-                                                    onOpenHome = { selectTab(MainTabs.HOME) },
-                                                )
-                                            }
-                                        MainTabs.SETTINGS ->
-                                            if (uiSkin == UiSkin.COLOROS) {
-                                                CouiSettingsScreen(
-                                                    manager = manager,
-                                                    contentPadding = pagePadding,
-                                                    onOpenRenameDialog = { showRenameDialog = true },
-                                                    onOpenPortDialog = { showPortDialog = true },
-                                                    onPickDirectory = { directoryPickerLauncher.launch(null) },
-                                                    onNavigateToUpdate = { backStack.add(AppRoute.Update) },
-                                                )
-                                            } else {
-                                                SettingsScreen(
-                                                    manager = manager,
-                                                    contentPadding = pagePadding,
-                                                    onOpenRenameDialog = { showRenameDialog = true },
-                                                    onOpenPortDialog = { showPortDialog = true },
-                                                    onPickDirectory = { directoryPickerLauncher.launch(null) },
-                                                    onNavigateToUpdate = { backStack.add(AppRoute.Update) },
-                                                )
-                                            }
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight(),
+                                ) {
+                                    HorizontalPager(
+                                        state = pagerState,
+                                        beyondViewportPageCount = 2,
+                                        modifier = Modifier.fillMaxSize(),
+                                    ) { page ->
+                                        val pagePadding =
+                                            PaddingValues(
+                                                top = innerPadding.calculateTopPadding(),
+                                                bottom = innerPadding.calculateBottomPadding(),
+                                            )
+                                        when (page) {
+                                            MainTabs.HOME ->
+                                                if (uiSkin == UiSkin.COLOROS) {
+                                                    CouiHomeScreen(
+                                                        manager = manager,
+                                                        contentPadding = pagePadding,
+                                                        actions = homeActions,
+                                                    )
+                                                } else {
+                                                    HomeScreen(
+                                                        manager = manager,
+                                                        contentPadding = pagePadding,
+                                                        actions = homeActions,
+                                                    )
+                                                }
+                                            MainTabs.HISTORY ->
+                                                if (uiSkin == UiSkin.COLOROS) {
+                                                    CouiHistoryScreen(
+                                                        manager = manager,
+                                                        contentPadding = pagePadding,
+                                                        onOpenHome = { selectTab(MainTabs.HOME) },
+                                                    )
+                                                } else {
+                                                    HistoryScreen(
+                                                        manager = manager,
+                                                        contentPadding = pagePadding,
+                                                        onOpenHome = { selectTab(MainTabs.HOME) },
+                                                    )
+                                                }
+                                            MainTabs.SETTINGS ->
+                                                if (uiSkin == UiSkin.COLOROS) {
+                                                    CouiSettingsScreen(
+                                                        manager = manager,
+                                                        contentPadding = pagePadding,
+                                                        onOpenRenameDialog = { showRenameDialog = true },
+                                                        onOpenPortDialog = { showPortDialog = true },
+                                                        onPickDirectory = { directoryPickerLauncher.launch(null) },
+                                                        onNavigateToUpdate = { backStack.add(AppRoute.Update) },
+                                                    )
+                                                } else {
+                                                    SettingsScreen(
+                                                        manager = manager,
+                                                        contentPadding = pagePadding,
+                                                        onOpenRenameDialog = { showRenameDialog = true },
+                                                        onOpenPortDialog = { showPortDialog = true },
+                                                        onPickDirectory = { directoryPickerLauncher.launch(null) },
+                                                        onNavigateToUpdate = { backStack.add(AppRoute.Update) },
+                                                    )
+                                                }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                if (uiSkin == UiSkin.COLOROS) {
-                    CouiSkinTheme { mainEntry() }
-                } else {
-                    mainEntry()
-                }
-            }
-
-            // 独立软件更新页（通过 miuix-nav 连续深度推进展示，支持左滑边缘返回手势）
-            entry<AppRoute.Update>(
-                swipeDismiss = NavSwipeDirection.LeftToRight,
-            ) {
-                if (uiSkin == UiSkin.COLOROS) {
-                    CouiUpdateScreen(
-                        manager = manager,
-                        onBack = { backStack.removeLastOrNull() },
-                    )
-                } else {
-                    UpdateScreen(
-                        manager = manager,
-                        onBack = { backStack.removeLastOrNull() },
-                    )
-                }
-            }
-        }
-
-        // Global Overlay Dialogs & BottomSheets
-        IncomingTransferDialog(
-            session = pendingIncomingSession?.takeIf { it.sessionId != dismissedIncomingSessionId },
-            onAccept = { selectedIds ->
-                pendingIncomingSession?.let { session ->
-                    // 弹窗以 null 表示“不限定文件”（打开链接后全部接收），此处换成语义明确的全部接收入口
-                    if (selectedIds == null) {
-                        manager.acceptAllIncomingTransfer(session.sessionId)
+                    if (uiSkin == UiSkin.COLOROS) {
+                        CouiSkinTheme { mainEntry() }
                     } else {
-                        manager.acceptIncomingTransfer(session.sessionId, selectedIds)
+                        mainEntry()
                     }
                 }
-            },
-            onAcceptAndCopy = {
-                pendingIncomingSession?.let { session ->
-                    val text = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent
-                    if (!text.isNullOrEmpty()) {
-                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", text))
-                        Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+
+                // 独立软件更新页（通过 miuix-nav 连续深度推进展示，支持左滑边缘返回手势）
+                entry<AppRoute.Update>(
+                    swipeDismiss = NavSwipeDirection.LeftToRight,
+                ) {
+                    if (uiSkin == UiSkin.COLOROS) {
+                        CouiUpdateScreen(
+                            manager = manager,
+                            onBack = { backStack.removeLastOrNull() },
+                        )
+                    } else {
+                        UpdateScreen(
+                            manager = manager,
+                            onBack = { backStack.removeLastOrNull() },
+                        )
                     }
-                    manager.acceptAllIncomingTransfer(session.sessionId)
                 }
-            },
-            onDecline = {
-                pendingIncomingSession?.let { manager.declineIncomingTransfer(it.sessionId) }
-            },
-            onDismiss = {
-                dismissedIncomingSessionId = pendingIncomingSession?.sessionId
-            },
-        )
+            }
 
-        RenameDeviceDialog(
-            show = showRenameDialog,
-            initialName = settings.alias,
-            onDismissRequest = { showRenameDialog = false },
-            onConfirm = { newAlias ->
-                manager.updateSettings { it.copy(alias = newAlias) }
-                Toast.makeText(context, context.getString(R.string.toast_device_renamed, newAlias), Toast.LENGTH_SHORT).show()
-            },
-        )
+            // Global Overlay Dialogs & BottomSheets
+            IncomingTransferDialog(
+                session = pendingIncomingSession?.takeIf { it.sessionId != dismissedIncomingSessionId },
+                onAccept = { selectedIds ->
+                    pendingIncomingSession?.let { session ->
+                        // 弹窗以 null 表示“不限定文件”（打开链接后全部接收），此处换成语义明确的全部接收入口
+                        if (selectedIds == null) {
+                            manager.acceptAllIncomingTransfer(session.sessionId)
+                        } else {
+                            manager.acceptIncomingTransfer(session.sessionId, selectedIds)
+                        }
+                    }
+                },
+                onAcceptAndCopy = {
+                    pendingIncomingSession?.let { session ->
+                        val text = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent
+                        if (!text.isNullOrEmpty()) {
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", text))
+                            Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                        }
+                        manager.acceptAllIncomingTransfer(session.sessionId)
+                    }
+                },
+                onDecline = {
+                    pendingIncomingSession?.let { manager.declineIncomingTransfer(it.sessionId) }
+                },
+                onDismiss = {
+                    dismissedIncomingSessionId = pendingIncomingSession?.sessionId
+                },
+            )
 
-        PortDialog(
-            show = showPortDialog,
-            initialPort = settings.port,
-            onDismissRequest = { showPortDialog = false },
-            // 重启是异步的且端口可能顺延，更新结果由 manager 依据真实监听端口统一提示，避免这里先报出未生效的请求端口
-            onConfirm = { newPort -> manager.applyPortChange(newPort) },
-        )
+            RenameDeviceDialog(
+                show = showRenameDialog,
+                initialName = settings.alias,
+                onDismissRequest = { showRenameDialog = false },
+                onConfirm = { newAlias ->
+                    manager.updateSettings { it.copy(alias = newAlias) }
+                    Toast.makeText(context, context.getString(R.string.toast_device_renamed, newAlias), Toast.LENGTH_SHORT).show()
+                },
+            )
 
-        SendTextDialog(
-            show = showSendTextDialog,
-            onDismissRequest = { showSendTextDialog = false },
-            onConfirm = { text ->
-                val bytes = text.toByteArray(Charsets.UTF_8)
-                val item =
-                    FileItem(
-                        name = "text_${System.currentTimeMillis()}.txt",
-                        size = bytes.size.toLong(),
-                        textContent = text,
-                        mimeType = "text/plain",
+            PortDialog(
+                show = showPortDialog,
+                initialPort = settings.port,
+                onDismissRequest = { showPortDialog = false },
+                // 重启是异步的且端口可能顺延，更新结果由 manager 依据真实监听端口统一提示，避免这里先报出未生效的请求端口
+                onConfirm = { newPort -> manager.applyPortChange(newPort) },
+            )
+
+            SendTextDialog(
+                show = showSendTextDialog,
+                onDismissRequest = { showSendTextDialog = false },
+                onConfirm = { text ->
+                    val bytes = text.toByteArray(Charsets.UTF_8)
+                    val item =
+                        FileItem(
+                            name = "text_${System.currentTimeMillis()}.txt",
+                            size = bytes.size.toLong(),
+                            textContent = text,
+                            mimeType = "text/plain",
+                        )
+                    manager.addFiles(listOf(item))
+                    Toast.makeText(context, context.getString(R.string.toast_text_added), Toast.LENGTH_SHORT).show()
+                },
+            )
+
+            AddContentBottomSheet(
+                show = showAddContentSheet,
+                onDismissRequest = { showAddContentSheet = false },
+                onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
+                onPickFolder = { folderPickerLauncher.launch(null) },
+                onPickMedia = {
+                    mediaPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                     )
-                manager.addFiles(listOf(item))
-                Toast.makeText(context, context.getString(R.string.toast_text_added), Toast.LENGTH_SHORT).show()
-            },
-        )
+                },
+                onPickApps = { showAppPickerSheet = true },
+                onSendText = { showSendTextDialog = true },
+                onPasteClipboard = pickClipboard,
+            )
 
-        AddContentBottomSheet(
-            show = showAddContentSheet,
-            onDismissRequest = { showAddContentSheet = false },
-            onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
-            onPickFolder = { folderPickerLauncher.launch(null) },
-            onPickMedia = {
-                mediaPickerLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+            AppPickerBottomSheet(
+                show = showAppPickerSheet,
+                onDismissRequest = { showAppPickerSheet = false },
+                manager = manager,
+            )
+
+            org.localsend.miuix.ui.component.WebShareDialog(
+                show = showWebShareDialog,
+                onDismissRequest = { showWebShareDialog = false },
+                manager = manager,
+            )
+
+            org.localsend.miuix.ui.component.ManualIpDialog(
+                show = showManualIpDialog,
+                recentIps = recentManualIps,
+                onDismissRequest = { showManualIpDialog = false },
+                onSend = { ip, port ->
+                    manager.sendToIp(ip, port)
+                    Toast.makeText(context, context.getString(R.string.toast_connecting_ip, ip, port), Toast.LENGTH_SHORT).show()
+                },
+            )
+
+            if (pendingTargetPinPrompt != null) {
+                org.localsend.miuix.ui.component.TargetDevicePinDialog(
+                    show = true,
+                    targetAlias = pendingTargetPinPrompt?.device?.alias ?: "",
+                    onDismissRequest = { pendingTargetPinPrompt?.onDismiss?.invoke() },
+                    onConfirm = { pin -> pendingTargetPinPrompt?.onPinEntered?.invoke(pin) },
                 )
-            },
-            onPickApps = { showAppPickerSheet = true },
-            onSendText = { showSendTextDialog = true },
-            onPasteClipboard = pickClipboard,
-        )
+            }
 
-        AppPickerBottomSheet(
-            show = showAppPickerSheet,
-            onDismissRequest = { showAppPickerSheet = false },
-            manager = manager,
-        )
-
-        org.localsend.miuix.ui.component.WebShareDialog(
-            show = showWebShareDialog,
-            onDismissRequest = { showWebShareDialog = false },
-            manager = manager,
-        )
-
-        org.localsend.miuix.ui.component.ManualIpDialog(
-            show = showManualIpDialog,
-            recentIps = recentManualIps,
-            onDismissRequest = { showManualIpDialog = false },
-            onSend = { ip, port ->
-                manager.sendToIp(ip, port)
-                Toast.makeText(context, context.getString(R.string.toast_connecting_ip, ip, port), Toast.LENGTH_SHORT).show()
-            },
-        )
-
-        if (pendingTargetPinPrompt != null) {
-            org.localsend.miuix.ui.component.TargetDevicePinDialog(
-                show = true,
-                targetAlias = pendingTargetPinPrompt?.device?.alias ?: "",
-                onDismissRequest = { pendingTargetPinPrompt?.onDismiss?.invoke() },
-                onConfirm = { pin -> pendingTargetPinPrompt?.onPinEntered?.invoke(pin) },
+            UpdateDialogHost(
+                show = showUpdateDialog,
+                manager = manager,
+                releaseInfo = availableUpdate,
+                onDismiss = { showUpdateDialog = false },
             )
         }
-
-        UpdateDialogHost(
-            show = showUpdateDialog,
-            manager = manager,
-            releaseInfo = availableUpdate,
-            onDismiss = { showUpdateDialog = false },
-        )
+        if (uiSkin == UiSkin.COLOROS) {
+            ProvideCouiMenuBackdrop { windowModifier ->
+                Box(modifier = Modifier.fillMaxSize().then(windowModifier)) {
+                    appWindowContent()
+                }
+            }
+        } else {
+            appWindowContent()
+        }
     }
 }

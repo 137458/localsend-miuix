@@ -6,7 +6,8 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,12 +40,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.itos.coui.effect.couiButtonFeedback
+import com.itos.coui.layout.Divider
+import com.itos.coui.layout.Item
+import com.itos.coui.scroll.rememberCouiOverscrollEffect
+import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
@@ -78,13 +84,11 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /** ColorOS 首页的圆角半径：卡片与队列容器用大圆角，胶囊按钮用半高圆角。 */
 private val CouiHomeCardRadius = 20.dp
 
-/** 卡片内行与行之间那条半分隔线的高度。 */
-private val CouiHomeDividerHeight = 0.5.dp
-
 /**
  * 首页（ColorOS 皮肤）：本机状态、正在接收的传输、待发送队列、快速选择与附近设备。
  *
- * 骨架、卡片容器与行式列表按 coUI 的材质自绘（coUI-Kit 没有 Card/Icon/IconButton 与
+ * 行、分隔线与行内按压/点击反馈走库 `layout.Item`、`layout.Divider` 与 `couiButtonFeedback`；
+ * 卡片外壳、图标按钮与进度仍按 coUI 的材质自绘（coUI-Kit 没有 Card/Icon/IconButton 与
  * 进度条，只有材质与 layout 原语）；缩略图、进度与预览弹窗继续复用既有组件，
  * 它们不参与皮肤外观，重复实现会扩散维护面。
  */
@@ -202,8 +206,13 @@ fun CouiHomeScreen(
             },
         )
 
+        // 回弹效果按滚动容器独占：在 item 作用域外记住，列表重组时不会反复重建
+        val homeOverscroll = rememberCouiOverscrollEffect()
+        // LazyColumn 的 overscrollEffect 实参由内部 scrollableArea 挂载回弹节点；
+        // 再叠 Modifier.overscroll 会把同一个 EdgeNode 二次 attach。
         LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(1f),
+            overscrollEffect = homeOverscroll,
             contentPadding =
                 PaddingValues(
                     start = 12.dp,
@@ -221,7 +230,7 @@ fun CouiHomeScreen(
                         title = settings.alias,
                         onClick = actions.onOpenRenameDialog,
                     )
-                    CouiHomeDivider()
+                    Divider()
                     CouiHomeRow(
                         title = "$primaryIp:$displayPort",
                         summary = if (localIps.size > 1) localIps.joinToString(", ") else null,
@@ -232,7 +241,7 @@ fun CouiHomeScreen(
                             Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                         },
                     )
-                    CouiHomeDivider()
+                    Divider()
                     CouiLocalStatusRow(
                         receivingCount = incomingSessions.size,
                         quickSave = settings.quickSave,
@@ -317,13 +326,16 @@ fun CouiHomeScreen(
 
                             if (selectedFiles.size > 3) {
                                 Spacer(modifier = Modifier.height(4.dp))
+                                val expandSource = remember { MutableInteractionSource() }
                                 Row(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .clip(CouiShape(12.dp, 3f))
-                                            .pointerInput(Unit) { detectTapGestures(onTap = { isFileListExpanded = !isFileListExpanded }) }
-                                            .padding(vertical = 8.dp),
+                                            .clip(CouiShape(12.dp))
+                                            .couiButtonFeedback(CouiTheme.isDark, expandSource)
+                                            .clickable(expandSource, null, enabled = true, role = Role.Button) {
+                                                isFileListExpanded = !isFileListExpanded
+                                            }.padding(vertical = 8.dp),
                                     horizontalArrangement = Arrangement.Center,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
@@ -587,7 +599,14 @@ private fun CouiSectionTitle(text: String) {
     )
 }
 
-/** 分组容器：可选标题 + 卡片表面。卡片的圆角、底色与分隔线统一在这里定义。 */
+/**
+ * 分组容器：可选标题 + 卡片表面。
+ *
+ * 没有换成库 `layout.Group`：Group 的外边距固定 16dp（本页 LazyColumn gutter 是 12dp）、
+ * 卡面圆角固定 24dp（这里 20dp，见 [CouiHomeCardRadius]）、标题行自带 32dp 缩进与 12/16dp
+ * 顶部间距，直接替换会同时挪动三处几何，还会与卡片外那行 `CouiSectionTitle`（16dp 缩进）错位。
+ * 圆角曲线已改成库默认的 `CouiCornerWeight`；卡内分隔线统一用库 `layout.Divider`。
+ */
 @Composable
 private fun CouiHomeSection(
     title: String? = null,
@@ -601,30 +620,19 @@ private fun CouiHomeSection(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(CouiShape(CouiHomeCardRadius, 3f))
+                    .clip(CouiShape(CouiHomeCardRadius))
                     .background(CouiTheme.colorScheme.card),
             content = content,
         )
     }
 }
 
-/** 卡片内半分隔线，左侧留出与文字相同的缩进。 */
-@Composable
-private fun CouiHomeDivider() {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp)
-                .height(CouiHomeDividerHeight)
-                .background(CouiTheme.colorScheme.outlineVariant),
-    )
-}
-
 /**
  * 行：可选左图标 + 标题 + 可选说明 + 可选行尾插槽。
  *
- * 整行可点，点击语义挂在行上而不是标题上，避免只有文字区域响应。
+ * 交给库 `layout.Item`：`onClick` 非空时它自带唯一的 `couiButtonFeedback(list = true)`
+ * 与 `clickable(role = Role.Button)`，行内留白也进点击区，行高按库默认最小 48dp。
+ * 点击语义仍挂在整行上而不是标题上，避免只有文字区域响应。
  */
 @Composable
 private fun CouiHomeRow(
@@ -635,38 +643,39 @@ private fun CouiHomeRow(
     iconTint: Color = CouiTheme.colorScheme.accentOnSurface,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    val tapHandler = onClick
-    val rowModifier =
-        if (tapHandler != null) {
-            Modifier.fillMaxWidth().pointerInput(Unit) { detectTapGestures(onTap = { tapHandler() }) }
+    // 先落成带类型的局部 val，空值直接给 null，行内不留占位
+    val iconSlot: (@Composable () -> Unit)? =
+        if (icon == null) {
+            null
         } else {
-            Modifier.fillMaxWidth()
-        }
-    Row(
-        modifier = rowModifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            CouiRowTitle(text = title)
-            if (summary != null) {
-                Spacer(modifier = Modifier.height(2.dp))
-                CouiRowSummary(text = summary)
+            {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(24.dp),
+                )
             }
         }
-        if (trailing != null) {
-            Spacer(modifier = Modifier.width(8.dp))
-            trailing()
+    val summarySlot: (@Composable () -> Unit)? =
+        if (summary == null) {
+            null
+        } else {
+            { CouiRowSummary(text = summary) }
         }
-    }
+    Item(
+        icon = iconSlot,
+        summary = summarySlot,
+        trailing = {
+            if (trailing != null) {
+                Spacer(modifier = Modifier.width(8.dp))
+                trailing()
+            }
+        },
+        onClick = onClick,
+        dark = CouiTheme.isDark,
+        title = { CouiRowTitle(text = title) },
+    )
 }
 
 /** 图标动作：40dp 触控区 + 22dp 图形，用于顶栏与行尾。 */
@@ -677,12 +686,14 @@ private fun CouiIconAction(
     tint: Color,
     onClick: () -> Unit,
 ) {
+    val source = remember { MutableInteractionSource() }
     Box(
         modifier =
             Modifier
                 .size(40.dp)
-                .clip(CouiShape(20.dp, 3f))
-                .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) },
+                .clip(CouiShape(20.dp))
+                .couiButtonFeedback(CouiTheme.isDark, source)
+                .clickable(source, null, enabled = true, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -736,12 +747,14 @@ private fun CouiPillButton(
     text: String,
     onClick: () -> Unit,
 ) {
+    val source = remember { MutableInteractionSource() }
     Box(
         modifier =
             Modifier
-                .clip(CouiShape(17.dp, 3f))
+                .clip(CouiCapsuleShape)
                 .background(CouiTheme.colorScheme.container)
-                .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) }
+                .couiButtonFeedback(CouiTheme.isDark, source)
+                .clickable(source, null, enabled = true, role = Role.Button, onClick = onClick)
                 .defaultMinSize(minWidth = 56.dp, minHeight = 34.dp)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
@@ -763,12 +776,14 @@ private fun CouiQuickAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val source = remember { MutableInteractionSource() }
     Column(
         modifier =
             modifier
-                .clip(CouiShape(16.dp, 3f))
+                .clip(CouiShape(16.dp))
                 .background(CouiTheme.colorScheme.container)
-                .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) }
+                .couiButtonFeedback(CouiTheme.isDark, source)
+                .clickable(source, null, enabled = true, role = Role.Button, onClick = onClick)
                 .defaultMinSize(minHeight = 72.dp)
                 .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -797,12 +812,14 @@ private fun CouiSelectedFileRow(
     onOpenPreview: () -> Unit,
     onRemove: () -> Unit,
 ) {
+    val source = remember { MutableInteractionSource() }
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(CouiShape(12.dp, 3f))
-                .pointerInput(Unit) { detectTapGestures(onTap = { onOpenPreview() }) }
+                .clip(CouiShape(12.dp))
+                .couiButtonFeedback(CouiTheme.isDark, source)
+                .clickable(source, null, enabled = true, role = Role.Button, onClick = onOpenPreview)
                 .padding(horizontal = 4.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

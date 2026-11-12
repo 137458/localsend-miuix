@@ -2,7 +2,10 @@ package org.localsend.miuix.ui.coui.page
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,8 +39,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.itos.coui.effect.couiButtonFeedback
+import com.itos.coui.scroll.rememberCouiOverscrollEffect
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
@@ -160,7 +166,7 @@ fun CouiHistoryScreen(
                             Modifier
                                 .weight(1f)
                                 .height(34.dp)
-                                .clip(remember { CouiShape(radius = 17.dp, cornerWeight = 3f) })
+                                .clip(remember { CouiShape(radius = 17.dp) })
                                 .background(if (selected) scheme.surface else scheme.container)
                                 .pointerInput(Unit) {
                                     detectTapGestures { selectedFilterIndex = tapIndex }
@@ -193,8 +199,12 @@ fun CouiHistoryScreen(
                             },
                     )
                 } else {
+                    // 回弹效果按滚动容器独占：在 item 作用域外记住，列表重组时不会反复重建
+                    val historyOverscroll = rememberCouiOverscrollEffect()
+                    // 回弹节点由 LazyColumn 内部的 scrollableArea 挂载，不能再叠 Modifier.overscroll
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
+                        overscrollEffect = historyOverscroll,
                         contentPadding =
                             PaddingValues(
                                 top = 4.dp,
@@ -272,7 +282,7 @@ fun CouiHistoryScreen(
     }
 }
 
-/** 顶栏动作：coUI-Kit 没有 IconButton，用圆形可点区域包一个 Miuix 图标，配色由调用方给定。 */
+/** 顶栏动作：coUI-Kit 没有 IconButton，用圆形可点区域包一个 Miuix 图标，配色由调用方给定，按压反馈走 couiButtonFeedback。 */
 @Composable
 private fun CouiHistoryAction(
     icon: ImageVector,
@@ -280,14 +290,14 @@ private fun CouiHistoryAction(
     tint: Color,
     onClick: () -> Unit,
 ) {
-    val shape = remember { CouiShape(radius = 20.dp, cornerWeight = 3f) }
-    val latestOnClick by rememberUpdatedState(onClick)
+    val source = remember { MutableInteractionSource() }
     Box(
         modifier =
             Modifier
                 .size(40.dp)
-                .clip(shape)
-                .pointerInput(Unit) { detectTapGestures { latestOnClick() } },
+                .clip(CouiShape(20.dp))
+                .couiButtonFeedback(CouiKitTheme.isDark, source)
+                .clickable(source, null, enabled = true, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -327,7 +337,10 @@ private fun CouiHistoryEmptyState(text: String) {
     }
 }
 
-/** 单条记录卡片：coUI-Kit 无卡片组件，按 ColorOS 分组卡样式自绘，整卡点击看详情、长按删除。 */
+/**
+ * 单条记录卡片：coUI-Kit 无卡片组件，按 ColorOS 分组卡样式自绘，整卡点击看详情、长按删除。
+ * 不用库 `layout.Item`：它不支持长按，会丢掉长按删除；卡片本身是单行富内容，也没有可拆的行与分隔线。
+ */
 @Composable
 private fun CouiHistoryCard(
     item: TransferHistoryItem,
@@ -337,9 +350,10 @@ private fun CouiHistoryCard(
 ) {
     val scheme = CouiKitTheme.colorScheme
     val errorColor = MiuixTheme.colorScheme.error
-    val shape = remember { CouiShape(radius = 18.dp, cornerWeight = 3f) }
+    val shape = remember { CouiShape(radius = 18.dp) }
     val latestOpenDetail by rememberUpdatedState(onOpenDetail)
     val latestLongPress by rememberUpdatedState(onLongPress)
+    val cardSource = remember { MutableInteractionSource() }
 
     val iconVector =
         when {
@@ -389,12 +403,14 @@ private fun CouiHistoryCard(
                 .padding(horizontal = 12.dp)
                 .clip(shape)
                 .background(scheme.card)
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = { latestOpenDetail() },
-                        onLongPress = { latestLongPress() },
-                    )
-                }.padding(horizontal = 14.dp, vertical = 14.dp),
+                .couiButtonFeedback(CouiKitTheme.isDark, cardSource)
+                .combinedClickable(
+                    interactionSource = cardSource,
+                    indication = null,
+                    role = Role.Button,
+                    onLongClick = { latestLongPress() },
+                    onClick = { latestOpenDetail() },
+                ).padding(horizontal = 14.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -450,14 +466,16 @@ private fun CouiHistoryCard(
         if (item.isTextMessage && !item.textContent.isNullOrEmpty()) {
             val textContent = item.textContent
             Spacer(modifier = Modifier.width(8.dp))
-            val copyShape = remember { CouiShape(radius = 12.dp, cornerWeight = 3f) }
+            val copyShape = remember { CouiShape(radius = 12.dp) }
+            val copySource = remember { MutableInteractionSource() }
             Box(
                 modifier =
                     Modifier
                         .clip(copyShape)
                         .background(scheme.container)
-                        .pointerInput(textContent) {
-                            detectTapGestures { onCopyText(textContent) }
+                        .couiButtonFeedback(CouiKitTheme.isDark, copySource)
+                        .clickable(copySource, null, enabled = true, role = Role.Button) {
+                            onCopyText(textContent)
                         }.padding(horizontal = 12.dp, vertical = 7.dp),
                 contentAlignment = Alignment.Center,
             ) {

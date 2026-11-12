@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +25,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.layout.Group
+import com.itos.coui.scroll.couiVerticalScroll
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
@@ -61,8 +61,10 @@ private enum class AdvancedNetworkField {
  * 卡片、行、开关与枚举选择换成 coUI-Kit 组件。全局弹窗（重命名、端口）仍由 App.kt 的
  * Miuix 宿主承担，本轮不搬。
  *
- * 顶栏没有用 coUI 的 TopAppBar：它要求宿主提供 CouiBackdrop，而设置页滚动区本身不是
- * 模糊采样源，迁移过来会多一层无谓的采样。这里画一条固定高度的标题带，滚动内容独立。
+ * 顶栏仍是固定高度的标题带，滚动内容独立：本页挂在 App.kt 的 Miuix 宿主里，不在 coUI
+ * Scaffold 的作用域内。coUI 的 Scaffold 自己建采样源（rememberCouiBackdrop）并用
+ * ProvideCouiBackdrop 包住 topBar 槽，TopAppBar 缺省从 LocalCouiBackdrop 取值，
+ * 所以「顶栏必须由宿主提供 CouiBackdrop」并不成立；骨架换成 Scaffold + TopAppBar 在下一轮。
  */
 @Composable
 fun CouiSettingsScreen(
@@ -158,7 +160,7 @@ fun CouiSettingsScreen(
                     Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .verticalScroll(rememberScrollState())
+                        .couiVerticalScroll(rememberScrollState())
                         .padding(bottom = contentPadding.calculateBottomPadding() + 16.dp),
             ) {
                 Group(title = stringResource(R.string.settings_section_general)) {

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +24,8 @@ import com.itos.coui.backdrop.CouiBackdrop
 import com.itos.coui.effect.CouiFloatingRenderer
 import com.itos.coui.navigation.CouiNavigationItem
 import com.itos.coui.navigation.NavigationBar
+import com.itos.coui.shape.CouiShape
+import com.itos.coui.theme.CouiColor
 import com.itos.coui.theme.CouiTheme
 import top.yukonga.miuix.kmp.basic.Icon
 
@@ -32,6 +35,9 @@ private const val COUI_FLOATING_NAV_BAR_MIN_SDK = 34
 /**
  * ColorOS 皮肤底栏（形态 A）：Android 14 及以上用 coUI-Kit 原厂浮动材质底栏，
  * Android 12–13 退回同色系平面胶囊，保证皮肤在 minSdk 31 上形态一致。
+ *
+ * [badgeVisible] 按 Tab 索引给出是否需要角标：库 [NavigationBar] 没有角标槽位，
+ * 只有平面兜底栏自绘 coUI 通知点。
  */
 @Composable
 internal fun CouiSkinNavigationBar(
@@ -40,6 +46,7 @@ internal fun CouiSkinNavigationBar(
     onSelect: (Int) -> Unit,
     backdrop: CouiBackdrop,
     modifier: Modifier = Modifier,
+    badgeVisible: (Int) -> Boolean = { false },
 ) {
     if (Build.VERSION.SDK_INT >= COUI_FLOATING_NAV_BAR_MIN_SDK) {
         CouiLibraryNavigationBar(
@@ -55,6 +62,7 @@ internal fun CouiSkinNavigationBar(
             selectedIndex = selectedIndex,
             onSelect = onSelect,
             modifier = modifier,
+            badgeVisible = badgeVisible,
         )
     }
 }
@@ -88,9 +96,13 @@ private fun CouiPlainNavigationBar(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    badgeVisible: (Int) -> Boolean = { false },
 ) {
     val scheme = CouiTheme.colorScheme
-    val tint = if (CouiTheme.isDark) Color.White else Color.Black
+    val dark = CouiTheme.isDark
+    val tint = if (dark) Color.White else Color.Black
+    // 角标沿用 coUI 固定色板的红，CouiColorScheme 本身没有通知/错误语义色
+    val badgeColor = if (dark) CouiColor.Night.RED else CouiColor.Day.RED
     Row(
         modifier =
             modifier
@@ -115,12 +127,25 @@ private fun CouiPlainNavigationBar(
                         .clickable { onSelect(index) },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = if (selected) item.selectedIcon else item.icon,
-                    contentDescription = item.title,
-                    tint = tint.copy(alpha = if (selected) 1f else 0.6f),
-                    modifier = Modifier.size(24.dp),
-                )
+                // 图标容器与图标同尺寸，角标按 TopEnd 对齐图标右上角
+                Box(modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        imageVector = if (selected) item.selectedIcon else item.icon,
+                        contentDescription = item.title,
+                        tint = tint.copy(alpha = if (selected) 1f else 0.6f),
+                        modifier = Modifier.size(24.dp),
+                    )
+                    if (badgeVisible(index)) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 2.dp, y = (-2).dp)
+                                    .size(8.dp)
+                                    .background(badgeColor, CouiShape(4.dp)),
+                        )
+                    }
+                }
             }
         }
     }

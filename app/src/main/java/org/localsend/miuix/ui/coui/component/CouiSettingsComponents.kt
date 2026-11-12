@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.layout.Item
 import com.itos.coui.menu.CouiMenuItem
 import com.itos.coui.menu.Menu
@@ -77,7 +78,9 @@ internal fun CouiArrowRow(
 /**
  * 开关行：整行可切换，[Switch] 只呈现状态。
  *
- * 开关自身不接点击，否则一次点击会被行与开关各消费一次。
+ * 开关自身不接点击，否则一次点击会被行与开关各消费一次；但滑块拖动的提交目标是同一个业务
+ * 回调，必须显式交给 onDragCheckedChange，否则拖到抬指不会写回，滑块会被宿主状态弹回。
+ * Item 的 onClick 只表达点击语义，这里由行自己持有 toggleable 与按压反馈，故两者都手配。
  */
 @Composable
 internal fun CouiSwitchRow(
@@ -90,17 +93,31 @@ internal fun CouiSwitchRow(
     val interactionSource = remember { MutableInteractionSource() }
     Item(
         modifier =
-            Modifier.toggleable(
-                value = checked,
-                interactionSource = interactionSource,
-                indication = null,
-                enabled = enabled,
-                role = Role.Switch,
-                onValueChange = onCheckedChange,
-            ),
+            Modifier
+                .couiButtonFeedback(
+                    dark = CouiTheme.isDark,
+                    interactionSource = interactionSource,
+                    enabled = enabled,
+                    list = true,
+                ).toggleable(
+                    value = checked,
+                    interactionSource = interactionSource,
+                    indication = null,
+                    enabled = enabled,
+                    role = Role.Switch,
+                    onValueChange = onCheckedChange,
+                ),
         title = { CouiRowTitle(title) },
         summary = couiSummaryOrNull(summary),
-        trailing = { Switch(checked = checked, onCheckedChange = null, enabled = enabled) },
+        enabled = enabled,
+        trailing = {
+            Switch(
+                checked = checked,
+                onCheckedChange = null,
+                onDragCheckedChange = onCheckedChange,
+                enabled = enabled,
+            )
+        },
     )
 }
 

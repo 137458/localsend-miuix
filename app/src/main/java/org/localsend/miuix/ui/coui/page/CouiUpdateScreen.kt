@@ -6,7 +6,8 @@ package org.localsend.miuix.ui.coui.page
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,19 +31,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.layout.Group
+import com.itos.coui.scroll.rememberCouiOverscrollEffect
+import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
@@ -141,6 +144,8 @@ fun CouiUpdateScreen(
         }
     }
 
+    val overscrollEffect = rememberCouiOverscrollEffect()
+
     Box(modifier = Modifier.fillMaxSize().background(CouiTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             CouiUpdateTopBar(onBack = onBack)
@@ -148,6 +153,7 @@ fun CouiUpdateScreen(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
+                overscrollEffect = overscrollEffect,
             ) {
                 item(key = "hero") {
                     CouiUpdateHero(
@@ -283,15 +289,20 @@ private fun CouiTopBarAction(
     contentDescription: String,
     onClick: () -> Unit,
 ) {
-    val currentOnClick by rememberUpdatedState(onClick)
+    val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier =
             Modifier
                 .size(40.dp)
-                .clip(CouiShape(radius = 20.dp, cornerWeight = 3f))
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = { currentOnClick() })
-                },
+                .clip(CouiShape(radius = 20.dp))
+                .couiButtonFeedback(CouiTheme.isDark, interactionSource)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    enabled = true,
+                    role = Role.Button,
+                    onClick = onClick,
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -357,6 +368,8 @@ private fun CouiUpdateHero(
 
 /**
  * 通用卡片：标题使用分组字阶，内容放在 20dp 圆角卡片内。
+ * 不替换为 Group：Group 自带 16dp 页边距与 32dp 标题缩进、卡片内不留白，与本页 12dp 列表内边距、
+ * 16dp 标题缩进及 14dp 内容留白不一致，替换会改变现有版式而非仅对齐几何。
  */
 @Composable
 private fun CouiSectionCard(
@@ -376,7 +389,7 @@ private fun CouiSectionCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(CouiShape(radius = 20.dp, cornerWeight = 3f))
+                    .clip(CouiShape(radius = 20.dp))
                     .background(CouiTheme.colorScheme.card)
                     .padding(14.dp),
             content = content,
@@ -501,17 +514,22 @@ private fun CouiActionButton(
     onClick: () -> Unit,
 ) {
     val scheme = CouiTheme.colorScheme
-    val currentOnClick by rememberUpdatedState(onClick)
+    val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .height(44.dp)
-                .clip(CouiShape(radius = 22.dp, cornerWeight = 3f))
+                .clip(CouiCapsuleShape)
                 .background(if (primary) scheme.accent else scheme.container)
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = { currentOnClick() })
-                },
+                .couiButtonFeedback(CouiTheme.isDark, interactionSource)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    enabled = true,
+                    role = Role.Button,
+                    onClick = onClick,
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Text(
