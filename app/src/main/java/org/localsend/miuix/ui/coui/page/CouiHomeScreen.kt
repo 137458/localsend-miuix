@@ -24,10 +24,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -39,9 +41,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,7 +60,8 @@ import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
-import com.itos.coui.topappbar.TopAppBar
+import com.itos.coui.topappbar.CouiTopAppBarDefaults
+import com.itos.coui.topappbar.LargeTopAppBar
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.Device
@@ -88,9 +94,10 @@ private val CouiHomeCardRadius = 20.dp
 /**
  * 首页（ColorOS 皮肤）：本机状态、正在接收的传输、待发送队列、快速选择与附近设备。
  *
- * 页面骨架走库 `layout.Scaffold` + `topappbar.TopAppBar`：系统栏 inset 由外层承担，顶栏高度以
- * contentPadding 交给列表，滚动内容从栏下穿过时由库的渐变遮罩与渐进模糊收边；行、分隔线与行内
- * 按压/点击反馈走库 `layout.Item`、`layout.Divider` 与 `couiButtonFeedback`。
+ * 页面骨架走库 `layout.Scaffold` + `topappbar.LargeTopAppBar`：系统栏 inset 由库默认值承担，大标题
+ * 随列表滚动收成紧凑标题，折叠位移与栏高经 `state.contentPadding` 注入列表内侧，滚动内容从栏下
+ * 穿过时由库的渐变遮罩与渐进模糊收边；行、分隔线与行内按压/点击反馈走库 `layout.Item`、
+ * `layout.Divider` 与 `couiButtonFeedback`。
  *
  * 顶栏的两个动作按钮仍用本文件的 `CouiIconAction`：库的 `TopAppBarButton`/`TopAppBarButtonGroup`
  * 标注 @RequiresApi(34)，本模块 minSdk 31 且不使用 Android 14 专属 API，故没有可替换的库按钮。
@@ -195,22 +202,41 @@ fun CouiHomeScreen(
         }
     }
 
+    // 大标题折叠：canScrollBackward 决定正文到顶后才展开标题，回弹期间不提前弹开。
+    // derivedStateOf 把滚动状态读取收进派生快照，避免每帧重组整页。
+    val listState = rememberLazyListState()
+    val canScrollBackward = remember(listState) { derivedStateOf { listState.canScrollBackward } }
+    val scrollBehavior =
+        CouiTopAppBarDefaults.exitUntilCollapsedScrollBehavior(canScroll = { canScrollBackward.value })
+    val density = LocalDensity.current
+
     Scaffold(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(CouiTheme.colorScheme.background),
-        // 系统栏由库默认 insets 处理：横向安全区归 Scaffold 容器，纵向顶栏 inset 归 TopAppBar，
+                .background(CouiTheme.colorScheme.background)
+                // 折叠连接只挂到滚动内容的祖先一次；LazyColumn 上不再叠 nestedScroll。
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
+        // 系统栏由库默认 insets 处理：横向安全区归 Scaffold 容器，纵向顶栏 inset 归 LargeTopAppBar，
         // 栏高（含状态栏）经 contentPadding 注入列表内侧，内容滚到状态栏下被顶栏材质采样。
         topBar = {
-            // 顶栏骨架、标题排版与栏下渐变模糊由库 TopAppBar 承担；两个动作按钮仍是本文件的 CouiIconAction，
-            // 因为库 TopAppBarButton 标注 @RequiresApi(34)，minSdk 31 上没有可用的顶栏按钮实现。
-            TopAppBar(
+            // 大标题折叠、标题排版与栏下渐变模糊由库 LargeTopAppBar 承担；两个动作按钮仍是本文件的
+            // CouiIconAction，因为库 TopAppBarButton 标注 @RequiresApi(34)，minSdk 31 上没有可用实现。
+            LargeTopAppBar(
                 title = {
+                    // 库 Text 的 kind 必填，且其 BasicText 直接吃 kind 样式、不读组件注入的
+                    // LocalCouiTextStyle，所以槽内不能用无 kind 的文本。HomeTitle 就是库
+                    // expandedTitleTextStyle 的默认来源（40sp），折叠缩放 24/40 才落在库的
+                    // titleOnlyCollapsedSize 上，几何与库默认一致。
                     Text(
                         text = stringResource(R.string.app_name),
-                        kind = CouiTextKind.TopBar,
+                        kind = CouiTextKind.HomeTitle,
                         color = CouiTheme.colorScheme.onSurface,
+                        // 库 Text 非列表项 kind 默认居中，大标题须与库的起点动画对齐，故显式起始对齐；
+                        // 单行省略保证收起后标题高度不随文案换行跳动。
+                        textAlign = TextAlign.Start,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 },
                 actions = {
@@ -231,23 +257,28 @@ fun CouiHomeScreen(
                         },
                     )
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { scaffoldPadding ->
+        // 折叠位移由库 state.contentPadding 注入：它消费 Scaffold 原始 padding 并叠加顶栏收起的位移，
+        // 只平移正文顶部留白，不移动滚动视口（库 KDoc 明确不可再整体平移视口）。
+        val collapsedPadding = scrollBehavior.state.contentPadding(scaffoldPadding, density)
         // 回弹效果按滚动容器独占：在 item 作用域外记住，列表重组时不会反复重建
         val homeOverscroll = rememberCouiOverscrollEffect()
         // LazyColumn 的 overscrollEffect 实参由内部 scrollableArea 挂载回弹节点；
         // 再叠 Modifier.overscroll 会把同一个 EdgeNode 二次 attach。
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
+            state = listState,
             overscrollEffect = homeOverscroll,
-            // 顶栏高度由 Scaffold 的 contentPadding 注入：首项被推到栏下，滚动时内容从栏下穿过，
+            // 顶栏高度由折叠状态的 contentPadding 注入：首项被推到栏下，滚动时内容从栏下穿过，
             // 栏底过渡由库 TopAppBarSurface 的渐变遮罩与渐进模糊负责。
             contentPadding =
                 PaddingValues(
                     start = 12.dp,
                     end = 12.dp,
-                    top = scaffoldPadding.calculateTopPadding() + 4.dp,
+                    top = collapsedPadding.calculateTopPadding() + 4.dp,
                     bottom = contentPadding.calculateBottomPadding() + 16.dp,
                 ),
             verticalArrangement = Arrangement.spacedBy(10.dp),

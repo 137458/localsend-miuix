@@ -66,6 +66,7 @@ import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
 import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.coui.component.CouiSkinNavigationBar
+import org.localsend.miuix.ui.coui.dialog.CouiIncomingTransferDialog
 import org.localsend.miuix.ui.coui.dialog.CouiInputDialog
 import org.localsend.miuix.ui.coui.page.CouiHistoryScreen
 import org.localsend.miuix.ui.coui.page.CouiHomeScreen
@@ -616,37 +617,75 @@ fun App(manager: LocalSendManager) {
             }
 
             // Global Overlay Dialogs & BottomSheets
-            // 待接收会话含文件多选、单项信息与总大小，库 Dialog 只有 title/message 两个文本槽 ⇒ 保留 Miuix。
-            IncomingTransferDialog(
-                session = pendingIncomingSession?.takeIf { it.sessionId != dismissedIncomingSessionId },
-                onAccept = { selectedIds ->
-                    pendingIncomingSession?.let { session ->
-                        // 弹窗以 null 表示“不限定文件”（打开链接后全部接收），此处换成语义明确的全部接收入口
-                        if (selectedIds == null) {
+            if (uiSkin == UiSkin.COLOROS) {
+                // coUI Dialog 的 content 槽能承载多选列表与文本预览，标题与来源设备仍走 title/message 两槽，
+                // 确认/拒绝动作与原实现逐项对应，故 ColorOS 走 coUI 版；
+                // 全局弹窗位于 mainEntry 的 CouiSkinTheme 之外，这里补一层同源皮肤主题，弹窗才取到同一份 coUI 色板。
+                CouiSkinTheme {
+                    CouiIncomingTransferDialog(
+                        session = pendingIncomingSession?.takeIf { it.sessionId != dismissedIncomingSessionId },
+                        onAccept = { selectedIds ->
+                            pendingIncomingSession?.let { session ->
+                                // 弹窗以 null 表示“不限定文件”（打开链接后全部接收），此处换成语义明确的全部接收入口
+                                if (selectedIds == null) {
+                                    manager.acceptAllIncomingTransfer(session.sessionId)
+                                } else {
+                                    manager.acceptIncomingTransfer(session.sessionId, selectedIds)
+                                }
+                            }
+                        },
+                        onAcceptAndCopy = {
+                            pendingIncomingSession?.let { session ->
+                                val text = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent
+                                if (!text.isNullOrEmpty()) {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", text))
+                                    Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                                }
+                                manager.acceptAllIncomingTransfer(session.sessionId)
+                            }
+                        },
+                        onDecline = {
+                            pendingIncomingSession?.let { manager.declineIncomingTransfer(it.sessionId) }
+                        },
+                        onDismiss = {
+                            dismissedIncomingSessionId = pendingIncomingSession?.sessionId
+                        },
+                    )
+                }
+            } else {
+                // HyperOS 皮肤保持原有 Miuix 实现，零行为变化。
+                IncomingTransferDialog(
+                    session = pendingIncomingSession?.takeIf { it.sessionId != dismissedIncomingSessionId },
+                    onAccept = { selectedIds ->
+                        pendingIncomingSession?.let { session ->
+                            // 弹窗以 null 表示“不限定文件”（打开链接后全部接收），此处换成语义明确的全部接收入口
+                            if (selectedIds == null) {
+                                manager.acceptAllIncomingTransfer(session.sessionId)
+                            } else {
+                                manager.acceptIncomingTransfer(session.sessionId, selectedIds)
+                            }
+                        }
+                    },
+                    onAcceptAndCopy = {
+                        pendingIncomingSession?.let { session ->
+                            val text = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent
+                            if (!text.isNullOrEmpty()) {
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", text))
+                                Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                            }
                             manager.acceptAllIncomingTransfer(session.sessionId)
-                        } else {
-                            manager.acceptIncomingTransfer(session.sessionId, selectedIds)
                         }
-                    }
-                },
-                onAcceptAndCopy = {
-                    pendingIncomingSession?.let { session ->
-                        val text = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent
-                        if (!text.isNullOrEmpty()) {
-                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", text))
-                            Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
-                        }
-                        manager.acceptAllIncomingTransfer(session.sessionId)
-                    }
-                },
-                onDecline = {
-                    pendingIncomingSession?.let { manager.declineIncomingTransfer(it.sessionId) }
-                },
-                onDismiss = {
-                    dismissedIncomingSessionId = pendingIncomingSession?.sessionId
-                },
-            )
+                    },
+                    onDecline = {
+                        pendingIncomingSession?.let { manager.declineIncomingTransfer(it.sessionId) }
+                    },
+                    onDismiss = {
+                        dismissedIncomingSessionId = pendingIncomingSession?.sessionId
+                    },
+                )
+            }
 
             if (uiSkin == UiSkin.COLOROS) {
                 // 单行文本 + 非空校验都能用库 InputDialog 真实表达（confirmEnabled 映射禁用的确认按钮），故走 coUI 版；
