@@ -32,11 +32,10 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.ui.MainActivity
-import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.PinDialog
 import org.localsend.miuix.ui.coui.component.CouiArrowRow
 import org.localsend.miuix.ui.coui.component.CouiChoiceRow
-import org.localsend.miuix.ui.coui.component.CouiIconAction
+import org.localsend.miuix.ui.coui.component.CouiIncomingBadgeAction
 import org.localsend.miuix.ui.coui.component.CouiSwitchRow
 import org.localsend.miuix.ui.coui.component.CouiTopBarTitle
 import org.localsend.miuix.ui.coui.dialog.CouiAlertDialog
@@ -150,15 +149,10 @@ fun CouiSettingsScreen(
                         )
                     },
                     actions = {
-                        if (incomingTaskCount > 0) {
-                            CouiIconAction(
-                                icon = AppIcons.Receive,
-                                contentDescription = stringResource(R.string.receive_section_incoming_count, incomingTaskCount),
-                                tint = CouiTheme.colorScheme.accentOnSurface,
-                                onClick = onOpenHome,
-                                showBadgeDot = true,
-                            )
-                        }
+                        CouiIncomingBadgeAction(
+                            incomingTaskCount = incomingTaskCount,
+                            onClick = onOpenHome,
+                        )
                     },
                 )
             },
@@ -387,9 +381,11 @@ fun CouiSettingsScreen(
         },
     )
 
+    val certFingerprint = if (settings.useHttps) manager.getLocalDevice().fingerprint else ""
     CouiCertFingerprintDialog(
         show = showCertDialog,
-        fingerprint = if (settings.useHttps) manager.getLocalDevice().fingerprint else "",
+        fingerprint = certFingerprint,
+        onCopyFingerprint = { manager.copyTextToClipboard(certFingerprint) },
         onDismissRequest = { showCertDialog = false },
         // 先收起证书弹窗再弹二次确认，避免两个弹窗叠层同时为 true
         onRegenerate = {

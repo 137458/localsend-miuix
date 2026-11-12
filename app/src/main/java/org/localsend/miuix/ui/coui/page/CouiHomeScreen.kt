@@ -2,9 +2,6 @@
 
 package org.localsend.miuix.ui.coui.page
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -38,6 +35,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +66,7 @@ import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
 import com.itos.coui.topappbar.CouiTopAppBarDefaults
 import com.itos.coui.topappbar.LargeTopAppBar
+import kotlinx.coroutines.launch
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.Device
@@ -80,6 +79,7 @@ import org.localsend.miuix.ui.component.FilePreviewDialog
 import org.localsend.miuix.ui.component.FileThumbnail
 import org.localsend.miuix.ui.component.InlineTransferProgress
 import org.localsend.miuix.ui.coui.component.CouiIconAction
+import org.localsend.miuix.ui.coui.component.CouiIncomingBadgeAction
 import org.localsend.miuix.ui.coui.component.CouiRowSummary
 import org.localsend.miuix.ui.coui.component.CouiRowTitle
 import org.localsend.miuix.ui.coui.component.couiMinTouchTarget
@@ -213,6 +213,7 @@ fun CouiHomeScreen(
     // 大标题折叠：canScrollBackward 决定正文到顶后才展开标题，回弹期间不提前弹开。
     // derivedStateOf 把滚动状态读取收进派生快照，避免每帧重组整页。
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     val canScrollBackward = remember(listState) { derivedStateOf { listState.canScrollBackward } }
     val scrollBehavior =
         CouiTopAppBarDefaults.exitUntilCollapsedScrollBehavior(canScroll = { canScrollBackward.value })
@@ -249,15 +250,15 @@ fun CouiHomeScreen(
                     )
                 },
                 actions = {
-                    if (incomingTaskCount > 0) {
-                        CouiIconAction(
-                            icon = AppIcons.Receive,
-                            contentDescription = stringResource(R.string.receive_section_incoming_count, incomingTaskCount),
-                            tint = CouiTheme.colorScheme.accentOnSurface,
-                            onClick = onOpenIncoming,
-                            showBadgeDot = true,
-                        )
-                    }
+                    CouiIncomingBadgeAction(
+                        incomingTaskCount = incomingTaskCount,
+                        onClick = {
+                            onOpenIncoming()
+                            coroutineScope.launch {
+                                listState.animateScrollToItem(if (incomingSessions.isNotEmpty()) 1 else 0)
+                            }
+                        },
+                    )
                     CouiIconAction(
                         icon = AppIcons.Edit,
                         contentDescription = stringResource(R.string.action_input_ip),
@@ -314,9 +315,7 @@ fun CouiHomeScreen(
                         title = "$primaryIp:$displayPort",
                         summary = if (localIps.size > 1) localIps.joinToString(", ") else null,
                         onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("LocalSend IP", "$primaryIp:$displayPort")
-                            clipboard.setPrimaryClip(clip)
+                            manager.copyTextToClipboard("$primaryIp:$displayPort")
                             Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                         },
                     )

@@ -3,7 +3,6 @@ package org.localsend.miuix.ui.coui.component
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,11 +16,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -30,15 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -123,16 +112,15 @@ private fun CouiPlainNavigationBar(
     val tint = if (dark) Color.White else Color.Black
     val selectedColor = tint.copy(alpha = 230f / 255f)
     val unselectedColor = tint.copy(alpha = 184f / 255f)
-    val density = LocalDensity.current
-    val bottomMargin = if (WindowInsets.tappableElement.getBottom(density) > 0) 0.dp else 8.dp
     val maxWidth = 24.dp + 70.dp * items.size + 8.dp * (items.size - 1)
 
+    // 纵向底部安全区已由 App.kt 外层 bottomBar 统一承担，这里仅补充横向安全区，避免低版本双重留白。
     Box(
         modifier =
             modifier
                 .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.tappableElement.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + bottomMargin),
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -160,22 +148,11 @@ private fun CouiPlainNavigationBar(
                             .clip(CouiCapsuleShape)
                             .background(if (isSelected) tint.copy(alpha = 0.12f) else Color.Transparent)
                             .couiButtonFeedback(dark = dark, interactionSource = interactionSource)
-                            .selectable(
+                            .couiSelectableTab(
                                 selected = isSelected,
                                 interactionSource = interactionSource,
-                                indication = null,
-                                role = Role.Tab,
-                                onClick = { if (!isSelected) onSelect(index) },
-                            ).semantics(mergeDescendants = true) {
-                                selected = isSelected
-                            }.onKeyEvent {
-                                if (it.type == KeyEventType.KeyUp && (it.key == Key.Enter || it.key == Key.Spacebar)) {
-                                    if (!isSelected) onSelect(index)
-                                    true
-                                } else {
-                                    false
-                                }
-                            }.focusable(interactionSource = interactionSource),
+                                onSelect = { onSelect(index) },
+                            ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(

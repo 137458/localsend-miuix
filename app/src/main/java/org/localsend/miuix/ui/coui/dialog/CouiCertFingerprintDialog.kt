@@ -1,8 +1,5 @@
 package org.localsend.miuix.ui.coui.dialog
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,10 +31,10 @@ import org.localsend.miuix.R
 internal fun CouiCertFingerprintDialog(
     show: Boolean,
     fingerprint: String,
+    onCopyFingerprint: () -> Unit,
     onDismissRequest: () -> Unit,
     onRegenerate: () -> Unit,
 ) {
-    val context = LocalContext.current
     val scheme = CouiTheme.colorScheme
 
     Dialog(
@@ -46,10 +42,7 @@ internal fun CouiCertFingerprintDialog(
         confirmAction =
             CouiDialogAction(
                 text = stringResource(R.string.dialog_cert_btn_copy),
-                onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Certificate Fingerprint", fingerprint))
-                },
+                onClick = onCopyFingerprint,
                 style = CouiDialogActionStyle.Primary,
                 colors = couiPrimaryActionColors(),
             ),

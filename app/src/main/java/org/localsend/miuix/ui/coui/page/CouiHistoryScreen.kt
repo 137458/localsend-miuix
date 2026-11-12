@@ -8,7 +8,6 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,7 +28,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -44,16 +42,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.effect.couiButtonFeedback
@@ -73,11 +64,13 @@ import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.model.filterByTab
 import org.localsend.miuix.ui.component.AppIcons
-import org.localsend.miuix.ui.component.ConfirmDialog
 import org.localsend.miuix.ui.component.HistoryDetailDialog
 import org.localsend.miuix.ui.coui.component.CouiIconAction
+import org.localsend.miuix.ui.coui.component.CouiIncomingBadgeAction
 import org.localsend.miuix.ui.coui.component.CouiTopBarTitle
 import org.localsend.miuix.ui.coui.component.couiMinTouchTarget
+import org.localsend.miuix.ui.coui.component.couiSelectableTab
+import org.localsend.miuix.ui.coui.dialog.CouiAlertDialog
 import org.localsend.miuix.ui.coui.theme.couiDangerColor
 import org.localsend.miuix.ui.util.openDownloadFolder
 import org.localsend.miuix.ui.util.rememberUiTimeText
@@ -98,6 +91,7 @@ fun CouiHistoryScreen(
     contentPadding: PaddingValues,
     onOpenHome: () -> Unit,
     incomingTaskCount: Int = 0,
+    onOpenIncoming: () -> Unit = onOpenHome,
 ) {
     val context = LocalContext.current
     val history by manager.transferHistory.collectAsStateWithLifecycle()
@@ -144,15 +138,10 @@ fun CouiHistoryScreen(
                         )
                     },
                     actions = {
-                        if (incomingTaskCount > 0) {
-                            CouiIconAction(
-                                icon = AppIcons.Receive,
-                                contentDescription = stringResource(R.string.receive_section_incoming_count, incomingTaskCount),
-                                tint = scheme.accentOnSurface,
-                                onClick = onOpenHome,
-                                showBadgeDot = true,
-                            )
-                        }
+                        CouiIncomingBadgeAction(
+                            incomingTaskCount = incomingTaskCount,
+                            onClick = onOpenIncoming,
+                        )
                         CouiIconAction(
                             icon = AppIcons.Folder,
                             contentDescription = stringResource(R.string.history_action_open_folder),
@@ -246,39 +235,49 @@ fun CouiHistoryScreen(
         },
     )
 
+    var lastItemToDelete by remember { mutableStateOf(itemToDelete) }
     if (itemToDelete != null) {
-        val target = itemToDelete!!
-        ConfirmDialog(
-            show = true,
-            title = stringResource(R.string.history_dialog_delete_title),
-            message = stringResource(R.string.history_dialog_delete_msg, target.deviceAlias),
-            confirmText = stringResource(R.string.history_detail_btn_delete_record),
-            onConfirm = {
+        lastItemToDelete = itemToDelete
+    }
+    val renderDeleteTarget = itemToDelete ?: lastItemToDelete
+
+    CouiAlertDialog(
+        show = itemToDelete != null,
+        title = stringResource(R.string.history_dialog_delete_title),
+        message = renderDeleteTarget?.let { stringResource(R.string.history_dialog_delete_msg, it.deviceAlias) } ?: "",
+        confirmText = stringResource(R.string.history_detail_btn_delete_record),
+        onConfirm = {
+            itemToDelete?.let { target ->
                 manager.deleteHistoryItem(target.id)
                 itemToDelete = null
                 Toast.makeText(context, context.getString(R.string.toast_history_item_deleted), Toast.LENGTH_SHORT).show()
-            },
-            onDismissRequest = { itemToDelete = null },
-            dismissText = stringResource(R.string.btn_cancel),
-            danger = true,
-        )
+            }
+        },
+        onDismissRequest = { itemToDelete = null },
+        dismissText = stringResource(R.string.btn_cancel),
+        danger = true,
+    )
+
+    var lastClearCount by remember { mutableIntStateOf(history.size) }
+    if (showClearConfirmDialog && history.isNotEmpty()) {
+        lastClearCount = history.size
     }
 
-    if (showClearConfirmDialog) {
-        ConfirmDialog(
-            show = true,
-            title = stringResource(R.string.history_dialog_clear_title),
-            message = stringResource(R.string.history_dialog_clear_msg, history.size),
-            confirmText = stringResource(R.string.btn_clear),
-            onConfirm = {
-                manager.clearHistory()
+    CouiAlertDialog(
+        show = showClearConfirmDialog,
+        title = stringResource(R.string.history_dialog_clear_title),
+        message = stringResource(R.string.history_dialog_clear_msg, lastClearCount),
+        confirmText = stringResource(R.string.btn_clear),
+        onConfirm = {
+            if (showClearConfirmDialog) {
                 showClearConfirmDialog = false
-            },
-            onDismissRequest = { showClearConfirmDialog = false },
-            dismissText = stringResource(R.string.btn_cancel),
-            danger = true,
-        )
-    }
+                manager.clearHistory()
+            }
+        },
+        onDismissRequest = { showClearConfirmDialog = false },
+        dismissText = stringResource(R.string.btn_cancel),
+        danger = true,
+    )
 }
 
 /** 库分段控件的系统门槛：材质与滑动着色依赖 Android 14（API 34），库函数本身带 RequiresApi(34)。 */
@@ -351,23 +350,11 @@ private fun CouiPlainFilterTabs(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .selectable(
+                        .couiSelectableTab(
                             selected = selected,
                             interactionSource = interactionSource,
-                            indication = null,
-                            role = Role.Tab,
-                            onClick = { if (!selected) onSelected(index) },
-                        ).couiMinTouchTarget()
-                        .semantics(mergeDescendants = true) {
-                            this.selected = selected
-                        }.onKeyEvent {
-                            if (it.type == KeyEventType.KeyUp && (it.key == Key.Enter || it.key == Key.Spacebar)) {
-                                if (!selected) onSelected(index)
-                                true
-                            } else {
-                                false
-                            }
-                        }.focusable(interactionSource = interactionSource),
+                            onSelect = { onSelected(index) },
+                        ).couiMinTouchTarget(),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
@@ -474,7 +461,7 @@ private fun CouiHistoryCard(
         }
     val detailText =
         if (item.isTextMessage && !item.textContent.isNullOrEmpty()) {
-            item.textContent ?: ""
+            item.textContent
         } else if (item.fileNames.isNotEmpty()) {
             item.fileNames.joinToString(stringResource(R.string.enumeration_separator))
         } else {

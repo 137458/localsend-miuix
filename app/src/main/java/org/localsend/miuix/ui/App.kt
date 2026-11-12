@@ -558,6 +558,10 @@ fun App(manager: LocalSendManager) {
                                                         contentPadding = pagePadding,
                                                         onOpenHome = { selectTab(MainTabs.HOME) },
                                                         incomingTaskCount = incomingTaskCount,
+                                                        onOpenIncoming = {
+                                                            dismissedIncomingSessionId = null
+                                                            selectTab(MainTabs.HOME)
+                                                        },
                                                     )
                                                 } else {
                                                     HistoryScreen(
@@ -576,7 +580,10 @@ fun App(manager: LocalSendManager) {
                                                         onPickDirectory = { directoryPickerLauncher.launch(null) },
                                                         onNavigateToUpdate = { backStack.add(AppRoute.Update) },
                                                         incomingTaskCount = incomingTaskCount,
-                                                        onOpenHome = { selectTab(MainTabs.HOME) },
+                                                        onOpenHome = {
+                                                            dismissedIncomingSessionId = null
+                                                            selectTab(MainTabs.HOME)
+                                                        },
                                                     )
                                                 } else {
                                                     SettingsScreen(
@@ -635,8 +642,7 @@ fun App(manager: LocalSendManager) {
                         pendingIncomingSession?.let { session ->
                             val text = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent
                             if (!text.isNullOrEmpty()) {
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", text))
+                                manager.copyTextToClipboard(text)
                                 Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                             }
                             manager.acceptAllIncomingTransfer(session.sessionId)
