@@ -32,7 +32,6 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.ui.MainActivity
-import org.localsend.miuix.ui.component.PinDialog
 import org.localsend.miuix.ui.coui.component.CouiArrowRow
 import org.localsend.miuix.ui.coui.component.CouiChoiceRow
 import org.localsend.miuix.ui.coui.component.CouiIncomingBadgeAction
@@ -41,6 +40,7 @@ import org.localsend.miuix.ui.coui.component.CouiTopBarTitle
 import org.localsend.miuix.ui.coui.dialog.CouiAlertDialog
 import org.localsend.miuix.ui.coui.dialog.CouiCertFingerprintDialog
 import org.localsend.miuix.ui.coui.dialog.CouiInputDialog
+import org.localsend.miuix.ui.coui.dialog.CouiPinDialog
 import org.localsend.miuix.util.AppLanguage
 import org.localsend.miuix.util.SettingsValidators
 
@@ -370,9 +370,7 @@ fun CouiSettingsScreen(
         }
     }
 
-    // PIN 是纯数字且只在传输握手时用：库输入弹窗没有 KeyboardOptions 槽位（InputDialog.kt:92-97），
-    // 换成 coUI 版会丢掉数字键盘，属可用性倒退，故与端口弹窗同样保留 Miuix 版（TextInputDialog.kt:56）。
-    PinDialog(
+    CouiPinDialog(
         show = showPinDialog,
         initialPin = settings.pin,
         onDismissRequest = { showPinDialog = false },

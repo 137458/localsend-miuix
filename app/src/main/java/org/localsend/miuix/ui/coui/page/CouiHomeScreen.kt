@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -52,6 +53,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.layout.CouiPageDefaults
@@ -63,6 +65,7 @@ import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
+import com.itos.coui.text.rememberCouiTextStyle
 import com.itos.coui.theme.CouiTheme
 import com.itos.coui.topappbar.CouiTopAppBarDefaults
 import com.itos.coui.topappbar.LargeTopAppBar
@@ -75,15 +78,18 @@ import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.model.countCategories
 import org.localsend.miuix.network.NetworkUtils
 import org.localsend.miuix.ui.component.AppIcons
-import org.localsend.miuix.ui.component.FilePreviewDialog
 import org.localsend.miuix.ui.component.FileThumbnail
 import org.localsend.miuix.ui.component.InlineTransferProgress
 import org.localsend.miuix.ui.coui.component.CouiIconAction
 import org.localsend.miuix.ui.coui.component.CouiIncomingBadgeAction
 import org.localsend.miuix.ui.coui.component.CouiRowSummary
 import org.localsend.miuix.ui.coui.component.CouiRowTitle
+import org.localsend.miuix.ui.coui.component.CouiTopBarActionGroup
+import org.localsend.miuix.ui.coui.component.CouiTopBarIconAction
 import org.localsend.miuix.ui.coui.component.couiMinTouchTarget
+import org.localsend.miuix.ui.coui.dialog.CouiFilePreviewDialog
 import org.localsend.miuix.ui.coui.theme.couiDangerColor
+import org.localsend.miuix.ui.coui.theme.couiSuccessColor
 import org.localsend.miuix.ui.screen.HomeActions
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
@@ -230,51 +236,54 @@ fun CouiHomeScreen(
         // 顶部状态栏由 LargeTopAppBar 的默认 insets 单独处理并经 collapsedPadding 注入列表。
         windowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // 大标题折叠、标题排版与栏下渐变模糊由库 LargeTopAppBar 承担；动作按钮使用共享的
-            // CouiIconAction，因为库 TopAppBarButton 标注 @RequiresApi(34)，minSdk 31 上没有可用实现。
+            // 大标题折叠、标题排版与栏下渐变模糊由库 LargeTopAppBar 承担；
+            // 库 AppBarLayout 展开时也会将 title 可用宽扣除右侧动作组宽度（约剩 240dp），
+            // 因此采用 26sp HomeTitle 保证 "LocalSend Miuix" 单行完整展示而不出现省略截断，
+            // 同时同步传给 expandedTitleStyle 使折叠缩放精确落回 24sp。
+            val expandedTitleStyle =
+                rememberCouiTextStyle(CouiTextKind.HomeTitle).copy(
+                    fontSize = 26.sp,
+                    color = CouiTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Start,
+                )
             LargeTopAppBar(
                 title = {
-                    // 库 Text 的 kind 必填，且其 BasicText 直接吃 kind 样式、不读组件注入的
-                    // LocalCouiTextStyle，所以槽内不能用无 kind 的文本。HomeTitle 就是库
-                    // expandedTitleTextStyle 的默认来源（40sp），折叠缩放 24/40 才落在库的
-                    // titleOnlyCollapsedSize 上，几何与库默认一致。
-                    Text(
+                    BasicText(
                         text = stringResource(R.string.app_name),
-                        kind = CouiTextKind.HomeTitle,
-                        color = CouiTheme.colorScheme.onSurface,
-                        // 库 Text 非列表项 kind 默认居中，大标题须与库的起点动画对齐，故显式起始对齐；
-                        // 单行省略保证收起后标题高度不随文案换行跳动。
-                        textAlign = TextAlign.Start,
+                        style = expandedTitleStyle,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
+                expandedTitleStyle = expandedTitleStyle,
                 actions = {
-                    CouiIncomingBadgeAction(
-                        incomingTaskCount = incomingTaskCount,
-                        onClick = {
-                            onOpenIncoming()
-                            coroutineScope.launch {
-                                listState.animateScrollToItem(if (incomingSessions.isNotEmpty()) 1 else 0)
-                            }
-                        },
-                    )
-                    CouiIconAction(
-                        icon = AppIcons.Edit,
-                        contentDescription = stringResource(R.string.action_input_ip),
-                        tint = if (isRefreshing) CouiTheme.colorScheme.onSurfaceVariant else CouiTheme.colorScheme.onSurface,
-                        onClick = actions.onManualIp,
-                    )
-                    CouiIconAction(
-                        icon = AppIcons.Refresh,
-                        contentDescription = stringResource(R.string.action_refresh),
-                        tint = if (isRefreshing) CouiTheme.colorScheme.onSurfaceVariant else CouiTheme.colorScheme.onSurface,
-                        onClick = {
-                            maybeOnRefresh()
-                            manager.refreshDevices()
-                            Toast.makeText(context, context.getString(R.string.toast_multicast_sent), Toast.LENGTH_SHORT).show()
-                        },
-                    )
+                    CouiTopBarActionGroup {
+                        CouiIncomingBadgeAction(
+                            incomingTaskCount = incomingTaskCount,
+                            onClick = {
+                                onOpenIncoming()
+                                coroutineScope.launch {
+                                    listState.animateScrollToItem(if (incomingSessions.isNotEmpty()) 1 else 0)
+                                }
+                            },
+                        )
+                        CouiTopBarIconAction(
+                            icon = AppIcons.Edit,
+                            contentDescription = stringResource(R.string.action_input_ip),
+                            tint = if (isRefreshing) CouiTheme.colorScheme.onSurfaceVariant else null,
+                            onClick = actions.onManualIp,
+                        )
+                        CouiTopBarIconAction(
+                            icon = AppIcons.Refresh,
+                            contentDescription = stringResource(R.string.action_refresh),
+                            tint = if (isRefreshing) CouiTheme.colorScheme.onSurfaceVariant else null,
+                            onClick = {
+                                maybeOnRefresh()
+                                manager.refreshDevices()
+                                Toast.makeText(context, context.getString(R.string.toast_multicast_sent), Toast.LENGTH_SHORT).show()
+                            },
+                        )
+                    }
                 },
                 scrollBehavior = scrollBehavior,
             )
@@ -297,10 +306,10 @@ fun CouiHomeScreen(
                 PaddingValues(
                     start = 12.dp,
                     end = 12.dp,
-                    top = collapsedPadding.calculateTopPadding() + 4.dp,
-                    bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                    top = collapsedPadding.calculateTopPadding() + 2.dp,
+                    bottom = contentPadding.calculateBottomPadding() + 28.dp,
                 ),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // 1. 本机状态：可被发现的地址 + 接收策略
             item {
@@ -625,14 +634,13 @@ fun CouiHomeScreen(
         }
     }
 
-    if (previewingIndex >= 0 && previewingIndex < selectedFiles.size) {
-        FilePreviewDialog(
-            files = selectedFiles,
-            initialIndex = previewingIndex,
-            onRemoveFile = { fileToRemove -> manager.removeFile(fileToRemove.id) },
-            onDismissRequest = { previewingIndex = -1 },
-        )
-    }
+    CouiFilePreviewDialog(
+        files = selectedFiles,
+        show = previewingIndex >= 0 && previewingIndex < selectedFiles.size,
+        initialIndex = previewingIndex.coerceAtLeast(0),
+        onRemoveFile = { fileToRemove -> manager.removeFile(fileToRemove.id) },
+        onDismissRequest = { previewingIndex = -1 },
+    )
 }
 
 /** 分组标题：卡片外的一行小字，与卡片内 16dp 文字缩进对齐。 */
@@ -735,7 +743,8 @@ private fun CouiLocalStatusRow(
     quickSave: Boolean,
 ) {
     val receiving = receivingCount > 0
-    val statusColor = if (receiving) CouiTheme.colorScheme.accentOnSurface else CouiTheme.colorScheme.onSurfaceVariant
+    val dotColor = if (receiving) CouiTheme.colorScheme.accentOnSurface else couiSuccessColor()
+    val textColor = if (receiving) CouiTheme.colorScheme.accentOnSurface else CouiTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -745,13 +754,13 @@ private fun CouiLocalStatusRow(
                 Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(statusColor),
+                    .background(dotColor),
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = if (receiving) stringResource(R.string.home_status_receiving, receivingCount) else stringResource(R.string.home_status_ready),
             kind = CouiTextKind.ItemSummary,
-            color = statusColor,
+            color = textColor,
         )
         Spacer(modifier = Modifier.weight(1f))
         Text(
@@ -814,17 +823,17 @@ private fun CouiQuickAction(
                 .background(CouiTheme.colorScheme.container)
                 .couiButtonFeedback(CouiTheme.isDark, source)
                 .clickable(source, null, enabled = true, role = Role.Button, onClick = onClick)
-                .defaultMinSize(minHeight = 72.dp)
-                .padding(vertical = 12.dp),
+                .defaultMinSize(minHeight = 66.dp)
+                .padding(vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = title,
             tint = CouiTheme.colorScheme.accentOnSurface,
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier.size(22.dp),
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = title,
             kind = CouiTextKind.ItemSummary,
@@ -936,7 +945,7 @@ private fun CouiEmptyState(
     title: String,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(

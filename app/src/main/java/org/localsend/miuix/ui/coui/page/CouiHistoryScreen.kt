@@ -64,13 +64,14 @@ import org.localsend.miuix.model.TransferHistoryItem
 import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.model.filterByTab
 import org.localsend.miuix.ui.component.AppIcons
-import org.localsend.miuix.ui.component.HistoryDetailDialog
-import org.localsend.miuix.ui.coui.component.CouiIconAction
 import org.localsend.miuix.ui.coui.component.CouiIncomingBadgeAction
+import org.localsend.miuix.ui.coui.component.CouiTopBarActionGroup
+import org.localsend.miuix.ui.coui.component.CouiTopBarIconAction
 import org.localsend.miuix.ui.coui.component.CouiTopBarTitle
 import org.localsend.miuix.ui.coui.component.couiMinTouchTarget
 import org.localsend.miuix.ui.coui.component.couiSelectableTab
 import org.localsend.miuix.ui.coui.dialog.CouiAlertDialog
+import org.localsend.miuix.ui.coui.dialog.CouiHistoryDetailDialog
 import org.localsend.miuix.ui.coui.theme.couiDangerColor
 import org.localsend.miuix.ui.util.openDownloadFolder
 import org.localsend.miuix.ui.util.rememberUiTimeText
@@ -138,28 +139,29 @@ fun CouiHistoryScreen(
                         )
                     },
                     actions = {
-                        CouiIncomingBadgeAction(
-                            incomingTaskCount = incomingTaskCount,
-                            onClick = onOpenIncoming,
-                        )
-                        CouiIconAction(
-                            icon = AppIcons.Folder,
-                            contentDescription = stringResource(R.string.history_action_open_folder),
-                            tint = scheme.onSurface,
-                            onClick = {
-                                openDownloadFolder(
-                                    context = context,
-                                    downloadTreeUri = settings.downloadTreeUri,
-                                )
-                            },
-                        )
-                        if (history.isNotEmpty()) {
-                            CouiIconAction(
-                                icon = MiuixIcons.Delete,
-                                contentDescription = stringResource(R.string.history_dialog_clear_title),
-                                tint = errorColor,
-                                onClick = { showClearConfirmDialog = true },
+                        CouiTopBarActionGroup {
+                            CouiIncomingBadgeAction(
+                                incomingTaskCount = incomingTaskCount,
+                                onClick = onOpenIncoming,
                             )
+                            CouiTopBarIconAction(
+                                icon = AppIcons.Folder,
+                                contentDescription = stringResource(R.string.history_action_open_folder),
+                                onClick = {
+                                    openDownloadFolder(
+                                        context = context,
+                                        downloadTreeUri = settings.downloadTreeUri,
+                                    )
+                                },
+                            )
+                            if (history.isNotEmpty()) {
+                                CouiTopBarIconAction(
+                                    icon = MiuixIcons.Delete,
+                                    contentDescription = stringResource(R.string.history_dialog_clear_title),
+                                    tint = errorColor,
+                                    onClick = { showClearConfirmDialog = true },
+                                )
+                            }
                         }
                     },
                 )
@@ -217,7 +219,7 @@ fun CouiHistoryScreen(
         }
     }
 
-    HistoryDetailDialog(
+    CouiHistoryDetailDialog(
         item = selectedItem,
         show = selectedItem != null,
         onDismissRequest = { selectedItem = null },
@@ -322,6 +324,7 @@ private fun CouiLibraryFilterTabs(
         labels = labels,
         selectedIndex = selectedIndex,
         onSelected = onSelected,
+        dark = CouiKitTheme.isDark,
         small = true,
     )
 }

@@ -66,8 +66,16 @@ import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
 import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.coui.component.CouiSkinNavigationBar
+import org.localsend.miuix.ui.coui.dialog.CouiAddContentDialog
+import org.localsend.miuix.ui.coui.dialog.CouiAppPickerDialog
 import org.localsend.miuix.ui.coui.dialog.CouiIncomingTransferDialog
 import org.localsend.miuix.ui.coui.dialog.CouiInputDialog
+import org.localsend.miuix.ui.coui.dialog.CouiManualIpDialog
+import org.localsend.miuix.ui.coui.dialog.CouiPortDialog
+import org.localsend.miuix.ui.coui.dialog.CouiSendTextDialog
+import org.localsend.miuix.ui.coui.dialog.CouiTargetDevicePinDialog
+import org.localsend.miuix.ui.coui.dialog.CouiUpdateDialogHost
+import org.localsend.miuix.ui.coui.dialog.CouiWebShareDialog
 import org.localsend.miuix.ui.coui.dialog.LocalCouiWindowBackdropAvailable
 import org.localsend.miuix.ui.coui.page.CouiHistoryScreen
 import org.localsend.miuix.ui.coui.page.CouiHomeScreen
@@ -434,7 +442,12 @@ fun App(manager: LocalSendManager) {
             ) {
                 entry<AppRoute.Main> {
                     // 采样层自带不透明底色：页签转场期只录正文会让底栏回填区域露出透明像素
-                    val couiPageBackground = MiuixTheme.colorScheme.background
+                    val couiPageBackground =
+                        if (uiSkin == UiSkin.COLOROS) {
+                            com.itos.coui.theme.CouiTheme.colorScheme.background
+                        } else {
+                            MiuixTheme.colorScheme.background
+                        }
                     val couiBackdrop =
                         if (uiSkin == UiSkin.COLOROS) {
                             key(couiPageBackground) {
@@ -725,88 +738,155 @@ fun App(manager: LocalSendManager) {
                 )
             }
 
-            // 端口要数字键盘与 5 位长度上限，库 InputDialog 无 KeyboardOptions / maxLength 槽位 ⇒ 保留 Miuix。
-            PortDialog(
-                show = showPortDialog,
-                initialPort = settings.port,
-                onDismissRequest = { showPortDialog = false },
+            val onConfirmPort: (Int) -> Unit = { newPort ->
                 // 重启是异步的且端口可能顺延，更新结果由 manager 依据真实监听端口统一提示，避免这里先报出未生效的请求端口
-                onConfirm = { newPort -> manager.applyPortChange(newPort) },
-            )
-
-            // 正文是 3-6 行多行文本域，库 InputDialog 只有单行 ⇒ 保留 Miuix。
-            SendTextDialog(
-                show = showSendTextDialog,
-                onDismissRequest = { showSendTextDialog = false },
-                onConfirm = { text ->
-                    val bytes = text.toByteArray(Charsets.UTF_8)
-                    val item =
-                        FileItem(
-                            name = "text_${System.currentTimeMillis()}.txt",
-                            size = bytes.size.toLong(),
-                            textContent = text,
-                            mimeType = "text/plain",
-                        )
-                    manager.addFiles(listOf(item))
-                    Toast.makeText(context, context.getString(R.string.toast_text_added), Toast.LENGTH_SHORT).show()
-                },
-            )
-
-            AddContentBottomSheet(
-                show = showAddContentSheet,
-                onDismissRequest = { showAddContentSheet = false },
-                onPickFiles = { filePickerLauncher.launch(arrayOf("*/*")) },
-                onPickFolder = { folderPickerLauncher.launch(null) },
-                onPickMedia = {
-                    mediaPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                manager.applyPortChange(newPort)
+            }
+            val onConfirmSendText: (String) -> Unit = { text ->
+                val bytes = text.toByteArray(Charsets.UTF_8)
+                val item =
+                    FileItem(
+                        name = "text_${System.currentTimeMillis()}.txt",
+                        size = bytes.size.toLong(),
+                        textContent = text,
+                        mimeType = "text/plain",
                     )
-                },
-                onPickApps = { showAppPickerSheet = true },
-                onSendText = { showSendTextDialog = true },
-                onPasteClipboard = pickClipboard,
-            )
+                manager.addFiles(listOf(item))
+                Toast.makeText(context, context.getString(R.string.toast_text_added), Toast.LENGTH_SHORT).show()
+            }
+            val onPickFilesAction: () -> Unit = { filePickerLauncher.launch(arrayOf("*/*")) }
+            val onPickFolderAction: () -> Unit = { folderPickerLauncher.launch(null) }
+            val onPickMediaAction: () -> Unit = {
+                mediaPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                )
+            }
+            val onSendManualIp: (String, Int) -> Unit = { ip, port ->
+                manager.sendToIp(ip, port)
+                Toast.makeText(context, context.getString(R.string.toast_connecting_ip, ip, port), Toast.LENGTH_SHORT).show()
+            }
 
-            AppPickerBottomSheet(
-                show = showAppPickerSheet,
-                onDismissRequest = { showAppPickerSheet = false },
-                manager = manager,
-            )
+            if (uiSkin == UiSkin.COLOROS) {
+                CouiPortDialog(
+                    show = showPortDialog,
+                    initialPort = settings.port,
+                    onDismissRequest = { showPortDialog = false },
+                    onConfirm = onConfirmPort,
+                )
 
-            // 内容是二维码、地址选择与复制动作的底部弹层，非 title/message 两槽可表达的正文 ⇒ 保留 Miuix。
-            org.localsend.miuix.ui.component.WebShareDialog(
-                show = showWebShareDialog,
-                onDismissRequest = { showWebShareDialog = false },
-                manager = manager,
-            )
+                CouiSendTextDialog(
+                    show = showSendTextDialog,
+                    onDismissRequest = { showSendTextDialog = false },
+                    onConfirm = onConfirmSendText,
+                )
 
-            // IP / 端口双字段分别要 Uri 与数字键盘，还要列出最近地址，库 InputDialog 只能表达单个文本框 ⇒ 保留 Miuix。
-            org.localsend.miuix.ui.component.ManualIpDialog(
-                show = showManualIpDialog,
-                recentIps = recentManualIps,
-                onDismissRequest = { showManualIpDialog = false },
-                onSend = { ip, port ->
-                    manager.sendToIp(ip, port)
-                    Toast.makeText(context, context.getString(R.string.toast_connecting_ip, ip, port), Toast.LENGTH_SHORT).show()
-                },
-            )
+                CouiAddContentDialog(
+                    show = showAddContentSheet,
+                    onDismissRequest = { showAddContentSheet = false },
+                    onPickFiles = onPickFilesAction,
+                    onPickFolder = onPickFolderAction,
+                    onPickMedia = onPickMediaAction,
+                    onPickApps = { showAppPickerSheet = true },
+                    onSendText = { showSendTextDialog = true },
+                    onPasteClipboard = pickClipboard,
+                )
 
-            // PIN 要 ASCII 键盘约束（库 InputDialog 无 KeyboardOptions 槽位）⇒ 保留 Miuix。
-            if (pendingTargetPinPrompt != null) {
-                org.localsend.miuix.ui.component.TargetDevicePinDialog(
-                    show = true,
-                    targetAlias = pendingTargetPinPrompt?.device?.alias ?: "",
+                CouiAppPickerDialog(
+                    show = showAppPickerSheet,
+                    onDismissRequest = { showAppPickerSheet = false },
+                    manager = manager,
+                )
+
+                CouiWebShareDialog(
+                    show = showWebShareDialog,
+                    onDismissRequest = { showWebShareDialog = false },
+                    manager = manager,
+                )
+
+                CouiManualIpDialog(
+                    show = showManualIpDialog,
+                    recentIps = recentManualIps,
+                    onDismissRequest = { showManualIpDialog = false },
+                    onSend = onSendManualIp,
+                )
+
+                var lastTargetPinPrompt by remember { mutableStateOf(pendingTargetPinPrompt) }
+                if (pendingTargetPinPrompt != null) {
+                    lastTargetPinPrompt = pendingTargetPinPrompt
+                }
+                CouiTargetDevicePinDialog(
+                    show = pendingTargetPinPrompt != null,
+                    targetAlias = lastTargetPinPrompt?.device?.alias ?: "",
                     onDismissRequest = { pendingTargetPinPrompt?.onDismiss?.invoke() },
                     onConfirm = { pin -> pendingTargetPinPrompt?.onPinEntered?.invoke(pin) },
                 )
-            }
 
-            UpdateDialogHost(
-                show = showUpdateDialog,
-                manager = manager,
-                releaseInfo = availableUpdate,
-                onDismiss = { showUpdateDialog = false },
-            )
+                CouiUpdateDialogHost(
+                    show = showUpdateDialog,
+                    manager = manager,
+                    releaseInfo = availableUpdate,
+                    onDismiss = { showUpdateDialog = false },
+                )
+            } else {
+                PortDialog(
+                    show = showPortDialog,
+                    initialPort = settings.port,
+                    onDismissRequest = { showPortDialog = false },
+                    onConfirm = onConfirmPort,
+                )
+
+                SendTextDialog(
+                    show = showSendTextDialog,
+                    onDismissRequest = { showSendTextDialog = false },
+                    onConfirm = onConfirmSendText,
+                )
+
+                AddContentBottomSheet(
+                    show = showAddContentSheet,
+                    onDismissRequest = { showAddContentSheet = false },
+                    onPickFiles = onPickFilesAction,
+                    onPickFolder = onPickFolderAction,
+                    onPickMedia = onPickMediaAction,
+                    onPickApps = { showAppPickerSheet = true },
+                    onSendText = { showSendTextDialog = true },
+                    onPasteClipboard = pickClipboard,
+                )
+
+                AppPickerBottomSheet(
+                    show = showAppPickerSheet,
+                    onDismissRequest = { showAppPickerSheet = false },
+                    manager = manager,
+                )
+
+                org.localsend.miuix.ui.component.WebShareDialog(
+                    show = showWebShareDialog,
+                    onDismissRequest = { showWebShareDialog = false },
+                    manager = manager,
+                )
+
+                org.localsend.miuix.ui.component.ManualIpDialog(
+                    show = showManualIpDialog,
+                    recentIps = recentManualIps,
+                    onDismissRequest = { showManualIpDialog = false },
+                    onSend = onSendManualIp,
+                )
+
+                if (pendingTargetPinPrompt != null) {
+                    org.localsend.miuix.ui.component.TargetDevicePinDialog(
+                        show = true,
+                        targetAlias = pendingTargetPinPrompt?.device?.alias ?: "",
+                        onDismissRequest = { pendingTargetPinPrompt?.onDismiss?.invoke() },
+                        onConfirm = { pin -> pendingTargetPinPrompt?.onPinEntered?.invoke(pin) },
+                    )
+                }
+
+                UpdateDialogHost(
+                    show = showUpdateDialog,
+                    manager = manager,
+                    releaseInfo = availableUpdate,
+                    onDismiss = { showUpdateDialog = false },
+                )
+            }
         }
         if (uiSkin == UiSkin.COLOROS) {
             ProvideCouiMenuBackdrop { windowModifier ->

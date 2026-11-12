@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.itos.coui.dialog.LoadingDialog
 import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.layout.CouiPageDefaults
 import com.itos.coui.layout.Divider
@@ -54,6 +55,7 @@ import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
 import com.itos.coui.topappbar.TopAppBar
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.localsend.miuix.BuildConfig
 import org.localsend.miuix.R
@@ -61,14 +63,14 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateCheckResult
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.ui.component.MarkdownText
-import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.component.updateBrowserUrl
 import org.localsend.miuix.ui.component.updateProgressDetail
 import org.localsend.miuix.ui.component.updateProgressFraction
 import org.localsend.miuix.ui.coui.component.CouiArrowRow
-import org.localsend.miuix.ui.coui.component.CouiIconAction
 import org.localsend.miuix.ui.coui.component.CouiSwitchRow
+import org.localsend.miuix.ui.coui.component.CouiTopBarIconAction
 import org.localsend.miuix.ui.coui.component.CouiTopBarTitle
+import org.localsend.miuix.ui.coui.dialog.CouiUpdateDialogHost
 import org.localsend.miuix.ui.coui.theme.couiDangerColor
 import org.localsend.miuix.updates.UpdateDownloadState
 import org.localsend.miuix.updates.UpdatePrompt
@@ -96,6 +98,8 @@ fun CouiUpdateScreen(
 
     var releaseInfo by remember { mutableStateOf<UpdateCheckResult?>(null) }
     var isChecking by remember { mutableStateOf(false) }
+    var isUserChecking by remember { mutableStateOf(false) }
+    var checkJob by remember { mutableStateOf<Job?>(null) }
     var showDialog by remember { mutableStateOf(false) }
 
     val downloaderState = manager.updates.downloader.state
@@ -106,33 +110,37 @@ fun CouiUpdateScreen(
     fun doCheck(userInitiated: Boolean = false) {
         if (isChecking) return
         isChecking = true
-        coroutineScope.launch {
-            val result = updateManager.checkForUpdate()
-            isChecking = false
-            result
-                .onSuccess { info ->
-                    releaseInfo = info
-                    if (info.hasUpdate) {
-                        val shouldNotify =
-                            UpdatePrompt.shouldNotify(
-                                latestVersion = info.latestVersion,
-                                ignoredVersion = settings.ignoredVersion,
-                                promptedVersion = manager.updates.promptedVersion,
-                            )
-                        if (userInitiated || shouldNotify) {
-                            showDialog = true
-                            manager.updates.promptedVersion = info.latestVersion
+        isUserChecking = userInitiated
+        checkJob =
+            coroutineScope.launch {
+                val result = updateManager.checkForUpdate()
+                if (userInitiated && !isUserChecking) return@launch
+                isChecking = false
+                isUserChecking = false
+                result
+                    .onSuccess { info ->
+                        releaseInfo = info
+                        if (info.hasUpdate) {
+                            val shouldNotify =
+                                UpdatePrompt.shouldNotify(
+                                    latestVersion = info.latestVersion,
+                                    ignoredVersion = settings.ignoredVersion,
+                                    promptedVersion = manager.updates.promptedVersion,
+                                )
+                            if (userInitiated || shouldNotify) {
+                                showDialog = true
+                                manager.updates.promptedVersion = info.latestVersion
+                            }
+                        } else if (userInitiated) {
+                            Toast.makeText(context, context.getString(R.string.toast_latest_version, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
                         }
-                    } else if (userInitiated) {
-                        Toast.makeText(context, context.getString(R.string.toast_latest_version, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
+                    }.onFailure { error ->
+                        val message = error.localizedMessage ?: ""
+                        if (userInitiated) {
+                            Toast.makeText(context, context.getString(R.string.toast_check_update_failed, message), Toast.LENGTH_SHORT).show()
+                        }
                     }
-                }.onFailure { error ->
-                    val message = error.localizedMessage ?: ""
-                    if (userInitiated) {
-                        Toast.makeText(context, context.getString(R.string.toast_check_update_failed, message), Toast.LENGTH_SHORT).show()
-                    }
-                }
-        }
+            }
     }
 
     fun startDownload() {
@@ -172,10 +180,9 @@ fun CouiUpdateScreen(
                         )
                     },
                     navigationIcon = {
-                        CouiIconAction(
+                        CouiTopBarIconAction(
                             icon = MiuixIcons.Back,
                             contentDescription = stringResource(R.string.action_back),
-                            tint = CouiTheme.colorScheme.onSurface,
                             onClick = onBack,
                         )
                     },
@@ -294,7 +301,19 @@ fun CouiUpdateScreen(
             }
         }
 
-        UpdateDialogHost(
+        LoadingDialog(
+            visible = isUserChecking,
+            message = stringResource(R.string.update_checking_hint),
+            onDismissRequest = {
+                checkJob?.cancel()
+                checkJob = null
+                isChecking = false
+                isUserChecking = false
+            },
+            dismissOnClickOutside = true,
+        )
+
+        CouiUpdateDialogHost(
             show = showDialog,
             manager = manager,
             releaseInfo = releaseInfo,
