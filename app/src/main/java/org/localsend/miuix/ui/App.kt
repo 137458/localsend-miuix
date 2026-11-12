@@ -65,6 +65,7 @@ import org.localsend.miuix.ui.component.SendTextDialog
 import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.coui.component.CouiSkinNavigationBar
 import org.localsend.miuix.ui.coui.page.CouiHistoryScreen
+import org.localsend.miuix.ui.coui.page.CouiHomeScreen
 import org.localsend.miuix.ui.coui.page.CouiSettingsScreen
 import org.localsend.miuix.ui.coui.theme.CouiSkinTheme
 import org.localsend.miuix.ui.navigation.AppRoute
@@ -524,11 +525,19 @@ fun App(manager: LocalSendManager) {
                                         )
                                     when (page) {
                                         MainTabs.HOME ->
-                                            HomeScreen(
-                                                manager = manager,
-                                                contentPadding = pagePadding,
-                                                actions = homeActions,
-                                            )
+                                            if (uiSkin == UiSkin.COLOROS) {
+                                                CouiHomeScreen(
+                                                    manager = manager,
+                                                    contentPadding = pagePadding,
+                                                    actions = homeActions,
+                                                )
+                                            } else {
+                                                HomeScreen(
+                                                    manager = manager,
+                                                    contentPadding = pagePadding,
+                                                    actions = homeActions,
+                                                )
+                                            }
                                         MainTabs.HISTORY ->
                                             if (uiSkin == UiSkin.COLOROS) {
                                                 CouiHistoryScreen(
