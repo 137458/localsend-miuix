@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -23,8 +26,7 @@ import com.itos.coui.layout.Divider
 import com.itos.coui.layout.Group
 import com.itos.coui.layout.Scaffold
 import com.itos.coui.scroll.couiVerticalScroll
-import com.itos.coui.theme.CouiTheme
-import com.itos.coui.topappbar.TopAppBar
+import com.itos.coui.topappbar.CouiTopAppBarDefaults
 import org.localsend.miuix.BuildConfig
 import org.localsend.miuix.R
 import org.localsend.miuix.core.ExternalLinks
@@ -35,8 +37,8 @@ import org.localsend.miuix.ui.MainActivity
 import org.localsend.miuix.ui.coui.component.CouiArrowRow
 import org.localsend.miuix.ui.coui.component.CouiChoiceRow
 import org.localsend.miuix.ui.coui.component.CouiIncomingBadgeAction
+import org.localsend.miuix.ui.coui.component.CouiScreenLargeTopAppBar
 import org.localsend.miuix.ui.coui.component.CouiSwitchRow
-import org.localsend.miuix.ui.coui.component.CouiTopBarTitle
 import org.localsend.miuix.ui.coui.dialog.CouiAlertDialog
 import org.localsend.miuix.ui.coui.dialog.CouiCertFingerprintDialog
 import org.localsend.miuix.ui.coui.dialog.CouiInputDialog
@@ -59,9 +61,9 @@ private enum class AdvancedNetworkField {
  * 卡片、行、开关与枚举选择换成 coUI-Kit 组件。全局弹窗（重命名、端口）仍由 App.kt 的
  * Miuix 宿主承担；本页只接管 PIN、证书指纹、重新生成确认与高级网络字段。
  *
- * 骨架用库 layout.Scaffold + topappbar.TopAppBar：顶栏玻璃取 Scaffold 自建的采样源
+ * 骨架用库 layout.Scaffold + topappbar.LargeTopAppBar：顶栏玻璃取 Scaffold 自建的采样源
  * （Scaffold.kt:61 rememberCouiBackdrop，:86 ProvideCouiBackdrop 包住 topBar 槽），
- * 纵向状态栏 inset 由 TopAppBar 的缺省 windowInsets 消费，栏高经 contentPadding 交给正文；
+ * 纵向状态栏 inset 由 LargeTopAppBar 的缺省 windowInsets 消费，折叠位移与栏高经 contentPadding 交给正文；
  * 横向安全区由 Scaffold 容器消费（Scaffold.kt:79），页面自己不再加 statusBarsPadding。
  *
  * 正文是 Column + couiVerticalScroll（不是 LazyColumn），顶栏高度放进滚动节点内侧：
@@ -134,39 +136,45 @@ fun CouiSettingsScreen(
             supportedDeviceTypes.indexOf(settings.deviceType).coerceAtLeast(0)
         }
 
+    val scrollState = rememberScrollState()
+    val canScrollBackward = remember(scrollState) { derivedStateOf { scrollState.canScrollBackward } }
+    val scrollBehavior =
+        CouiTopAppBarDefaults.exitUntilCollapsedScrollBehavior(canScroll = { canScrollBackward.value })
+    val density = LocalDensity.current
+
     // 外层 Box 只负责给 Scaffold 有界约束：库在无界约束下直接 require 失败（Scaffold.kt:81）。
     Box(modifier = Modifier.fillMaxSize()) {
         // 顶栏玻璃与采样源由库 Scaffold 自建；外围 insets 清零以防和外层 Miuix Scaffold 重复消费。
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
             windowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
-                TopAppBar(
-                    title = {
-                        CouiTopBarTitle(
-                            text = stringResource(R.string.settings_title),
-                            color = CouiTheme.colorScheme.onSurface,
-                        )
-                    },
+                CouiScreenLargeTopAppBar(
+                    title = stringResource(R.string.settings_title),
                     actions = {
                         CouiIncomingBadgeAction(
                             incomingTaskCount = incomingTaskCount,
                             onClick = onOpenHome,
                         )
                     },
+                    scrollBehavior = scrollBehavior,
                 )
             },
         ) { scaffoldPadding ->
+            val collapsedPadding = scrollBehavior.state.contentPadding(scaffoldPadding, density)
             Column(
                 modifier =
                     Modifier
                         .fillMaxSize()
                         // padding 写在 couiVerticalScroll 之后：它作用在滚动内容上而不是视口，
                         // 所以视口从页面顶端开始、首项排在栏下，滚动时内容从顶栏下穿过被玻璃采样。
-                        .couiVerticalScroll(rememberScrollState())
+                        .couiVerticalScroll(scrollState)
                         .padding(
-                            top = scaffoldPadding.calculateTopPadding(),
-                            bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                            top = collapsedPadding.calculateTopPadding(),
+                            bottom = contentPadding.calculateBottomPadding() + 28.dp,
                         ),
             ) {
                 Group(title = stringResource(R.string.settings_section_general)) {

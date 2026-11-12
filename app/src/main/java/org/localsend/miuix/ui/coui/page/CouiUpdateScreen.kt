@@ -1,4 +1,4 @@
-// ColorOS 皮肤软件更新页：coUI Scaffold + TopAppBar 骨架（顶栏玻璃取 Scaffold 自建采样源）与 coUI 卡片、分组。
+// ColorOS 皮肤软件更新页：coUI Scaffold + LargeTopAppBar 骨架（顶栏玻璃取 Scaffold 自建采样源）与 coUI 分组。
 @file:Suppress("LocalContextGetResourceValueCall")
 
 package org.localsend.miuix.ui.coui.page
@@ -11,7 +11,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,13 +18,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,12 +34,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,7 +54,7 @@ import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
-import com.itos.coui.topappbar.TopAppBar
+import com.itos.coui.topappbar.CouiTopAppBarDefaults
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.localsend.miuix.BuildConfig
@@ -67,9 +67,9 @@ import org.localsend.miuix.ui.component.updateBrowserUrl
 import org.localsend.miuix.ui.component.updateProgressDetail
 import org.localsend.miuix.ui.component.updateProgressFraction
 import org.localsend.miuix.ui.coui.component.CouiArrowRow
+import org.localsend.miuix.ui.coui.component.CouiScreenLargeTopAppBar
 import org.localsend.miuix.ui.coui.component.CouiSwitchRow
 import org.localsend.miuix.ui.coui.component.CouiTopBarIconAction
-import org.localsend.miuix.ui.coui.component.CouiTopBarTitle
 import org.localsend.miuix.ui.coui.dialog.CouiUpdateDialogHost
 import org.localsend.miuix.ui.coui.theme.couiDangerColor
 import org.localsend.miuix.updates.UpdateDownloadState
@@ -81,9 +81,8 @@ import kotlin.math.round
 
 /**
  * ColorOS 皮肤的系统更新页。
- * 骨架用库 layout.Scaffold + topappbar.TopAppBar：顶栏玻璃取 Scaffold 自建采样源，系统栏留白由外层
- * 修饰符承担、顶栏高度经 contentPadding 交给列表内侧；版式与 HyperOS 版对齐（版本信息、更新日志、
- * 更新设置、版本通道），视觉改用 coUI 卡片与分组。
+ * 骨架用库 layout.Scaffold + topappbar.LargeTopAppBar：顶栏玻璃取 Scaffold 自建采样源，折叠位移与系统栏留白经
+ * contentPadding 交给列表内侧；版式与 HyperOS 版对齐（版本信息、更新日志、更新设置、版本通道），视觉改用 coUI 分组。
  */
 @Composable
 fun CouiUpdateScreen(
@@ -159,26 +158,25 @@ fun CouiUpdateScreen(
         }
     }
 
+    val listState = rememberLazyListState()
+    val canScrollBackward = remember(listState) { derivedStateOf { listState.canScrollBackward } }
+    val scrollBehavior =
+        CouiTopAppBarDefaults.exitUntilCollapsedScrollBehavior(canScroll = { canScrollBackward.value })
+    val density = LocalDensity.current
     val overscrollEffect = rememberCouiOverscrollEffect()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 顶栏玻璃与采样源由库 Scaffold 自建；状态栏 inset 由 TopAppBar 的默认 windowInsets 消费
-        // （栏高含状态栏，经 contentPadding 注入列表内侧，内容滚到状态栏下由顶栏材质采样）。
-        // 底部安全区没有底栏承接，由外层 navigationBarsPadding 交给页面。
+        // 顶栏玻璃与采样源由库 Scaffold 自建；系统栏 insets 经 scaffoldPadding 与 collapsedPadding
+        // 注入列表内侧（横向 16dp 边距由各 Group 自身承担，避免与 LazyColumn 内边距叠加成 28dp）。
         Scaffold(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .background(CouiTheme.colorScheme.background)
-                    .navigationBarsPadding(),
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
-                TopAppBar(
-                    title = {
-                        CouiTopBarTitle(
-                            text = stringResource(R.string.update_screen_title),
-                            color = CouiTheme.colorScheme.onSurface,
-                        )
-                    },
+                CouiScreenLargeTopAppBar(
+                    title = stringResource(R.string.update_screen_title),
                     navigationIcon = {
                         CouiTopBarIconAction(
                             icon = MiuixIcons.Back,
@@ -186,20 +184,20 @@ fun CouiUpdateScreen(
                             onClick = onBack,
                         )
                     },
+                    scrollBehavior = scrollBehavior,
                 )
             },
         ) { scaffoldPadding ->
+            val collapsedPadding = scrollBehavior.state.contentPadding(scaffoldPadding, density)
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                // 顶栏高度放进滚动节点内侧：首项排在栏下，滚动时内容从栏下穿过。
+                state = listState,
+                // 顶栏高度与底部导航栏安全区放进滚动节点内侧：首项排在栏下，滚动时内容从栏下穿过。
                 contentPadding =
                     PaddingValues(
-                        start = 12.dp,
-                        end = 12.dp,
-                        top = scaffoldPadding.calculateTopPadding() + 4.dp,
-                        bottom = 24.dp,
+                        top = collapsedPadding.calculateTopPadding() + 4.dp,
+                        bottom = collapsedPadding.calculateBottomPadding() + 28.dp,
                     ),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
                 overscrollEffect = overscrollEffect,
             ) {
                 item(key = "hero") {
@@ -220,29 +218,31 @@ fun CouiUpdateScreen(
                             }
                         val defaultReleaseTitle = stringResource(R.string.update_release_default_title)
                         val releaseTitleText = releaseInfo?.releaseTitle?.ifBlank { defaultReleaseTitle } ?: defaultReleaseTitle
-                        CouiSectionCard(title = changelogTitle) {
-                            Text(
-                                text = releaseTitleText,
-                                kind = CouiTextKind.ItemTitle,
-                                color = CouiTheme.colorScheme.onSurface,
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            MarkdownText(
-                                markdown = releaseInfo?.changelog ?: "",
-                                modifier = Modifier.fillMaxWidth(),
-                                baseFontSize = 14,
-                            )
-                            CouiDownloadStatus(state = downloadState)
-                            CouiDownloadActions(
-                                state = downloadState,
-                                hasNew = hasNew,
-                                apkAvailable = releaseInfo?.apk != null,
-                                onCancel = { manager.updates.downloader.cancel() },
-                                onInstall = { (downloadState as? UpdateDownloadState.Done)?.let { UpdateManager.installApk(context, it.file) } },
-                                onRetry = { startDownload() },
-                                onBrowser = { releaseInfo?.let { UpdateManager.openInBrowser(context, updateBrowserUrl(it)) } },
-                                onDownload = { startDownload() },
-                            )
+                        Group(title = changelogTitle) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(CouiPageDefaults.rowPadding)) {
+                                Text(
+                                    text = releaseTitleText,
+                                    kind = CouiTextKind.ItemTitle,
+                                    color = CouiTheme.colorScheme.onSurface,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                MarkdownText(
+                                    markdown = releaseInfo?.changelog ?: "",
+                                    modifier = Modifier.fillMaxWidth(),
+                                    baseFontSize = 14,
+                                )
+                                CouiDownloadStatus(state = downloadState)
+                                CouiDownloadActions(
+                                    state = downloadState,
+                                    hasNew = hasNew,
+                                    apkAvailable = releaseInfo?.apk != null,
+                                    onCancel = { manager.updates.downloader.cancel() },
+                                    onInstall = { (downloadState as? UpdateDownloadState.Done)?.let { UpdateManager.installApk(context, it.file) } },
+                                    onRetry = { startDownload() },
+                                    onBrowser = { releaseInfo?.let { UpdateManager.openInBrowser(context, updateBrowserUrl(it)) } },
+                                    onDownload = { startDownload() },
+                                )
+                            }
                         }
                     }
                 }
@@ -370,41 +370,6 @@ private fun CouiUpdateHero(
             color = statusColor,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-        )
-    }
-}
-
-/**
- * 通用卡片：标题使用分组字阶，内容放在 `CouiPageDefaults.shape`（24dp 连续曲率）圆角卡片内。
- * 不替换为 Group：Group 自带 16dp 页边距与 32dp 标题缩进、卡片内不留白，与本页 12dp 列表内边距、
- * 16dp 标题缩进及 14dp 内容留白不一致，替换会改变现有版式而非仅对齐几何。
- */
-@Composable
-private fun CouiSectionCard(
-    title: String?,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        if (title != null) {
-            Text(
-                text = title,
-                kind = CouiTextKind.GroupTitle,
-                color = CouiTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Start,
-                modifier =
-                    Modifier
-                        .padding(start = 4.dp, bottom = 6.dp)
-                        .semantics { heading() },
-            )
-        }
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(CouiPageDefaults.shape)
-                    .background(CouiTheme.colorScheme.card)
-                    .padding(14.dp),
-            content = content,
         )
     }
 }

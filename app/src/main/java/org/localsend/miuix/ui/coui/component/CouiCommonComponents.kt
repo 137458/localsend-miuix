@@ -31,12 +31,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.shape.CouiShape
+import com.itos.coui.text.CouiTextKind
+import com.itos.coui.text.rememberCouiTextStyle
 import com.itos.coui.theme.CouiTheme
-import com.itos.coui.topappbar.CouiTopAppBarDefaults
+import com.itos.coui.topappbar.CouiTopAppBarScrollBehavior
+import com.itos.coui.topappbar.LargeTopAppBar
 import com.itos.coui.topappbar.TopAppBarButton
 import com.itos.coui.topappbar.TopAppBarButtonGroup
 import org.localsend.miuix.R
@@ -122,20 +127,37 @@ internal fun CouiIconAction(
 }
 
 /**
- * 紧凑顶栏标题：对齐库 `CouiTopAppBarDefaults.titleTextStyle()`（HomeTitle 字族、700 字重）。
+ * 统一大标题顶栏：全 ColorOS 皮肤页面共用同一 `26.sp` HomeTitle 展开字阶，
+ * 避免中英文长标题在有右侧动作组时截断，并同步传给 `expandedTitleStyle` 保证折叠缩放比例一致。
  */
 @Composable
-internal fun CouiTopBarTitle(
-    text: String,
+internal fun CouiScreenLargeTopAppBar(
+    title: String,
+    scrollBehavior: CouiTopAppBarScrollBehavior,
     modifier: Modifier = Modifier,
-    color: Color = CouiTheme.colorScheme.onSurface,
+    navigationIcon: @Composable () -> Unit = {},
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
-    BasicText(
-        text = text,
+    val expandedTitleStyle =
+        rememberCouiTextStyle(CouiTextKind.HomeTitle).copy(
+            fontSize = 26.sp,
+            color = CouiTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Start,
+        )
+    LargeTopAppBar(
         modifier = modifier,
-        style = CouiTopAppBarDefaults.titleTextStyle().copy(color = color),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
+        title = {
+            BasicText(
+                text = title,
+                style = expandedTitleStyle,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        navigationIcon = navigationIcon,
+        actions = actions,
+        expandedTitleStyle = expandedTitleStyle,
+        scrollBehavior = scrollBehavior,
     )
 }
 

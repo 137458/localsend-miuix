@@ -28,9 +28,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +44,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -55,7 +59,7 @@ import com.itos.coui.segmentbutton.SegmentedControl
 import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
-import com.itos.coui.topappbar.TopAppBar
+import com.itos.coui.topappbar.CouiTopAppBarDefaults
 import kotlinx.coroutines.launch
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
@@ -65,9 +69,9 @@ import org.localsend.miuix.model.TransferStatus
 import org.localsend.miuix.model.filterByTab
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.coui.component.CouiIncomingBadgeAction
+import org.localsend.miuix.ui.coui.component.CouiScreenLargeTopAppBar
 import org.localsend.miuix.ui.coui.component.CouiTopBarActionGroup
 import org.localsend.miuix.ui.coui.component.CouiTopBarIconAction
-import org.localsend.miuix.ui.coui.component.CouiTopBarTitle
 import org.localsend.miuix.ui.coui.component.couiMinTouchTarget
 import org.localsend.miuix.ui.coui.component.couiSelectableTab
 import org.localsend.miuix.ui.coui.dialog.CouiAlertDialog
@@ -82,7 +86,7 @@ import com.itos.coui.theme.CouiTheme as CouiKitTheme
 
 /**
  * 传输历史页（ColorOS 皮肤）：筛选、卡片、详情与删除确认的行为与 HyperOS 皮肤一致，
- * 视觉改用 coUI-Kit 的配色、形状与字阶。骨架用库 Scaffold + TopAppBar（顶栏自己消费状态栏内边距），
+ * 视觉改用 coUI-Kit 的配色、形状与字阶。骨架用库 Scaffold + LargeTopAppBar（顶栏自己消费状态栏内边距），
  * 筛选在 Android 14 及以上用库 SegmentedControl；coUI-Kit 没有卡片与图标组件，
  * 卡片由 Row 自绘，图标沿用项目既有 AppIcons（tint 由本页指定）。
  */
@@ -123,21 +127,25 @@ fun CouiHistoryScreen(
             history.filterByTab(currentTab)
         }
 
+    val listState = rememberLazyListState()
+    val canScrollBackward = remember(listState) { derivedStateOf { listState.canScrollBackward } }
+    val scrollBehavior =
+        CouiTopAppBarDefaults.exitUntilCollapsedScrollBehavior(canScroll = { canScrollBackward.value })
+    val density = LocalDensity.current
+
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
         // 外层 Miuix Scaffold 已承载窗口安全区；此处显式清零外围 insets，避免嵌套重复消费，
-        // 顶栏状态栏与横向安全区由 TopAppBar 默认 insets 及筛选栏/列表内容内边距分别处理。
+        // 顶栏状态栏与横向安全区由 LargeTopAppBar 默认 insets 及筛选栏/列表内容内边距分别处理。
         windowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = scheme.background,
         topBar = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                TopAppBar(
-                    title = {
-                        CouiTopBarTitle(
-                            text = stringResource(R.string.history_title),
-                            color = scheme.onSurface,
-                        )
-                    },
+                CouiScreenLargeTopAppBar(
+                    title = stringResource(R.string.history_title),
                     actions = {
                         CouiTopBarActionGroup {
                             CouiIncomingBadgeAction(
@@ -164,6 +172,7 @@ fun CouiHistoryScreen(
                             }
                         }
                     },
+                    scrollBehavior = scrollBehavior,
                 )
                 CouiHistoryFilterBar(
                     labels = filterTabs,
@@ -173,47 +182,47 @@ fun CouiHistoryScreen(
             }
         },
     ) { scaffoldPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        val collapsedPadding = scrollBehavior.state.contentPadding(scaffoldPadding, density)
+        // 回弹效果按滚动容器独占：在 item 作用域外记住，列表重组时不会反复重建
+        val historyOverscroll = rememberCouiOverscrollEffect()
+        // 回弹节点由 LazyColumn 内部的 scrollableArea 挂载，不能再叠 Modifier.overscroll；
+        // 顶栏高度只放进列表内侧 contentPadding：正文与栏位同点叠放，内容从栏下穿过才会被顶栏材质采样
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            overscrollEffect = historyOverscroll,
+            contentPadding =
+                PaddingValues(
+                    start = CouiPageDefaults.horizontalMargin,
+                    end = CouiPageDefaults.horizontalMargin,
+                    top = collapsedPadding.calculateTopPadding() + 4.dp,
+                    bottom = contentPadding.calculateBottomPadding() + 28.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             if (filteredHistory.isEmpty()) {
-                CouiHistoryEmptyState(
-                    modifier =
-                        Modifier.padding(
-                            top = scaffoldPadding.calculateTopPadding(),
-                            bottom = contentPadding.calculateBottomPadding(),
-                        ),
-                    text =
-                        when (selectedFilterIndex) {
-                            1 -> stringResource(R.string.history_empty_receive)
-                            2 -> stringResource(R.string.history_empty_send)
-                            else -> stringResource(R.string.history_empty_title)
-                        },
-                )
-            } else {
-                // 回弹效果按滚动容器独占：在 item 作用域外记住，列表重组时不会反复重建
-                val historyOverscroll = rememberCouiOverscrollEffect()
-                // 回弹节点由 LazyColumn 内部的 scrollableArea 挂载，不能再叠 Modifier.overscroll；
-                // 顶栏高度只放进列表内侧 contentPadding：正文与栏位同点叠放，内容从栏下穿过才会被顶栏材质采样
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    overscrollEffect = historyOverscroll,
-                    contentPadding =
-                        PaddingValues(
-                            top = scaffoldPadding.calculateTopPadding() + 4.dp,
-                            bottom = contentPadding.calculateBottomPadding() + 16.dp,
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(filteredHistory, key = { it.id }) { item ->
-                        CouiHistoryCard(
-                            item = item,
-                            onOpenDetail = { selectedItem = item },
-                            onLongPress = { itemToDelete = item },
-                            onCopyText = { text ->
-                                manager.copyTextToClipboard(text)
-                                Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                item(key = "empty") {
+                    CouiHistoryEmptyState(
+                        modifier = Modifier.fillParentMaxSize(),
+                        text =
+                            when (selectedFilterIndex) {
+                                1 -> stringResource(R.string.history_empty_receive)
+                                2 -> stringResource(R.string.history_empty_send)
+                                else -> stringResource(R.string.history_empty_title)
                             },
-                        )
-                    }
+                    )
+                }
+            } else {
+                items(filteredHistory, key = { it.id }) { item ->
+                    CouiHistoryCard(
+                        item = item,
+                        onOpenDetail = { selectedItem = item },
+                        onLongPress = { itemToDelete = item },
+                        onCopyText = { text ->
+                            manager.copyTextToClipboard(text)
+                            Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                        },
+                    )
                 }
             }
         }
@@ -301,7 +310,7 @@ private fun CouiHistoryFilterBar(
                 .fillMaxWidth()
                 .background(CouiKitTheme.colorScheme.background)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = CouiPageDefaults.horizontalMargin, vertical = 8.dp),
     ) {
         if (Build.VERSION.SDK_INT >= COUI_SEGMENTED_CONTROL_MIN_SDK) {
             CouiLibraryFilterTabs(labels = labels, selectedIndex = selectedIndex, onSelected = onSelected)
@@ -476,7 +485,6 @@ private fun CouiHistoryCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
                 .clip(shape)
                 .background(scheme.card)
                 .couiButtonFeedback(CouiKitTheme.isDark, cardSource)
@@ -486,7 +494,7 @@ private fun CouiHistoryCard(
                     role = Role.Button,
                     onLongClick = { latestLongPress() },
                     onClick = { latestOpenDetail() },
-                ).padding(horizontal = 14.dp, vertical = 14.dp),
+                ).padding(horizontal = CouiPageDefaults.rowPadding, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(

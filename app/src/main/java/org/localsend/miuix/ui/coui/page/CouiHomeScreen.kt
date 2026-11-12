@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -53,7 +52,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.layout.CouiPageDefaults
@@ -65,10 +63,8 @@ import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
-import com.itos.coui.text.rememberCouiTextStyle
 import com.itos.coui.theme.CouiTheme
 import com.itos.coui.topappbar.CouiTopAppBarDefaults
-import com.itos.coui.topappbar.LargeTopAppBar
 import kotlinx.coroutines.launch
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
@@ -84,6 +80,7 @@ import org.localsend.miuix.ui.coui.component.CouiIconAction
 import org.localsend.miuix.ui.coui.component.CouiIncomingBadgeAction
 import org.localsend.miuix.ui.coui.component.CouiRowSummary
 import org.localsend.miuix.ui.coui.component.CouiRowTitle
+import org.localsend.miuix.ui.coui.component.CouiScreenLargeTopAppBar
 import org.localsend.miuix.ui.coui.component.CouiTopBarActionGroup
 import org.localsend.miuix.ui.coui.component.CouiTopBarIconAction
 import org.localsend.miuix.ui.coui.component.couiMinTouchTarget
@@ -236,26 +233,8 @@ fun CouiHomeScreen(
         // 顶部状态栏由 LargeTopAppBar 的默认 insets 单独处理并经 collapsedPadding 注入列表。
         windowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // 大标题折叠、标题排版与栏下渐变模糊由库 LargeTopAppBar 承担；
-            // 库 AppBarLayout 展开时也会将 title 可用宽扣除右侧动作组宽度（约剩 240dp），
-            // 因此采用 26sp HomeTitle 保证 "LocalSend Miuix" 单行完整展示而不出现省略截断，
-            // 同时同步传给 expandedTitleStyle 使折叠缩放精确落回 24sp。
-            val expandedTitleStyle =
-                rememberCouiTextStyle(CouiTextKind.HomeTitle).copy(
-                    fontSize = 26.sp,
-                    color = CouiTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Start,
-                )
-            LargeTopAppBar(
-                title = {
-                    BasicText(
-                        text = stringResource(R.string.app_name),
-                        style = expandedTitleStyle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                expandedTitleStyle = expandedTitleStyle,
+            CouiScreenLargeTopAppBar(
+                title = stringResource(R.string.app_name),
                 actions = {
                     CouiTopBarActionGroup {
                         CouiIncomingBadgeAction(
@@ -304,9 +283,9 @@ fun CouiHomeScreen(
             // 栏底过渡由库 TopAppBarSurface 的渐变遮罩与渐进模糊负责。
             contentPadding =
                 PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
-                    top = collapsedPadding.calculateTopPadding() + 2.dp,
+                    start = CouiPageDefaults.horizontalMargin,
+                    end = CouiPageDefaults.horizontalMargin,
+                    top = collapsedPadding.calculateTopPadding() + 4.dp,
                     bottom = contentPadding.calculateBottomPadding() + 28.dp,
                 ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -362,7 +341,7 @@ fun CouiHomeScreen(
                         Column(
                             modifier =
                                 Modifier
-                                    .padding(14.dp)
+                                    .padding(CouiPageDefaults.rowPadding)
                                     .animateContentSize(),
                         ) {
                             Row(
@@ -457,7 +436,7 @@ fun CouiHomeScreen(
             item {
                 CouiHomeSection(title = stringResource(R.string.send_section_quick_pick)) {
                     Column(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(CouiPageDefaults.rowPadding),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -643,7 +622,7 @@ fun CouiHomeScreen(
     )
 }
 
-/** 分组标题：卡片外的一行小字，与卡片内 16dp 文字缩进对齐。 */
+/** 分组标题：卡片外的一行小字，与屏幕左缘 32dp 缩进对齐（16dp 列表边距 + 16dp 行内边距）。 */
 @Composable
 private fun CouiSectionTitle(text: String) {
     Text(
@@ -653,7 +632,7 @@ private fun CouiSectionTitle(text: String) {
         textAlign = TextAlign.Start,
         modifier =
             Modifier
-                .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 2.dp)
+                .padding(start = CouiPageDefaults.rowPadding, end = CouiPageDefaults.rowPadding, top = 6.dp, bottom = 2.dp)
                 .semantics { heading() },
     )
 }
@@ -661,8 +640,7 @@ private fun CouiSectionTitle(text: String) {
 /**
  * 分组容器：可选标题 + 卡片表面。
  *
- * 没有换成库 `layout.Group`：Group 的外边距固定 16dp（本页 LazyColumn gutter 是 12dp）、
- * 标题行自带 32dp 缩进与 12/16dp 顶部间距，直接替换会与卡片外那行 `CouiSectionTitle`（16dp 缩进）错位。
+ * 外边距由外层 LazyColumn 的 `CouiPageDefaults.horizontalMargin`（16dp）统一承担；
  * 卡片形状统一对齐 `CouiPageDefaults.shape`（24dp, 3f 连续曲率）；卡内分隔线统一用库 `layout.Divider`。
  */
 @Composable
