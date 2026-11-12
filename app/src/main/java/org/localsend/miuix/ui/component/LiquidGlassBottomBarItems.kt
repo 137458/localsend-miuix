@@ -39,6 +39,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.theme.LocalContentColor as MiuixLocalContentColor
 
@@ -50,6 +51,7 @@ import top.yukonga.miuix.kmp.theme.LocalContentColor as MiuixLocalContentColor
 internal fun RowScope.FloatingBottomBarItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    minWidth: Dp = 78.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scale = LocalFloatingBottomBarTabScale.current
@@ -78,7 +80,7 @@ internal fun RowScope.FloatingBottomBarItem(
                 }.focusable()
                 .fillMaxHeight()
                 .weight(1f)
-                .defaultMinSize(minWidth = 78.dp)
+                .defaultMinSize(minWidth = minWidth)
                 .graphicsLayer {
                     val s = scale()
                     scaleX = s

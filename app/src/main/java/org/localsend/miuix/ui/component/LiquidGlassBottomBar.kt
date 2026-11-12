@@ -13,6 +13,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -26,6 +27,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -45,6 +47,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -227,12 +230,20 @@ fun LiquidGlassBottomBar(
     mode: FloatingBottomBarMode = if (isRuntimeShaderSupported() && backdrop != null) FloatingBottomBarMode.LiquidGlass else FloatingBottomBarMode.Blur,
     colors: FloatingBottomBarColors = FloatingBottomBarDefaults.colors(),
     directSelector: FloatingBottomBarDirectSelector? = null,
+    barHeight: Dp = 64.dp,
+    indicatorHeight: Dp = 56.dp,
+    baseRefraction: Dp = 24.dp,
+    indicatorPressedScale: Float = 78f / 56f,
+    followTabGesture: Boolean = true,
+    fillMaxWidth: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     val isDark = MiuixTheme.colorScheme.surface.luminance() < 0.5f
     val pillShape = remember { CircleShape }
-    // 主页 Pager 手势翻页的连续位置；null = 非手势滚动，滑块走 damped spring 动画值
-    val gesturePosition = LocalTabGesturePosition.current
+    // 主页 Pager 手势翻页的连续位置；仅底栏跟随主 Pager，顶部分段栏需隔离以免主页面切换带动滑块位移
+    val localTabGesturePosition = LocalTabGesturePosition.current
+    val inertGesturePosition = remember { mutableStateOf<Float?>(null) }
+    val gesturePosition = if (followTabGesture) localTabGesturePosition else inertGesturePosition
     val isLiquidGlassMode = mode == FloatingBottomBarMode.LiquidGlass && backdrop != null && isRuntimeShaderSupported()
     val isBlurMode = mode == FloatingBottomBarMode.Blur && backdrop != null
     val containerColor = if (isLiquidGlassMode) colors.containerColor.copy(alpha = 0.4f) else colors.containerColor
@@ -279,7 +290,7 @@ fun LiquidGlassBottomBar(
                 valueRange = 0f..(tabsCount - 1).toFloat(),
                 visibilityThreshold = 0.001f,
                 initialScale = 1f,
-                pressedScale = 78f / 56f,
+                pressedScale = indicatorPressedScale,
                 canDrag = { offset ->
                     val anim = holder.instance ?: return@DampedDragAnimation true
                     if (tabWidthPx == 0f) return@DampedDragAnimation false
@@ -387,7 +398,7 @@ fun LiquidGlassBottomBar(
     }
 
     Box(
-        modifier = modifier.width(IntrinsicSize.Min),
+        modifier = if (fillMaxWidth) modifier.fillMaxWidth() else modifier.width(IntrinsicSize.Min),
         contentAlignment = Alignment.CenterStart,
     ) {
         // ── 1. Base Layer（未选中状态底层外壳） ──
@@ -408,6 +419,9 @@ fun LiquidGlassBottomBar(
                 val contentWidthPx = totalWidthPx - with(density) { 8.dp.toPx() }
                 tabWidthPx = (contentWidthPx / tabsCount).coerceAtLeast(0f)
             },
+            barHeight = barHeight,
+            baseRefraction = baseRefraction,
+            fillMaxWidth = fillMaxWidth,
             content = content,
         )
 
@@ -422,6 +436,9 @@ fun LiquidGlassBottomBar(
             containerColor = containerColor,
             interactiveHighlight = interactiveHighlight,
             tabsBackdrop = tabsBackdrop,
+            barHeight = barHeight,
+            baseRefraction = baseRefraction,
+            fillMaxWidth = fillMaxWidth,
             content = content,
         )
 
@@ -441,6 +458,7 @@ fun LiquidGlassBottomBar(
             colors = colors,
             isDark = isDark,
             isLtr = isLtr,
+            indicatorHeight = indicatorHeight,
             content = content,
         )
     }

@@ -24,6 +24,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
@@ -46,6 +47,7 @@ import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceIn
@@ -82,12 +84,15 @@ internal fun BottomBarBaseLayer(
     baseHighlight: State<Highlight>,
     interactiveHighlight: InteractiveHighlight?,
     onSizeChanged: (IntSize) -> Unit,
+    barHeight: Dp = 64.dp,
+    baseRefraction: Dp = 24.dp,
+    fillMaxWidth: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     CompositionLocalProvider(LocalFloatingBottomBarContentColor provides colors.contentColor) {
         Row(
             modifier =
-                Modifier
+                (if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier)
                     .selectableGroup()
                     .onSizeChanged(onSizeChanged)
                     .graphicsLayer { translationX = panelOffsetState.value }
@@ -113,8 +118,8 @@ internal fun BottomBarBaseLayer(
                                     vibrancy()
                                     blur(4.dp.toPx(), 4.dp.toPx())
                                     lens(
-                                        refractionHeight = 24.dp.toPx(),
-                                        refractionAmount = 24.dp.toPx(),
+                                        refractionHeight = baseRefraction.toPx(),
+                                        refractionAmount = baseRefraction.toPx(),
                                     )
                                 },
                                 highlight = { baseHighlight.value.copy(alpha = 0.75f) },
@@ -141,7 +146,7 @@ internal fun BottomBarBaseLayer(
                             Modifier.background(containerColor, pillShape)
                         },
                     ).then(if (isLiquidGlassMode && interactiveHighlight != null) interactiveHighlight.modifier else Modifier)
-                    .height(64.dp)
+                    .height(barHeight)
                     .padding(4.dp),
             verticalAlignment = Alignment.CenterVertically,
             content = content,
@@ -165,6 +170,9 @@ internal fun BottomBarActiveTabsLayer(
     containerColor: Color,
     interactiveHighlight: InteractiveHighlight?,
     tabsBackdrop: LayerBackdrop,
+    barHeight: Dp = 64.dp,
+    baseRefraction: Dp = 24.dp,
+    fillMaxWidth: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     if (backdrop != null && isLiquidGlassMode) {
@@ -176,7 +184,7 @@ internal fun BottomBarActiveTabsLayer(
         ) {
             Row(
                 modifier =
-                    Modifier
+                    (if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier)
                         .clearAndSetSemantics {}
                         .alpha(0f)
                         .layerBackdrop(tabsBackdrop)
@@ -188,13 +196,13 @@ internal fun BottomBarActiveTabsLayer(
                                 vibrancy()
                                 blur(4.dp.toPx(), 4.dp.toPx())
                                 lens(
-                                    refractionHeight = 24.dp.toPx(),
-                                    refractionAmount = 24.dp.toPx(),
+                                    refractionHeight = baseRefraction.toPx(),
+                                    refractionAmount = baseRefraction.toPx(),
                                 )
                             },
                             onDrawSurface = { drawRect(containerColor) },
                         ).then(interactiveHighlight?.modifier ?: Modifier)
-                        .height(64.dp)
+                        .height(barHeight)
                         .padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 content = content,
@@ -224,6 +232,7 @@ internal fun BottomBarIndicatorLayer(
     colors: FloatingBottomBarColors,
     isDark: Boolean,
     isLtr: Boolean,
+    indicatorHeight: Dp = 56.dp,
     content: @Composable RowScope.() -> Unit,
 ) {
     if (tabWidthPx > 0f) {
@@ -272,7 +281,7 @@ internal fun BottomBarIndicatorLayer(
                                 color = Color.Black.copy(alpha = 0.15f),
                                 alpha = dampedDragAnimation.pressProgress,
                             )
-                        }.height(56.dp)
+                        }.height(indicatorHeight)
                         .width(tabWidthDp),
             )
         } else {
@@ -289,7 +298,7 @@ internal fun BottomBarIndicatorLayer(
                         }.then(dampedDragAnimation.modifier)
                         .clip(pillShape)
                         .background(colors.indicatorColor.copy(alpha = 0.15f), pillShape)
-                        .height(56.dp)
+                        .height(indicatorHeight)
                         .width(tabWidthDp),
                 contentAlignment = Alignment.CenterStart,
             ) {
@@ -300,7 +309,7 @@ internal fun BottomBarIndicatorLayer(
                                 .clearAndSetSemantics {}
                                 .wrapContentWidth(align = Alignment.Start, unbounded = true)
                                 .requiredWidth(with(density) { (totalWidthPx - 8.dp.toPx()).toDp() })
-                                .height(56.dp)
+                                .height(indicatorHeight)
                                 .graphicsLayer {
                                     val progressOffset = (gesturePosition.value ?: dampedDragAnimation.value) * tabWidthPx
                                     translationX = if (isLtr) -progressOffset else progressOffset

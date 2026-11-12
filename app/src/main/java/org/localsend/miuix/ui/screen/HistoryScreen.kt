@@ -49,6 +49,7 @@ import org.localsend.miuix.ui.component.BlurredBar
 import org.localsend.miuix.ui.component.ConfirmDialog
 import org.localsend.miuix.ui.component.EmptyStateCard
 import org.localsend.miuix.ui.component.HistoryDetailDialog
+import org.localsend.miuix.ui.component.LiquidGlassSegmentedBar
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
 import org.localsend.miuix.ui.util.openDownloadFolder
@@ -60,8 +61,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.TabRowDefaults
-import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -110,17 +109,13 @@ fun HistoryScreen(
             history.filterByTab(currentTab)
         }
 
-    // 无模糊能力时退化为实色底，避免滚动中的卡片穿透分段条
-    val filterStripBackground =
-        if (backdrop == null) Modifier.background(colorScheme.surface) else Modifier
-
     Scaffold(
         topBar = {
-            BlurredBar(
-                backdrop = backdrop,
-                scrollBehavior = scrollBehavior,
-            ) {
-                Column {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                BlurredBar(
+                    backdrop = backdrop,
+                    scrollBehavior = scrollBehavior,
+                ) {
                     TopAppBar(
                         title = stringResource(R.string.history_title),
                         scrollBehavior = scrollBehavior,
@@ -151,32 +146,27 @@ fun HistoryScreen(
                             }
                         },
                     )
-                    // 分段条并入顶栏模糊层，标题与胶囊连成一片渐变模糊；无模糊能力时退化为实色底，避免卡片穿透
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .then(filterStripBackground)
-                                .padding(
-                                    top = 4.dp,
-                                    bottom = 6.dp,
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        TabRowWithContour(
-                            tabs = filterTabs,
-                            selectedTabIndex = selectedFilterIndex,
-                            onTabSelected = { selectedFilterIndex = it },
-                            // 轨道底色透明：分段条不遮挡顶栏渐变模糊；选中胶囊用浅灰实色以在毛玻璃上可见
-                            colors =
-                                TabRowDefaults.tabRowColors(
-                                    backgroundColor = Color.Transparent,
-                                    selectedBackgroundColor = colorScheme.surface,
-                                ),
-                        )
-                    }
+                }
+                // 分段胶囊独立悬浮于顶栏下方，外层无背景底色，滚动内容直接穿过胶囊并参与液态玻璃折射采样
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                top = 4.dp,
+                                bottom = 8.dp,
+                                start = 16.dp,
+                                end = 16.dp,
+                            ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    LiquidGlassSegmentedBar(
+                        tabs = filterTabs,
+                        selectedIndex = selectedFilterIndex,
+                        onSelected = { selectedFilterIndex = it },
+                        backdrop = backdrop,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         },
