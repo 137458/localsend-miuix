@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -49,12 +48,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.layout.Divider
 import com.itos.coui.layout.Item
+import com.itos.coui.layout.Scaffold
 import com.itos.coui.scroll.rememberCouiOverscrollEffect
 import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
+import com.itos.coui.topappbar.TopAppBar
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.Device
@@ -87,10 +88,15 @@ private val CouiHomeCardRadius = 20.dp
 /**
  * 首页（ColorOS 皮肤）：本机状态、正在接收的传输、待发送队列、快速选择与附近设备。
  *
- * 行、分隔线与行内按压/点击反馈走库 `layout.Item`、`layout.Divider` 与 `couiButtonFeedback`；
- * 卡片外壳、图标按钮与进度仍按 coUI 的材质自绘（coUI-Kit 没有 Card/Icon/IconButton 与
- * 进度条，只有材质与 layout 原语）；缩略图、进度与预览弹窗继续复用既有组件，
- * 它们不参与皮肤外观，重复实现会扩散维护面。
+ * 页面骨架走库 `layout.Scaffold` + `topappbar.TopAppBar`：系统栏 inset 由外层承担，顶栏高度以
+ * contentPadding 交给列表，滚动内容从栏下穿过时由库的渐变遮罩与渐进模糊收边；行、分隔线与行内
+ * 按压/点击反馈走库 `layout.Item`、`layout.Divider` 与 `couiButtonFeedback`。
+ *
+ * 顶栏的两个动作按钮仍用本文件的 `CouiIconAction`：库的 `TopAppBarButton`/`TopAppBarButtonGroup`
+ * 标注 @RequiresApi(34)，本模块 minSdk 31 且不使用 Android 14 专属 API，故没有可替换的库按钮。
+ * 卡片外壳、图标按钮与进度仍按 coUI 的材质自绘（coUI-Kit 没有 Card/Icon/IconButton 与进度条，
+ * 只有材质与 layout 原语）；缩略图、进度与预览弹窗继续复用既有组件，它们不参与皮肤外观，
+ * 重复实现会扩散维护面。
  */
 @Composable
 fun CouiHomeScreen(
@@ -189,35 +195,59 @@ fun CouiHomeScreen(
         }
     }
 
-    Column(
+    Scaffold(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(CouiTheme.colorScheme.background)
-                .statusBarsPadding(),
-    ) {
-        CouiHomeTopBar(
-            isRefreshing = isRefreshing,
-            onOpenManualIp = actions.onManualIp,
-            onRefresh = {
-                maybeOnRefresh()
-                manager.refreshDevices()
-                Toast.makeText(context, context.getString(R.string.toast_multicast_sent), Toast.LENGTH_SHORT).show()
-            },
-        )
-
+                .background(CouiTheme.colorScheme.background),
+        // 系统栏由库默认 insets 处理：横向安全区归 Scaffold 容器，纵向顶栏 inset 归 TopAppBar，
+        // 栏高（含状态栏）经 contentPadding 注入列表内侧，内容滚到状态栏下被顶栏材质采样。
+        topBar = {
+            // 顶栏骨架、标题排版与栏下渐变模糊由库 TopAppBar 承担；两个动作按钮仍是本文件的 CouiIconAction，
+            // 因为库 TopAppBarButton 标注 @RequiresApi(34)，minSdk 31 上没有可用的顶栏按钮实现。
+            TopAppBar(
+                title = {
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        kind = CouiTextKind.TopBar,
+                        color = CouiTheme.colorScheme.onSurface,
+                    )
+                },
+                actions = {
+                    CouiIconAction(
+                        icon = AppIcons.Edit,
+                        contentDescription = stringResource(R.string.action_input_ip),
+                        tint = if (isRefreshing) CouiTheme.colorScheme.onSurfaceVariant else CouiTheme.colorScheme.onSurface,
+                        onClick = actions.onManualIp,
+                    )
+                    CouiIconAction(
+                        icon = AppIcons.Refresh,
+                        contentDescription = stringResource(R.string.action_refresh),
+                        tint = if (isRefreshing) CouiTheme.colorScheme.onSurfaceVariant else CouiTheme.colorScheme.onSurface,
+                        onClick = {
+                            maybeOnRefresh()
+                            manager.refreshDevices()
+                            Toast.makeText(context, context.getString(R.string.toast_multicast_sent), Toast.LENGTH_SHORT).show()
+                        },
+                    )
+                },
+            )
+        },
+    ) { scaffoldPadding ->
         // 回弹效果按滚动容器独占：在 item 作用域外记住，列表重组时不会反复重建
         val homeOverscroll = rememberCouiOverscrollEffect()
         // LazyColumn 的 overscrollEffect 实参由内部 scrollableArea 挂载回弹节点；
         // 再叠 Modifier.overscroll 会把同一个 EdgeNode 二次 attach。
         LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
+            modifier = Modifier.fillMaxSize(),
             overscrollEffect = homeOverscroll,
+            // 顶栏高度由 Scaffold 的 contentPadding 注入：首项被推到栏下，滚动时内容从栏下穿过，
+            // 栏底过渡由库 TopAppBarSurface 的渐变遮罩与渐进模糊负责。
             contentPadding =
                 PaddingValues(
                     start = 12.dp,
                     end = 12.dp,
-                    top = 4.dp,
+                    top = scaffoldPadding.calculateTopPadding() + 4.dp,
                     bottom = contentPadding.calculateBottomPadding() + 16.dp,
                 ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -552,38 +582,6 @@ fun CouiHomeScreen(
             initialIndex = previewingIndex,
             onRemoveFile = { fileToRemove -> manager.removeFile(fileToRemove.id) },
             onDismissRequest = { previewingIndex = -1 },
-        )
-    }
-}
-
-/** 顶栏：应用名 + 手动输入 IP + 重新扫描。刷新期间图标侧不做进度态，文案由 Toast 兜底。 */
-@Composable
-private fun CouiHomeTopBar(
-    isRefreshing: Boolean,
-    onOpenManualIp: () -> Unit,
-    onRefresh: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(52.dp).padding(start = 20.dp, end = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(R.string.app_name),
-            kind = CouiTextKind.TopBar,
-            color = CouiTheme.colorScheme.onSurface,
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        CouiIconAction(
-            icon = AppIcons.Edit,
-            contentDescription = stringResource(R.string.action_input_ip),
-            tint = if (isRefreshing) CouiTheme.colorScheme.onSurfaceVariant else CouiTheme.colorScheme.onSurface,
-            onClick = onOpenManualIp,
-        )
-        CouiIconAction(
-            icon = AppIcons.Refresh,
-            contentDescription = stringResource(R.string.action_refresh),
-            tint = if (isRefreshing) CouiTheme.colorScheme.onSurfaceVariant else CouiTheme.colorScheme.onSurface,
-            onClick = onRefresh,
         )
     }
 }

@@ -1,6 +1,8 @@
 package org.localsend.miuix.ui.coui.page
 
+import android.os.Build
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -17,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -43,10 +44,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.effect.couiButtonFeedback
+import com.itos.coui.layout.Scaffold
 import com.itos.coui.scroll.rememberCouiOverscrollEffect
+import com.itos.coui.segmentbutton.SegmentedControl
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
+import com.itos.coui.topappbar.TopAppBar
 import kotlinx.coroutines.launch
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
@@ -67,7 +71,8 @@ import com.itos.coui.theme.CouiTheme as CouiKitTheme
 
 /**
  * 传输历史页（ColorOS 皮肤）：筛选、卡片、详情与删除确认的行为与 HyperOS 皮肤一致，
- * 视觉改用 coUI-Kit 的配色、形状与字阶；coUI-Kit 没有卡片与图标组件，
+ * 视觉改用 coUI-Kit 的配色、形状与字阶。骨架用库 Scaffold + TopAppBar（顶栏自己消费状态栏内边距），
+ * 筛选在 Android 14 及以上用库 SegmentedControl；coUI-Kit 没有卡片与图标组件，
  * 卡片由 Row 自绘，图标沿用项目既有 AppIcons（tint 由本页指定）。
  */
 @Composable
@@ -105,124 +110,87 @@ fun CouiHistoryScreen(
             history.filterByTab(currentTab)
         }
 
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(scheme.background),
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding(),
-        ) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .padding(start = 20.dp, end = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.history_title),
-                    kind = CouiTextKind.TopBar,
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                CouiHistoryAction(
-                    icon = AppIcons.Folder,
-                    contentDescription = stringResource(R.string.history_action_open_folder),
-                    tint = scheme.onSurface,
-                    onClick = {
-                        openDownloadFolder(
-                            context = context,
-                            downloadTreeUri = settings.downloadTreeUri,
-                        )
-                    },
-                )
-                if (history.isNotEmpty()) {
-                    CouiHistoryAction(
-                        icon = MiuixIcons.Delete,
-                        contentDescription = stringResource(R.string.history_dialog_clear_title),
-                        tint = errorColor,
-                        onClick = { showClearConfirmDialog = true },
-                    )
-                }
-            }
-
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                filterTabs.forEachIndexed { index, label ->
-                    val selected = index == selectedFilterIndex
-                    val tapIndex by rememberUpdatedState(index)
-                    Box(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .height(34.dp)
-                                .clip(remember { CouiShape(radius = 17.dp) })
-                                .background(if (selected) scheme.surface else scheme.container)
-                                .pointerInput(Unit) {
-                                    detectTapGestures { selectedFilterIndex = tapIndex }
-                                },
-                        contentAlignment = Alignment.Center,
-                    ) {
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        // 纵向状态栏由库顶栏的默认 insets 消费（栏高含状态栏，经 contentPadding 注入列表内侧）；
+        // 横向安全区由容器默认 insets 处理，避免正文与顶栏两侧错位。
+        containerColor = scheme.background,
+        topBar = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                TopAppBar(
+                    title = {
                         Text(
-                            text = label,
-                            kind = CouiTextKind.ItemSummary,
-                            color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
+                            text = stringResource(R.string.history_title),
+                            kind = CouiTextKind.TopBar,
                             maxLines = 1,
                         )
-                    }
-                }
-            }
-
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-            ) {
-                if (filteredHistory.isEmpty()) {
-                    CouiHistoryEmptyState(
-                        text =
-                            when (selectedFilterIndex) {
-                                1 -> stringResource(R.string.history_empty_receive)
-                                2 -> stringResource(R.string.history_empty_send)
-                                else -> stringResource(R.string.history_empty_title)
+                    },
+                    actions = {
+                        CouiHistoryAction(
+                            icon = AppIcons.Folder,
+                            contentDescription = stringResource(R.string.history_action_open_folder),
+                            tint = scheme.onSurface,
+                            onClick = {
+                                openDownloadFolder(
+                                    context = context,
+                                    downloadTreeUri = settings.downloadTreeUri,
+                                )
                             },
-                    )
-                } else {
-                    // 回弹效果按滚动容器独占：在 item 作用域外记住，列表重组时不会反复重建
-                    val historyOverscroll = rememberCouiOverscrollEffect()
-                    // 回弹节点由 LazyColumn 内部的 scrollableArea 挂载，不能再叠 Modifier.overscroll
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        overscrollEffect = historyOverscroll,
-                        contentPadding =
-                            PaddingValues(
-                                top = 4.dp,
-                                bottom = contentPadding.calculateBottomPadding() + 16.dp,
-                            ),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(filteredHistory, key = { it.id }) { item ->
-                            CouiHistoryCard(
-                                item = item,
-                                onOpenDetail = { selectedItem = item },
-                                onLongPress = { itemToDelete = item },
-                                onCopyText = { text ->
-                                    manager.copyTextToClipboard(text)
-                                    Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
-                                },
+                        )
+                        if (history.isNotEmpty()) {
+                            CouiHistoryAction(
+                                icon = MiuixIcons.Delete,
+                                contentDescription = stringResource(R.string.history_dialog_clear_title),
+                                tint = errorColor,
+                                onClick = { showClearConfirmDialog = true },
                             )
                         }
+                    },
+                )
+                CouiHistoryFilterBar(
+                    labels = filterTabs,
+                    selectedIndex = selectedFilterIndex,
+                    onSelected = { selectedFilterIndex = it },
+                )
+            }
+        },
+    ) { scaffoldPadding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (filteredHistory.isEmpty()) {
+                CouiHistoryEmptyState(
+                    modifier = Modifier.padding(scaffoldPadding),
+                    text =
+                        when (selectedFilterIndex) {
+                            1 -> stringResource(R.string.history_empty_receive)
+                            2 -> stringResource(R.string.history_empty_send)
+                            else -> stringResource(R.string.history_empty_title)
+                        },
+                )
+            } else {
+                // 回弹效果按滚动容器独占：在 item 作用域外记住，列表重组时不会反复重建
+                val historyOverscroll = rememberCouiOverscrollEffect()
+                // 回弹节点由 LazyColumn 内部的 scrollableArea 挂载，不能再叠 Modifier.overscroll；
+                // 顶栏高度只放进列表内侧 contentPadding：正文与栏位同点叠放，内容从栏下穿过才会被顶栏材质采样
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    overscrollEffect = historyOverscroll,
+                    contentPadding =
+                        PaddingValues(
+                            top = scaffoldPadding.calculateTopPadding() + 4.dp,
+                            bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(filteredHistory, key = { it.id }) { item ->
+                        CouiHistoryCard(
+                            item = item,
+                            onOpenDetail = { selectedItem = item },
+                            onLongPress = { itemToDelete = item },
+                            onCopyText = { text ->
+                                manager.copyTextToClipboard(text)
+                                Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                            },
+                        )
                     }
                 }
             }
@@ -309,13 +277,99 @@ private fun CouiHistoryAction(
     }
 }
 
+/** 库分段控件的系统门槛：材质与滑动着色依赖 Android 14（API 34），库函数本身带 RequiresApi(34)。 */
+private const val COUI_SEGMENTED_CONTROL_MIN_SDK = 34
+
+/**
+ * 筛选栏：Android 14 及以上用库 [SegmentedControl]，Android 12-13 退回同形制的自绘三段胶囊。
+ * 栏位层叠在正文之上，必须刷页面底色，否则滚动内容会从筛选栏下方透出来。
+ */
+@Composable
+private fun CouiHistoryFilterBar(
+    labels: List<String>,
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(CouiKitTheme.colorScheme.background)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        if (Build.VERSION.SDK_INT >= COUI_SEGMENTED_CONTROL_MIN_SDK) {
+            CouiLibraryFilterTabs(labels = labels, selectedIndex = selectedIndex, onSelected = onSelected)
+        } else {
+            CouiPlainFilterTabs(labels = labels, selectedIndex = selectedIndex, onSelected = onSelected)
+        }
+    }
+}
+
+/** 库分支：先判版本再进来，RequiresApi 守卫必须是 SDK_INT 比较，否则 Lint 报 CallRequiresApi。 */
+@RequiresApi(COUI_SEGMENTED_CONTROL_MIN_SDK)
+@Composable
+private fun CouiLibraryFilterTabs(
+    labels: List<String>,
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+) {
+    SegmentedControl(
+        modifier = Modifier.fillMaxWidth(),
+        labels = labels,
+        selectedIndex = selectedIndex,
+        onSelected = onSelected,
+        small = true,
+    )
+}
+
+/** 平面兜底：低版本沿用等宽三段胶囊，几何与点击行为与旧实现一致。 */
+@Composable
+private fun CouiPlainFilterTabs(
+    labels: List<String>,
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+) {
+    val scheme = CouiKitTheme.colorScheme
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        labels.forEachIndexed { index, label ->
+            val selected = index == selectedIndex
+            val tapIndex by rememberUpdatedState(index)
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(34.dp)
+                        .clip(remember { CouiShape(radius = 17.dp) })
+                        .background(if (selected) scheme.surface else scheme.container)
+                        .pointerInput(Unit) {
+                            detectTapGestures { onSelected(tapIndex) }
+                        },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    kind = CouiTextKind.ItemSummary,
+                    color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
 /** 空态：coUI-Kit 未提供空列表组件，居中图标加一行说明。 */
 @Composable
-private fun CouiHistoryEmptyState(text: String) {
+private fun CouiHistoryEmptyState(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     val scheme = CouiKitTheme.colorScheme
     Column(
         modifier =
-            Modifier
+            modifier
                 .fillMaxSize()
                 .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

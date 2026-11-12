@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,6 +66,7 @@ import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
 import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.coui.component.CouiSkinNavigationBar
+import org.localsend.miuix.ui.coui.dialog.CouiInputDialog
 import org.localsend.miuix.ui.coui.page.CouiHistoryScreen
 import org.localsend.miuix.ui.coui.page.CouiHomeScreen
 import org.localsend.miuix.ui.coui.page.CouiSettingsScreen
@@ -614,6 +616,7 @@ fun App(manager: LocalSendManager) {
             }
 
             // Global Overlay Dialogs & BottomSheets
+            // 待接收会话含文件多选、单项信息与总大小，库 Dialog 只有 title/message 两个文本槽 ⇒ 保留 Miuix。
             IncomingTransferDialog(
                 session = pendingIncomingSession?.takeIf { it.sessionId != dismissedIncomingSessionId },
                 onAccept = { selectedIds ->
@@ -645,16 +648,45 @@ fun App(manager: LocalSendManager) {
                 },
             )
 
-            RenameDeviceDialog(
-                show = showRenameDialog,
-                initialName = settings.alias,
-                onDismissRequest = { showRenameDialog = false },
-                onConfirm = { newAlias ->
-                    manager.updateSettings { it.copy(alias = newAlias) }
-                    Toast.makeText(context, context.getString(R.string.toast_device_renamed, newAlias), Toast.LENGTH_SHORT).show()
-                },
-            )
+            if (uiSkin == UiSkin.COLOROS) {
+                // 单行文本 + 非空校验都能用库 InputDialog 真实表达（confirmEnabled 映射禁用的确认按钮），故走 coUI 版；
+                // 库必填的 clearContentDescription 复用已有串 btn_clear（“清空”/Clear），不新增资源。
+                // 全局弹窗位于 mainEntry 的 CouiSkinTheme 之外，这里补一层同源皮肤主题，弹窗才取到同一份 coUI 色板。
+                CouiSkinTheme {
+                    var renameValue by remember(showRenameDialog, settings.alias) {
+                        mutableStateOf(TextFieldValue(settings.alias))
+                    }
+                    CouiInputDialog(
+                        show = showRenameDialog,
+                        title = stringResource(R.string.dialog_rename_title),
+                        value = renameValue,
+                        onValueChange = { renameValue = it },
+                        onConfirm = {
+                            val newAlias = renameValue.text.trim()
+                            manager.updateSettings { it.copy(alias = newAlias) }
+                            Toast.makeText(context, context.getString(R.string.toast_device_renamed, newAlias), Toast.LENGTH_SHORT).show()
+                            showRenameDialog = false
+                        },
+                        onDismissRequest = { showRenameDialog = false },
+                        confirmText = stringResource(R.string.btn_confirm),
+                        clearContentDescription = stringResource(R.string.btn_clear),
+                        message = stringResource(R.string.dialog_rename_label),
+                        confirmEnabled = renameValue.text.isNotBlank(),
+                    )
+                }
+            } else {
+                RenameDeviceDialog(
+                    show = showRenameDialog,
+                    initialName = settings.alias,
+                    onDismissRequest = { showRenameDialog = false },
+                    onConfirm = { newAlias ->
+                        manager.updateSettings { it.copy(alias = newAlias) }
+                        Toast.makeText(context, context.getString(R.string.toast_device_renamed, newAlias), Toast.LENGTH_SHORT).show()
+                    },
+                )
+            }
 
+            // 端口要数字键盘与 5 位长度上限，库 InputDialog 无 KeyboardOptions / maxLength 槽位 ⇒ 保留 Miuix。
             PortDialog(
                 show = showPortDialog,
                 initialPort = settings.port,
@@ -663,6 +695,7 @@ fun App(manager: LocalSendManager) {
                 onConfirm = { newPort -> manager.applyPortChange(newPort) },
             )
 
+            // 正文是 3-6 行多行文本域，库 InputDialog 只有单行 ⇒ 保留 Miuix。
             SendTextDialog(
                 show = showSendTextDialog,
                 onDismissRequest = { showSendTextDialog = false },
@@ -701,12 +734,14 @@ fun App(manager: LocalSendManager) {
                 manager = manager,
             )
 
+            // 内容是二维码、地址选择与复制动作的底部弹层，非 title/message 两槽可表达的正文 ⇒ 保留 Miuix。
             org.localsend.miuix.ui.component.WebShareDialog(
                 show = showWebShareDialog,
                 onDismissRequest = { showWebShareDialog = false },
                 manager = manager,
             )
 
+            // IP / 端口双字段分别要 Uri 与数字键盘，还要列出最近地址，库 InputDialog 只能表达单个文本框 ⇒ 保留 Miuix。
             org.localsend.miuix.ui.component.ManualIpDialog(
                 show = showManualIpDialog,
                 recentIps = recentManualIps,
@@ -717,6 +752,7 @@ fun App(manager: LocalSendManager) {
                 },
             )
 
+            // PIN 要 ASCII 键盘约束（库 InputDialog 无 KeyboardOptions 槽位）⇒ 保留 Miuix。
             if (pendingTargetPinPrompt != null) {
                 org.localsend.miuix.ui.component.TargetDevicePinDialog(
                     show = true,

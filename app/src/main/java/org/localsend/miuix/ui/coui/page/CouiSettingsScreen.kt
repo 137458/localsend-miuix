@@ -1,34 +1,41 @@
 package org.localsend.miuix.ui.coui.page
 
-import android.widget.Toast
-import androidx.annotation.StringRes
-import androidx.compose.foundation.background
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.itos.coui.dialog.CouiDialogAction
+import com.itos.coui.dialog.CouiDialogActionStyle
+import com.itos.coui.dialog.CouiDialogDefaults
+import com.itos.coui.dialog.Dialog
 import com.itos.coui.layout.Group
+import com.itos.coui.layout.Scaffold
 import com.itos.coui.scroll.couiVerticalScroll
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
+import com.itos.coui.topappbar.TopAppBar
 import org.localsend.miuix.BuildConfig
 import org.localsend.miuix.R
 import org.localsend.miuix.core.ExternalLinks
@@ -36,13 +43,12 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.ui.MainActivity
-import org.localsend.miuix.ui.component.CertFingerprintDialog
-import org.localsend.miuix.ui.component.ConfirmDialog
 import org.localsend.miuix.ui.component.PinDialog
-import org.localsend.miuix.ui.component.TextInputDialog
 import org.localsend.miuix.ui.coui.component.CouiArrowRow
 import org.localsend.miuix.ui.coui.component.CouiChoiceRow
 import org.localsend.miuix.ui.coui.component.CouiSwitchRow
+import org.localsend.miuix.ui.coui.dialog.CouiAlertDialog
+import org.localsend.miuix.ui.coui.dialog.CouiInputDialog
 import org.localsend.miuix.util.AppLanguage
 import org.localsend.miuix.util.SettingsValidators
 
@@ -59,12 +65,15 @@ private enum class AdvancedNetworkField {
  *
  * 与 Miuix 版逐项对应：同样的设置项、同样的写回路径、同样的校验规则。差异只在呈现层，
  * 卡片、行、开关与枚举选择换成 coUI-Kit 组件。全局弹窗（重命名、端口）仍由 App.kt 的
- * Miuix 宿主承担，本轮不搬。
+ * Miuix 宿主承担；本页只接管 PIN、证书指纹、重新生成确认与高级网络字段。
  *
- * 顶栏仍是固定高度的标题带，滚动内容独立：本页挂在 App.kt 的 Miuix 宿主里，不在 coUI
- * Scaffold 的作用域内。coUI 的 Scaffold 自己建采样源（rememberCouiBackdrop）并用
- * ProvideCouiBackdrop 包住 topBar 槽，TopAppBar 缺省从 LocalCouiBackdrop 取值，
- * 所以「顶栏必须由宿主提供 CouiBackdrop」并不成立；骨架换成 Scaffold + TopAppBar 在下一轮。
+ * 骨架用库 layout.Scaffold + topappbar.TopAppBar：顶栏玻璃取 Scaffold 自建的采样源
+ * （Scaffold.kt:61 rememberCouiBackdrop，:86 ProvideCouiBackdrop 包住 topBar 槽），
+ * 纵向状态栏 inset 由 TopAppBar 的缺省 windowInsets 消费，栏高经 contentPadding 交给正文；
+ * 横向安全区由 Scaffold 容器消费（Scaffold.kt:79），页面自己不再加 statusBarsPadding。
+ *
+ * 正文是 Column + couiVerticalScroll（不是 LazyColumn），顶栏高度放进滚动节点内侧：
+ * 首屏内容排在栏下，滚动时内容从顶栏下穿过、被顶栏玻璃采样。
  */
 @Composable
 fun CouiSettingsScreen(
@@ -77,7 +86,6 @@ fun CouiSettingsScreen(
 ) {
     val context = LocalContext.current
     val settings by manager.settings.collectAsStateWithLifecycle()
-    val scheme = CouiTheme.colorScheme
 
     var showPinDialog by remember { mutableStateOf(false) }
     var showCertDialog by remember { mutableStateOf(false) }
@@ -132,36 +140,34 @@ fun CouiSettingsScreen(
             supportedDeviceTypes.indexOf(settings.deviceType).coerceAtLeast(0)
         }
 
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(scheme.background),
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding(),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .padding(horizontal = 16.dp),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Text(text = stringResource(R.string.settings_title), kind = CouiTextKind.TopBar)
-            }
-
+    // 外层 Box 只负责给 Scaffold 有界约束：库在无界约束下直接 require 失败（Scaffold.kt:81）。
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 顶栏玻璃与采样源由库 Scaffold 自建；状态栏 inset 由 TopAppBar 的缺省 windowInsets 消费。
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = stringResource(R.string.settings_title),
+                            kind = CouiTextKind.TopBar,
+                            color = CouiTheme.colorScheme.onSurface,
+                        )
+                    },
+                )
+            },
+        ) { scaffoldPadding ->
             Column(
                 modifier =
                     Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
+                        .fillMaxSize()
+                        // padding 写在 couiVerticalScroll 之后：它作用在滚动内容上而不是视口，
+                        // 所以视口从页面顶端开始、首项排在栏下，滚动时内容从顶栏下穿过被玻璃采样。
                         .couiVerticalScroll(rememberScrollState())
-                        .padding(bottom = contentPadding.calculateBottomPadding() + 16.dp),
+                        .padding(
+                            top = scaffoldPadding.calculateTopPadding(),
+                            bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                        ),
             ) {
                 Group(title = stringResource(R.string.settings_section_general)) {
                     CouiArrowRow(
@@ -345,6 +351,8 @@ fun CouiSettingsScreen(
         }
     }
 
+    // PIN 是纯数字且只在传输握手时用：库输入弹窗没有 KeyboardOptions 槽位（InputDialog.kt:92-97），
+    // 换成 coUI 版会丢掉数字键盘，属可用性倒退，故与端口弹窗同样保留 Miuix 版（TextInputDialog.kt:56）。
     PinDialog(
         show = showPinDialog,
         initialPin = settings.pin,
@@ -354,7 +362,7 @@ fun CouiSettingsScreen(
         },
     )
 
-    CertFingerprintDialog(
+    CouiCertFingerprintDialog(
         show = showCertDialog,
         fingerprint = if (settings.useHttps) manager.getLocalDevice().fingerprint else "",
         onDismissRequest = { showCertDialog = false },
@@ -365,82 +373,70 @@ fun CouiSettingsScreen(
         },
     )
 
-    // 重新生成证书会让所有已记录该指纹的设备下次校验失败，属于破坏性操作，需二次确认
-    if (showRegenerateConfirm) {
-        ConfirmDialog(
-            show = true,
-            title = stringResource(R.string.dialog_cert_regen_confirm_title),
-            message = stringResource(R.string.dialog_cert_regen_confirm_msg),
-            confirmText = stringResource(R.string.btn_confirm),
-            onConfirm = {
-                showRegenerateConfirm = false
-                showCertDialog = false
-                manager.regenerateCertificate()
-            },
-            onDismissRequest = { showRegenerateConfirm = false },
-            dismissText = stringResource(R.string.btn_cancel),
-            danger = true,
-        )
-    }
+    // 重新生成证书会让所有已记录该指纹的设备下次校验失败，属于破坏性操作，需二次确认。
+    // 调用不套 if：库靠 visible 保留退场窗口（Dialog.kt:48-49），拆掉组合会丢退场动画。
+    CouiAlertDialog(
+        show = showRegenerateConfirm,
+        title = stringResource(R.string.dialog_cert_regen_confirm_title),
+        message = stringResource(R.string.dialog_cert_regen_confirm_msg),
+        confirmText = stringResource(R.string.btn_confirm),
+        onConfirm = {
+            showRegenerateConfirm = false
+            showCertDialog = false
+            manager.regenerateCertificate()
+        },
+        onDismissRequest = { showRegenerateConfirm = false },
+        dismissText = stringResource(R.string.btn_cancel),
+        danger = true,
+    )
 
-    when (editingAdvancedField) {
-        AdvancedNetworkField.WHITELIST ->
-            AdvancedNetworkEditDialog(
-                show = true,
-                title = stringResource(R.string.settings_pref_network_whitelist_title),
-                initialValue = settings.networkWhitelist,
-                keyboardType = KeyboardType.Ascii,
-                invalidToastRes = null,
-                validate = { true },
-                onDismissRequest = { editingAdvancedField = null },
-                onSave = { value ->
-                    manager.updateSettings { it.copy(networkWhitelist = value) }
-                },
-            )
-        AdvancedNetworkField.BLACKLIST ->
-            AdvancedNetworkEditDialog(
-                show = true,
-                title = stringResource(R.string.settings_pref_network_blacklist_title),
-                initialValue = settings.networkBlacklist,
-                keyboardType = KeyboardType.Ascii,
-                invalidToastRes = null,
-                validate = { true },
-                onDismissRequest = { editingAdvancedField = null },
-                onSave = { value ->
-                    manager.updateSettings { it.copy(networkBlacklist = value) }
-                },
-            )
-        AdvancedNetworkField.MULTICAST_GROUP ->
-            AdvancedNetworkEditDialog(
-                show = true,
-                title = stringResource(R.string.settings_pref_multicast_group_title),
-                initialValue = settings.multicastGroup,
-                keyboardType = KeyboardType.Ascii,
-                invalidToastRes = R.string.toast_invalid_multicast_group,
-                validate = { SettingsValidators.isValidMulticastGroup(it) },
-                onDismissRequest = { editingAdvancedField = null },
-                onSave = { value ->
-                    manager.updateSettings { it.copy(multicastGroup = value) }
-                },
-            )
-        AdvancedNetworkField.DISCOVERY_TIMEOUT ->
-            AdvancedNetworkEditDialog(
-                show = true,
-                title = stringResource(R.string.settings_pref_discovery_timeout_title),
-                initialValue = settings.discoveryTimeout.toString(),
-                keyboardType = KeyboardType.Number,
-                invalidToastRes = R.string.toast_invalid_discovery_timeout,
-                validate = { SettingsValidators.parseDiscoveryTimeout(it) != null },
-                onDismissRequest = { editingAdvancedField = null },
-                onSave = { value ->
+    // 弹窗同样常驻组合，只把 show 交给库的 visible；为 null 时不显示，字段值不参与渲染。
+    val editingField = editingAdvancedField
+    val editingTitle =
+        when (editingField) {
+            AdvancedNetworkField.WHITELIST -> stringResource(R.string.settings_pref_network_whitelist_title)
+            AdvancedNetworkField.BLACKLIST -> stringResource(R.string.settings_pref_network_blacklist_title)
+            AdvancedNetworkField.MULTICAST_GROUP -> stringResource(R.string.settings_pref_multicast_group_title)
+            AdvancedNetworkField.DISCOVERY_TIMEOUT -> stringResource(R.string.settings_pref_discovery_timeout_title)
+            null -> ""
+        }
+    val editingInitialValue =
+        when (editingField) {
+            AdvancedNetworkField.WHITELIST -> settings.networkWhitelist
+            AdvancedNetworkField.BLACKLIST -> settings.networkBlacklist
+            AdvancedNetworkField.MULTICAST_GROUP -> settings.multicastGroup
+            AdvancedNetworkField.DISCOVERY_TIMEOUT -> settings.discoveryTimeout.toString()
+            null -> ""
+        }
+    // 键值表没有格式约束，留空即清空；组播地址与超时沿用原校验器。
+    val editingValidate: (String) -> Boolean =
+        when (editingField) {
+            AdvancedNetworkField.MULTICAST_GROUP -> { value -> SettingsValidators.isValidMulticastGroup(value) }
+            AdvancedNetworkField.DISCOVERY_TIMEOUT -> { value -> SettingsValidators.parseDiscoveryTimeout(value) != null }
+            else -> { _ -> true }
+        }
+
+    AdvancedNetworkEditDialog(
+        show = editingField != null,
+        title = editingTitle,
+        initialValue = editingInitialValue,
+        validate = editingValidate,
+        onDismissRequest = { editingAdvancedField = null },
+        onSave = { value ->
+            when (editingField) {
+                AdvancedNetworkField.WHITELIST -> manager.updateSettings { it.copy(networkWhitelist = value) }
+                AdvancedNetworkField.BLACKLIST -> manager.updateSettings { it.copy(networkBlacklist = value) }
+                AdvancedNetworkField.MULTICAST_GROUP -> manager.updateSettings { it.copy(multicastGroup = value) }
+                AdvancedNetworkField.DISCOVERY_TIMEOUT -> {
                     val timeout = SettingsValidators.parseDiscoveryTimeout(value)
                     if (timeout != null) {
                         manager.updateSettings { it.copy(discoveryTimeout = timeout) }
                     }
-                },
-            )
-        null -> {}
-    }
+                }
+                null -> {}
+            }
+        },
+    )
 }
 
 /** 语言枚举在选项表中的下标，找不到时回落到系统语言。 */
@@ -449,40 +445,108 @@ private fun selectedLanguageIndex(
     language: String,
 ): Int = settings.indexOf(language).coerceAtLeast(0)
 
-/** 高级网络选项的文本编辑弹窗，复用 PortDialog 的 WindowDialog+TextField+双按钮模式。 */
+/**
+ * TLS 证书指纹弹窗，正文用库 Dialog 的 content 槽位：标签 + 可长按复制的指纹。
+ *
+ * 动作走库的 confirm/dismiss/neutral 三槽：复制是主操作（弹窗不关闭，库的动作是受控回调），
+ * 重新生成放在 neutral 上，库对它固定使用破坏性配色（Dialog.kt:167）。
+ * 三个动作时库横排转竖排、顺序为 neutral/confirm/dismiss（Dialog.kt:105-106、:123），
+ * 与原版「复制 → 重新生成 → 关闭」的上下次序不同，这是库的排版契约。
+ */
+@Composable
+private fun CouiCertFingerprintDialog(
+    show: Boolean,
+    fingerprint: String,
+    onDismissRequest: () -> Unit,
+    onRegenerate: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scheme = CouiTheme.colorScheme
+
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        confirmAction =
+            CouiDialogAction(
+                text = stringResource(R.string.dialog_cert_btn_copy),
+                onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Certificate Fingerprint", fingerprint))
+                },
+                style = CouiDialogActionStyle.Primary,
+                colors = CouiDialogDefaults.primaryActionColors(scheme.accent),
+            ),
+        title = stringResource(R.string.dialog_cert_title),
+        message = stringResource(R.string.dialog_cert_desc),
+        neutralAction =
+            CouiDialogAction(
+                text = stringResource(R.string.dialog_cert_btn_regenerate),
+                onClick = onRegenerate,
+            ),
+        dismissAction =
+            CouiDialogAction(
+                text = stringResource(R.string.btn_close),
+                onClick = onDismissRequest,
+            ),
+        visible = show,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = CouiDialogDefaults.contentPadding),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.dialog_cert_label),
+                kind = CouiTextKind.ItemSummary,
+                color = scheme.onSurfaceVariant,
+            )
+            SelectionContainer {
+                Text(
+                    text = fingerprint.ifEmpty { stringResource(R.string.dialog_cert_empty) },
+                    kind = CouiTextKind.ItemValue,
+                    color = scheme.accent,
+                    textAlign = TextAlign.Start,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 高级网络选项的文本编辑弹窗。
+ *
+ * 校验不通过时置灰确认按钮（库的 CouiDialogAction.enabled），不再 Toast 后保持窗口：
+ * 原实现的 Toast 反馈只在点击确认后出现，改成禁用后错误在点击前就可感知。
+ * 库输入弹窗没有 maxLength 槽位，等价改写为在 onValueChange 里丢弃超长输入。
+ */
 @Composable
 private fun AdvancedNetworkEditDialog(
     show: Boolean,
     title: String,
     initialValue: String,
-    keyboardType: KeyboardType,
-    @StringRes invalidToastRes: Int?,
     validate: (String) -> Boolean,
     onDismissRequest: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    val context = LocalContext.current
-    var value by remember(show, initialValue) { mutableStateOf(initialValue) }
+    var value by remember(show, initialValue) {
+        mutableStateOf(TextFieldValue(initialValue, TextRange(initialValue.length)))
+    }
 
-    TextInputDialog(
+    CouiInputDialog(
         show = show,
         title = title,
         value = value,
-        onValueChange = { value = it },
-        label = title,
-        keyboardType = keyboardType,
-        maxLength = 200,
-        onDismissRequest = onDismissRequest,
+        onValueChange = { if (it.text.length <= 200) value = it },
+        placeholder = title,
+        confirmText = stringResource(R.string.btn_confirm),
+        clearContentDescription = stringResource(R.string.btn_clear),
+        dismissText = stringResource(R.string.btn_cancel),
+        confirmEnabled = validate(value.text),
         onConfirm = {
-            if (validate(value)) {
-                onSave(value)
-                true
-            } else {
-                if (invalidToastRes != null) {
-                    Toast.makeText(context, invalidToastRes, Toast.LENGTH_SHORT).show()
-                }
-                false
-            }
+            onSave(value.text)
+            onDismissRequest()
         },
+        onDismissRequest = onDismissRequest,
     )
 }

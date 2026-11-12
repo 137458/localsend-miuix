@@ -1,4 +1,4 @@
-// ColorOS 皮肤软件更新页：coUI-Kit 卡片与设置分组，不使用 HyperOS 流光背景与模糊顶栏。
+// ColorOS 皮肤软件更新页：coUI Scaffold + TopAppBar 骨架（顶栏玻璃取 Scaffold 自建采样源）与 coUI 卡片、分组。
 @file:Suppress("LocalContextGetResourceValueCall")
 
 package org.localsend.miuix.ui.coui.page
@@ -21,8 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -44,12 +42,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.layout.Group
+import com.itos.coui.layout.Scaffold
 import com.itos.coui.scroll.rememberCouiOverscrollEffect
 import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
+import com.itos.coui.topappbar.TopAppBar
 import kotlinx.coroutines.launch
 import org.localsend.miuix.BuildConfig
 import org.localsend.miuix.R
@@ -74,7 +74,9 @@ import kotlin.math.round
 
 /**
  * ColorOS 皮肤的系统更新页。
- * 版式与 HyperOS 版对齐（版本信息、更新日志、更新设置、版本通道），视觉改用 coUI 卡片与分组。
+ * 骨架用库 layout.Scaffold + topappbar.TopAppBar：顶栏玻璃取 Scaffold 自建采样源，系统栏留白由外层
+ * 修饰符承担、顶栏高度经 contentPadding 交给列表内侧；版式与 HyperOS 版对齐（版本信息、更新日志、
+ * 更新设置、版本通道），视觉改用 coUI 卡片与分组。
  */
 @Composable
 fun CouiUpdateScreen(
@@ -146,12 +148,44 @@ fun CouiUpdateScreen(
 
     val overscrollEffect = rememberCouiOverscrollEffect()
 
-    Box(modifier = Modifier.fillMaxSize().background(CouiTheme.colorScheme.background)) {
-        Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-            CouiUpdateTopBar(onBack = onBack)
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 顶栏玻璃与采样源由库 Scaffold 自建；状态栏 inset 由 TopAppBar 的默认 windowInsets 消费
+        // （栏高含状态栏，经 contentPadding 注入列表内侧，内容滚到状态栏下由顶栏材质采样）。
+        // 底部安全区没有底栏承接，由外层 navigationBarsPadding 交给页面。
+        Scaffold(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(CouiTheme.colorScheme.background)
+                    .navigationBarsPadding(),
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = stringResource(R.string.update_screen_title),
+                            kind = CouiTextKind.TopBar,
+                            color = CouiTheme.colorScheme.onSurface,
+                        )
+                    },
+                    navigationIcon = {
+                        CouiTopBarAction(
+                            contentDescription = stringResource(R.string.action_back),
+                            onClick = onBack,
+                        )
+                    },
+                )
+            },
+        ) { scaffoldPadding ->
             LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 24.dp),
+                modifier = Modifier.fillMaxSize(),
+                // 顶栏高度放进滚动节点内侧：首项排在栏下，滚动时内容从栏下穿过。
+                contentPadding =
+                    PaddingValues(
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = scaffoldPadding.calculateTopPadding() + 4.dp,
+                        bottom = 24.dp,
+                    ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 overscrollEffect = overscrollEffect,
             ) {
@@ -257,29 +291,6 @@ fun CouiUpdateScreen(
             manager = manager,
             releaseInfo = releaseInfo,
             onDismiss = { showDialog = false },
-        )
-    }
-}
-
-@Composable
-private fun CouiUpdateTopBar(onBack: () -> Unit) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .padding(start = 8.dp, end = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CouiTopBarAction(
-            contentDescription = stringResource(R.string.action_back),
-            onClick = onBack,
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = stringResource(R.string.update_screen_title),
-            kind = CouiTextKind.TopBar,
-            color = CouiTheme.colorScheme.onSurface,
         )
     }
 }
