@@ -64,6 +64,7 @@ import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
 import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.coui.component.CouiSkinNavigationBar
+import org.localsend.miuix.ui.coui.page.CouiHistoryScreen
 import org.localsend.miuix.ui.coui.page.CouiSettingsScreen
 import org.localsend.miuix.ui.coui.theme.CouiSkinTheme
 import org.localsend.miuix.ui.navigation.AppRoute
@@ -529,11 +530,19 @@ fun App(manager: LocalSendManager) {
                                                 actions = homeActions,
                                             )
                                         MainTabs.HISTORY ->
-                                            HistoryScreen(
-                                                manager = manager,
-                                                contentPadding = pagePadding,
-                                                onOpenHome = { selectTab(MainTabs.HOME) },
-                                            )
+                                            if (uiSkin == UiSkin.COLOROS) {
+                                                CouiHistoryScreen(
+                                                    manager = manager,
+                                                    contentPadding = pagePadding,
+                                                    onOpenHome = { selectTab(MainTabs.HOME) },
+                                                )
+                                            } else {
+                                                HistoryScreen(
+                                                    manager = manager,
+                                                    contentPadding = pagePadding,
+                                                    onOpenHome = { selectTab(MainTabs.HOME) },
+                                                )
+                                            }
                                         MainTabs.SETTINGS ->
                                             if (uiSkin == UiSkin.COLOROS) {
                                                 CouiSettingsScreen(

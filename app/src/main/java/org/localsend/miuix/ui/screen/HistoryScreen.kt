@@ -3,11 +3,7 @@
 
 package org.localsend.miuix.ui.screen
 
-import android.app.DownloadManager
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -55,6 +51,7 @@ import org.localsend.miuix.ui.component.EmptyStateCard
 import org.localsend.miuix.ui.component.HistoryDetailDialog
 import org.localsend.miuix.ui.component.blurBackdropSource
 import org.localsend.miuix.ui.component.rememberBlurBackdrop
+import org.localsend.miuix.ui.util.openDownloadFolder
 import org.localsend.miuix.ui.util.rememberUiTimeText
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -420,41 +417,6 @@ private fun HistoryItemCard(
                 }
             }
         }
-    }
-}
-
-private fun openDownloadFolder(
-    context: Context,
-    downloadTreeUri: String?,
-) {
-    var opened = false
-    if (!downloadTreeUri.isNullOrEmpty()) {
-        try {
-            val intent =
-                Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(Uri.parse(downloadTreeUri), DocumentsContract.Document.MIME_TYPE_DIR)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            context.startActivity(intent)
-            opened = true
-        } catch (_: Exception) {
-            opened = false
-        }
-    }
-    if (!opened) {
-        try {
-            val downloadsIntent =
-                Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            context.startActivity(downloadsIntent)
-            opened = true
-        } catch (_: Exception) {
-            opened = false
-        }
-    }
-    if (!opened) {
-        Toast.makeText(context, context.getString(R.string.toast_cannot_open_folder), Toast.LENGTH_SHORT).show()
     }
 }
 
