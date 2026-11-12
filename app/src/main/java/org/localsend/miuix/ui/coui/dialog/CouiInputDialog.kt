@@ -4,9 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.input.TextFieldValue
 import com.itos.coui.dialog.CouiDialogAction
 import com.itos.coui.dialog.CouiDialogActionStyle
-import com.itos.coui.dialog.CouiDialogDefaults
 import com.itos.coui.dialog.InputDialog
-import com.itos.coui.theme.CouiTheme
 
 /**
  * coUI 单行输入弹窗：复用库 [InputDialog] 的 TextFieldValue 重载（InputDialog.kt:69），
@@ -31,6 +29,8 @@ internal fun CouiInputDialog(
     dismissText: String? = null,
     message: String? = null,
     placeholder: String? = null,
+    counter: String? = null,
+    counterIsError: Boolean = false,
     confirmEnabled: Boolean = true,
     autoFocus: Boolean = true,
 ) {
@@ -44,16 +44,20 @@ internal fun CouiInputDialog(
                 onClick = onConfirm,
                 enabled = confirmEnabled,
                 style = CouiDialogActionStyle.Primary,
-                colors = CouiDialogDefaults.primaryActionColors(CouiTheme.colorScheme.accent),
+                colors = couiPrimaryActionColors(),
             ),
         clearContentDescription = clearContentDescription,
         title = title,
         message = message,
         placeholder = placeholder,
+        counter = counter,
+        counterIsError = counterIsError,
         dismissAction =
             dismissText?.let { text ->
                 CouiDialogAction(text = text, onClick = onDismissRequest)
             },
+        placement = rememberCouiDialogPlacement(),
+        material = rememberCouiDialogMaterial(),
         autoFocus = autoFocus,
         visible = show,
     )

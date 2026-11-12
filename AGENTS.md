@@ -9,19 +9,25 @@ LocalSend 协议（v2）兼容的 Android 原生重写版，Compose + Miuix（Hy
   - 编译 Debug APK：`./gradlew assembleDebug`（产物位于 `app/build/outputs/apk/debug/app-debug.apk`）
   - 单元测试：`./gradlew testDebugUnitTest`
   - 代码风格检查：`./gradlew ktlintCheck`（ktlint 已接入构建门禁）
-- **完成标准**：编译、测试、ktlint 全部通过。
+  - Android Lint 检查：`./gradlew :app:lintDebug`
+- **完成标准**：编译、测试、ktlint、lint 全部通过。
 
 ## 项目约定
 
 - **协议对齐**：以官方 LocalSend 协议为准，参考源码位于 `../localsend-reference`（冻结于官方 v1.18.2，只读）。设备发现、握手、传输及 Web Share 行为必须对照官方实现。
 - **协议常量**：组播发现地址 `224.0.0.167:53317`、默认服务端口 `53317` 严格与官方一致。
-- **UI 规范**：严格使用 `top.yukonga.miuix.kmp` 官方组件，严禁引入 Material 3 控件；组件与规范契约审查见 `docs/research/`。
+- **UI 规范**：
+  - HyperOS 皮肤严格使用 `top.yukonga.miuix.kmp` 官方组件，严禁引入 Material 3 控件；组件与规范契约审查见 `docs/research/`。
+  - ColorOS 皮肤（`ui/coui/`）优先使用 `com.itos.coui` 官方原语，严禁引入 Material 3 控件；仅当 coUI 明确存在能力缺口（如数字输入弹窗、进度条、图标库、多文件详情复用组件，见 `docs/research/coui-capability-gaps.md`）时按能力边界清单回退到共享或自绘组件，并在对应页面保留 `@RequiresApi` 守卫与低版本平替。
+  - coUI 页面、弹窗与组件禁止直接读取 `MiuixTheme.colorScheme` 语义色（危险色统一经 `couiDangerColor()` 取 `CouiColor.Day/Night.RED`）；交互控件最小命中区不低于 48dp。
 
 ## 内部文档索引
 
 | 业务场景 | 文档路径 | 核心内容 |
 |---|---|---|
 | **UI 规范审查** | `docs/research/miuix-0.9.4-rc01-ui-review.md` | Miuix 0.9.4-rc01 官方组件契约、偏差改写清单与落点速查 |
+| **coUI 合规审查** | `docs/research/coui-alpha10-compliance-review.md` | coUI `0.0.1-alpha10` 合规性评估、P1/P2/P3 问题清单与重构落点 |
+| **coUI 能力边界** | `docs/research/coui-capability-gaps.md` | coUI `0.0.1-alpha10` 已有原语、API 门槛（`@RequiresApi`）与自绘/复用边界 |
 | **TabRow 架构调研** | `docs/research/miuix-tabrow-implementation-research.md` | Miuix TabRow 与 TabRowWithContour 契约剖析、测量算法与落地建议 |
 | **全量质量评估** | `docs/research/quality-assessment-report.md` | 23 项缺陷矩阵（P0~P3）、根因定位与整改路线图 |
 | **对外更新日志** | `CHANGELOG.md` | 外部发布历史与版本变更记录（对外文档） |

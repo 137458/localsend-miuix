@@ -1,3 +1,5 @@
+@file:Suppress("LocalContextGetResourceValueCall")
+
 package org.localsend.miuix.ui.coui.page
 
 import android.content.ClipData
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,11 +49,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.effect.couiButtonFeedback
+import com.itos.coui.layout.CouiPageDefaults
 import com.itos.coui.layout.Divider
 import com.itos.coui.layout.Item
 import com.itos.coui.layout.Scaffold
@@ -73,8 +79,11 @@ import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.FilePreviewDialog
 import org.localsend.miuix.ui.component.FileThumbnail
 import org.localsend.miuix.ui.component.InlineTransferProgress
+import org.localsend.miuix.ui.coui.component.CouiIconAction
 import org.localsend.miuix.ui.coui.component.CouiRowSummary
 import org.localsend.miuix.ui.coui.component.CouiRowTitle
+import org.localsend.miuix.ui.coui.component.couiMinTouchTarget
+import org.localsend.miuix.ui.coui.theme.couiDangerColor
 import org.localsend.miuix.ui.screen.HomeActions
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
@@ -86,20 +95,17 @@ import top.yukonga.miuix.kmp.icon.extended.ExpandLess
 import top.yukonga.miuix.kmp.icon.extended.ExpandMore
 import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Image
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-
-/** ColorOS 首页的圆角半径：卡片与队列容器用大圆角，胶囊按钮用半高圆角。 */
-private val CouiHomeCardRadius = 20.dp
 
 /**
  * 首页（ColorOS 皮肤）：本机状态、正在接收的传输、待发送队列、快速选择与附近设备。
  *
- * 页面骨架走库 `layout.Scaffold` + `topappbar.LargeTopAppBar`：系统栏 inset 由库默认值承担，大标题
+ * 页面骨架走库 `layout.Scaffold` + `topappbar.LargeTopAppBar`：横向安全区由外层宿主的 Miuix Scaffold
+ * 与列表内容留白承担，内层显式关闭重复系统栏消费并保留顶栏高度经 `state.contentPadding` 注入；大标题
  * 随列表滚动收成紧凑标题，折叠位移与栏高经 `state.contentPadding` 注入列表内侧，滚动内容从栏下
  * 穿过时由库的渐变遮罩与渐进模糊收边；行、分隔线与行内按压/点击反馈走库 `layout.Item`、
  * `layout.Divider` 与 `couiButtonFeedback`。
  *
- * 顶栏的两个动作按钮仍用本文件的 `CouiIconAction`：库的 `TopAppBarButton`/`TopAppBarButtonGroup`
+ * 顶栏的动作按钮使用共享的 `CouiIconAction`：库的 `TopAppBarButton`/`TopAppBarButtonGroup`
  * 标注 @RequiresApi(34)，本模块 minSdk 31 且不使用 Android 14 专属 API，故没有可替换的库按钮。
  * 卡片外壳、图标按钮与进度仍按 coUI 的材质自绘（coUI-Kit 没有 Card/Icon/IconButton 与进度条，
  * 只有材质与 layout 原语）；缩略图、进度与预览弹窗继续复用既有组件，它们不参与皮肤外观，
@@ -110,6 +116,8 @@ fun CouiHomeScreen(
     manager: LocalSendManager,
     contentPadding: PaddingValues,
     actions: HomeActions,
+    incomingTaskCount: Int = 0,
+    onOpenIncoming: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val settings by manager.settings.collectAsStateWithLifecycle()
@@ -217,10 +225,11 @@ fun CouiHomeScreen(
                 .background(CouiTheme.colorScheme.background)
                 // 折叠连接只挂到滚动内容的祖先一次；LazyColumn 上不再叠 nestedScroll。
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
-        // 系统栏由库默认 insets 处理：横向安全区归 Scaffold 容器，纵向顶栏 inset 归 LargeTopAppBar，
-        // 栏高（含状态栏）经 contentPadding 注入列表内侧，内容滚到状态栏下被顶栏材质采样。
+        // 外层 Miuix Scaffold 已包一层主导航窗口容器；此处显式清零外围 insets，避免嵌套重复消费，
+        // 顶部状态栏由 LargeTopAppBar 的默认 insets 单独处理并经 collapsedPadding 注入列表。
+        windowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // 大标题折叠、标题排版与栏下渐变模糊由库 LargeTopAppBar 承担；两个动作按钮仍是本文件的
+            // 大标题折叠、标题排版与栏下渐变模糊由库 LargeTopAppBar 承担；动作按钮使用共享的
             // CouiIconAction，因为库 TopAppBarButton 标注 @RequiresApi(34)，minSdk 31 上没有可用实现。
             LargeTopAppBar(
                 title = {
@@ -240,6 +249,15 @@ fun CouiHomeScreen(
                     )
                 },
                 actions = {
+                    if (incomingTaskCount > 0) {
+                        CouiIconAction(
+                            icon = AppIcons.Receive,
+                            contentDescription = stringResource(R.string.receive_section_incoming_count, incomingTaskCount),
+                            tint = CouiTheme.colorScheme.accentOnSurface,
+                            onClick = onOpenIncoming,
+                            showBadgeDot = true,
+                        )
+                    }
                     CouiIconAction(
                         icon = AppIcons.Edit,
                         contentDescription = stringResource(R.string.action_input_ip),
@@ -392,6 +410,7 @@ fun CouiHomeScreen(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
+                                            .defaultMinSize(minHeight = 48.dp)
                                             .clip(CouiShape(12.dp))
                                             .couiButtonFeedback(CouiTheme.isDark, expandSource)
                                             .clickable(expandSource, null, enabled = true, role = Role.Button) {
@@ -409,7 +428,7 @@ fun CouiHomeScreen(
                                             } else {
                                                 stringResource(R.string.send_expand_files, selectedFiles.size - 3)
                                             },
-                                        kind = CouiTextKind.GroupFooter,
+                                        kind = CouiTextKind.ItemSummary,
                                         color = expandTint,
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -624,7 +643,11 @@ private fun CouiSectionTitle(text: String) {
         text = text,
         kind = CouiTextKind.GroupTitle,
         color = CouiTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 2.dp),
+        textAlign = TextAlign.Start,
+        modifier =
+            Modifier
+                .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 2.dp)
+                .semantics { heading() },
     )
 }
 
@@ -632,9 +655,8 @@ private fun CouiSectionTitle(text: String) {
  * 分组容器：可选标题 + 卡片表面。
  *
  * 没有换成库 `layout.Group`：Group 的外边距固定 16dp（本页 LazyColumn gutter 是 12dp）、
- * 卡面圆角固定 24dp（这里 20dp，见 [CouiHomeCardRadius]）、标题行自带 32dp 缩进与 12/16dp
- * 顶部间距，直接替换会同时挪动三处几何，还会与卡片外那行 `CouiSectionTitle`（16dp 缩进）错位。
- * 圆角曲线已改成库默认的 `CouiCornerWeight`；卡内分隔线统一用库 `layout.Divider`。
+ * 标题行自带 32dp 缩进与 12/16dp 顶部间距，直接替换会与卡片外那行 `CouiSectionTitle`（16dp 缩进）错位。
+ * 卡片形状统一对齐 `CouiPageDefaults.shape`（24dp, 3f 连续曲率）；卡内分隔线统一用库 `layout.Divider`。
  */
 @Composable
 private fun CouiHomeSection(
@@ -649,7 +671,7 @@ private fun CouiHomeSection(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(CouiShape(CouiHomeCardRadius))
+                    .clip(CouiPageDefaults.shape)
                     .background(CouiTheme.colorScheme.card),
             content = content,
         )
@@ -707,33 +729,6 @@ private fun CouiHomeRow(
     )
 }
 
-/** 图标动作：40dp 触控区 + 22dp 图形，用于顶栏与行尾。 */
-@Composable
-private fun CouiIconAction(
-    icon: ImageVector,
-    contentDescription: String?,
-    tint: Color,
-    onClick: () -> Unit,
-) {
-    val source = remember { MutableInteractionSource() }
-    Box(
-        modifier =
-            Modifier
-                .size(40.dp)
-                .clip(CouiShape(20.dp))
-                .couiButtonFeedback(CouiTheme.isDark, source)
-                .clickable(source, null, enabled = true, role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = tint,
-            modifier = Modifier.size(22.dp),
-        )
-    }
-}
-
 /** 本机接收状态：左状态点 + 接收中文案，右侧当前接收策略。 */
 @Composable
 private fun CouiLocalStatusRow(
@@ -780,20 +775,27 @@ private fun CouiPillButton(
     Box(
         modifier =
             Modifier
-                .clip(CouiCapsuleShape)
-                .background(CouiTheme.colorScheme.container)
-                .couiButtonFeedback(CouiTheme.isDark, source)
                 .clickable(source, null, enabled = true, role = Role.Button, onClick = onClick)
-                .defaultMinSize(minWidth = 56.dp, minHeight = 34.dp)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .couiMinTouchTarget(),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = text,
-            kind = CouiTextKind.ItemSummary,
-            color = CouiTheme.colorScheme.accentOnSurface,
-            maxLines = 1,
-        )
+        Box(
+            modifier =
+                Modifier
+                    .clip(CouiCapsuleShape)
+                    .background(CouiTheme.colorScheme.container)
+                    .couiButtonFeedback(CouiTheme.isDark, source)
+                    .defaultMinSize(minWidth = 56.dp, minHeight = 34.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = text,
+                kind = CouiTextKind.ItemSummary,
+                color = CouiTheme.colorScheme.accentOnSurface,
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -879,7 +881,7 @@ private fun CouiSelectedFileRow(
         CouiIconAction(
             icon = MiuixIcons.Delete,
             contentDescription = stringResource(R.string.btn_delete),
-            tint = MiuixTheme.colorScheme.error,
+            tint = couiDangerColor(),
             onClick = onRemove,
         )
     }

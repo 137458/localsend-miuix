@@ -1,3 +1,5 @@
+@file:Suppress("LocalContextGetResourceValueCall")
+
 package org.localsend.miuix.ui.coui.page
 
 import android.os.Build
@@ -6,7 +8,7 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,14 +16,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,19 +44,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.effect.couiButtonFeedback
+import com.itos.coui.layout.CouiPageDefaults
 import com.itos.coui.layout.Scaffold
 import com.itos.coui.scroll.rememberCouiOverscrollEffect
 import com.itos.coui.segmentbutton.SegmentedControl
-import com.itos.coui.shape.CouiShape
+import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
 import com.itos.coui.topappbar.TopAppBar
@@ -61,12 +75,15 @@ import org.localsend.miuix.model.filterByTab
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.ConfirmDialog
 import org.localsend.miuix.ui.component.HistoryDetailDialog
+import org.localsend.miuix.ui.coui.component.CouiIconAction
+import org.localsend.miuix.ui.coui.component.CouiTopBarTitle
+import org.localsend.miuix.ui.coui.component.couiMinTouchTarget
+import org.localsend.miuix.ui.coui.theme.couiDangerColor
 import org.localsend.miuix.ui.util.openDownloadFolder
 import org.localsend.miuix.ui.util.rememberUiTimeText
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.itos.coui.theme.CouiTheme as CouiKitTheme
 
 /**
@@ -80,12 +97,13 @@ fun CouiHistoryScreen(
     manager: LocalSendManager,
     contentPadding: PaddingValues,
     onOpenHome: () -> Unit,
+    incomingTaskCount: Int = 0,
 ) {
     val context = LocalContext.current
     val history by manager.transferHistory.collectAsStateWithLifecycle()
     val settings by manager.settings.collectAsStateWithLifecycle()
     val scheme = CouiKitTheme.colorScheme
-    val errorColor = MiuixTheme.colorScheme.error
+    val errorColor = couiDangerColor()
     val coroutineScope = rememberCoroutineScope()
 
     var selectedFilterIndex by rememberSaveable { mutableIntStateOf(0) }
@@ -112,21 +130,30 @@ fun CouiHistoryScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        // 纵向状态栏由库顶栏的默认 insets 消费（栏高含状态栏，经 contentPadding 注入列表内侧）；
-        // 横向安全区由容器默认 insets 处理，避免正文与顶栏两侧错位。
+        // 外层 Miuix Scaffold 已承载窗口安全区；此处显式清零外围 insets，避免嵌套重复消费，
+        // 顶栏状态栏与横向安全区由 TopAppBar 默认 insets 及筛选栏/列表内容内边距分别处理。
+        windowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = scheme.background,
         topBar = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 TopAppBar(
                     title = {
-                        Text(
+                        CouiTopBarTitle(
                             text = stringResource(R.string.history_title),
-                            kind = CouiTextKind.TopBar,
-                            maxLines = 1,
+                            color = scheme.onSurface,
                         )
                     },
                     actions = {
-                        CouiHistoryAction(
+                        if (incomingTaskCount > 0) {
+                            CouiIconAction(
+                                icon = AppIcons.Receive,
+                                contentDescription = stringResource(R.string.receive_section_incoming_count, incomingTaskCount),
+                                tint = scheme.accentOnSurface,
+                                onClick = onOpenHome,
+                                showBadgeDot = true,
+                            )
+                        }
+                        CouiIconAction(
                             icon = AppIcons.Folder,
                             contentDescription = stringResource(R.string.history_action_open_folder),
                             tint = scheme.onSurface,
@@ -138,7 +165,7 @@ fun CouiHistoryScreen(
                             },
                         )
                         if (history.isNotEmpty()) {
-                            CouiHistoryAction(
+                            CouiIconAction(
                                 icon = MiuixIcons.Delete,
                                 contentDescription = stringResource(R.string.history_dialog_clear_title),
                                 tint = errorColor,
@@ -158,7 +185,11 @@ fun CouiHistoryScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             if (filteredHistory.isEmpty()) {
                 CouiHistoryEmptyState(
-                    modifier = Modifier.padding(scaffoldPadding),
+                    modifier =
+                        Modifier.padding(
+                            top = scaffoldPadding.calculateTopPadding(),
+                            bottom = contentPadding.calculateBottomPadding(),
+                        ),
                     text =
                         when (selectedFilterIndex) {
                             1 -> stringResource(R.string.history_empty_receive)
@@ -250,33 +281,6 @@ fun CouiHistoryScreen(
     }
 }
 
-/** 顶栏动作：coUI-Kit 没有 IconButton，用圆形可点区域包一个 Miuix 图标，配色由调用方给定，按压反馈走 couiButtonFeedback。 */
-@Composable
-private fun CouiHistoryAction(
-    icon: ImageVector,
-    contentDescription: String,
-    tint: Color,
-    onClick: () -> Unit,
-) {
-    val source = remember { MutableInteractionSource() }
-    Box(
-        modifier =
-            Modifier
-                .size(40.dp)
-                .clip(CouiShape(20.dp))
-                .couiButtonFeedback(CouiKitTheme.isDark, source)
-                .clickable(source, null, enabled = true, role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            modifier = Modifier.size(22.dp),
-            tint = tint,
-        )
-    }
-}
-
 /** 库分段控件的系统门槛：材质与滑动着色依赖 Android 14（API 34），库函数本身带 RequiresApi(34)。 */
 private const val COUI_SEGMENTED_CONTROL_MIN_SDK = 34
 
@@ -295,6 +299,7 @@ private fun CouiHistoryFilterBar(
             Modifier
                 .fillMaxWidth()
                 .background(CouiKitTheme.colorScheme.background)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                 .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         if (Build.VERSION.SDK_INT >= COUI_SEGMENTED_CONTROL_MIN_SDK) {
@@ -322,7 +327,7 @@ private fun CouiLibraryFilterTabs(
     )
 }
 
-/** 平面兜底：低版本沿用等宽三段胶囊，几何与点击行为与旧实现一致。 */
+/** 平面兜底：低版本沿用等宽三段胶囊，对齐 48dp 命中区、Tab 语义与键盘触发。 */
 @Composable
 private fun CouiPlainFilterTabs(
     labels: List<String>,
@@ -330,31 +335,58 @@ private fun CouiPlainFilterTabs(
     onSelected: (Int) -> Unit,
 ) {
     val scheme = CouiKitTheme.colorScheme
+    val dark = CouiKitTheme.isDark
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         labels.forEachIndexed { index, label ->
             val selected = index == selectedIndex
-            val tapIndex by rememberUpdatedState(index)
+            val interactionSource = remember { MutableInteractionSource() }
             Box(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .height(34.dp)
-                        .clip(remember { CouiShape(radius = 17.dp) })
-                        .background(if (selected) scheme.surface else scheme.container)
-                        .pointerInput(Unit) {
-                            detectTapGestures { onSelected(tapIndex) }
-                        },
+                        .selectable(
+                            selected = selected,
+                            interactionSource = interactionSource,
+                            indication = null,
+                            role = Role.Tab,
+                            onClick = { if (!selected) onSelected(index) },
+                        ).couiMinTouchTarget()
+                        .semantics(mergeDescendants = true) {
+                            this.selected = selected
+                        }.onKeyEvent {
+                            if (it.type == KeyEventType.KeyUp && (it.key == Key.Enter || it.key == Key.Spacebar)) {
+                                if (!selected) onSelected(index)
+                                true
+                            } else {
+                                false
+                            }
+                        }.focusable(interactionSource = interactionSource),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = label,
-                    kind = CouiTextKind.ItemSummary,
-                    color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .clip(CouiCapsuleShape)
+                            .background(if (selected) scheme.surface else scheme.container)
+                            .couiButtonFeedback(dark = dark, interactionSource = interactionSource),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = label,
+                        kind = CouiTextKind.ItemSummary,
+                        color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }
@@ -403,8 +435,8 @@ private fun CouiHistoryCard(
     onCopyText: (String) -> Unit,
 ) {
     val scheme = CouiKitTheme.colorScheme
-    val errorColor = MiuixTheme.colorScheme.error
-    val shape = remember { CouiShape(radius = 18.dp) }
+    val errorColor = couiDangerColor()
+    val shape = CouiPageDefaults.shape
     val latestOpenDetail by rememberUpdatedState(onOpenDetail)
     val latestLongPress by rememberUpdatedState(onLongPress)
     val cardSource = remember { MutableInteractionSource() }
@@ -520,25 +552,36 @@ private fun CouiHistoryCard(
         if (item.isTextMessage && !item.textContent.isNullOrEmpty()) {
             val textContent = item.textContent
             Spacer(modifier = Modifier.width(8.dp))
-            val copyShape = remember { CouiShape(radius = 12.dp) }
             val copySource = remember { MutableInteractionSource() }
             Box(
                 modifier =
                     Modifier
-                        .clip(copyShape)
-                        .background(scheme.container)
-                        .couiButtonFeedback(CouiKitTheme.isDark, copySource)
-                        .clickable(copySource, null, enabled = true, role = Role.Button) {
+                        .clickable(
+                            interactionSource = copySource,
+                            indication = null,
+                            enabled = true,
+                            role = Role.Button,
+                        ) {
                             onCopyText(textContent)
-                        }.padding(horizontal = 12.dp, vertical = 7.dp),
+                        }.couiMinTouchTarget(),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = stringResource(R.string.btn_copy),
-                    kind = CouiTextKind.GroupFooter,
-                    color = scheme.accent,
-                    maxLines = 1,
-                )
+                Box(
+                    modifier =
+                        Modifier
+                            .clip(CouiCapsuleShape)
+                            .background(scheme.container)
+                            .couiButtonFeedback(CouiKitTheme.isDark, copySource)
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.btn_copy),
+                        kind = CouiTextKind.ItemSummary,
+                        color = scheme.accent,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

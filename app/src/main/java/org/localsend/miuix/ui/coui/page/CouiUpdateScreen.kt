@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,15 +38,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.effect.couiButtonFeedback
+import com.itos.coui.layout.CouiPageDefaults
+import com.itos.coui.layout.Divider
 import com.itos.coui.layout.Group
 import com.itos.coui.layout.Scaffold
 import com.itos.coui.scroll.rememberCouiOverscrollEffect
 import com.itos.coui.shape.CouiCapsuleShape
-import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
@@ -62,14 +66,15 @@ import org.localsend.miuix.ui.component.updateBrowserUrl
 import org.localsend.miuix.ui.component.updateProgressDetail
 import org.localsend.miuix.ui.component.updateProgressFraction
 import org.localsend.miuix.ui.coui.component.CouiArrowRow
+import org.localsend.miuix.ui.coui.component.CouiIconAction
 import org.localsend.miuix.ui.coui.component.CouiSwitchRow
+import org.localsend.miuix.ui.coui.component.CouiTopBarTitle
+import org.localsend.miuix.ui.coui.theme.couiDangerColor
 import org.localsend.miuix.updates.UpdateDownloadState
 import org.localsend.miuix.updates.UpdatePrompt
-import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.round
 
 /**
@@ -161,15 +166,16 @@ fun CouiUpdateScreen(
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(
+                        CouiTopBarTitle(
                             text = stringResource(R.string.update_screen_title),
-                            kind = CouiTextKind.TopBar,
                             color = CouiTheme.colorScheme.onSurface,
                         )
                     },
                     navigationIcon = {
-                        CouiTopBarAction(
+                        CouiIconAction(
+                            icon = MiuixIcons.Back,
                             contentDescription = stringResource(R.string.action_back),
+                            tint = CouiTheme.colorScheme.onSurface,
                             onClick = onBack,
                         )
                     },
@@ -243,6 +249,7 @@ fun CouiUpdateScreen(
                                 manager.updateSettings { it.copy(autoCheckUpdate = checked) }
                             },
                         )
+                        Divider()
                         CouiSwitchRow(
                             title = stringResource(R.string.update_pref_ignore_title),
                             summary =
@@ -253,7 +260,7 @@ fun CouiUpdateScreen(
                                         stringResource(R.string.update_pref_ignore_ignored, releaseInfo?.latestVersion ?: "")
                                     else -> stringResource(R.string.update_pref_ignore_desc, releaseInfo?.latestVersion ?: "")
                                 },
-                            checked = hasNew && UpdatePrompt.isIgnored(settings.ignoredVersion, releaseInfo?.latestVersion),
+                            checked = UpdatePrompt.isIgnored(settings.ignoredVersion, releaseInfo?.latestVersion),
                             onCheckedChange = {
                                 val next = UpdatePrompt.toggleIgnored(settings.ignoredVersion, releaseInfo?.latestVersion)
                                 manager.updateSettings { it.copy(ignoredVersion = next) }
@@ -275,6 +282,7 @@ fun CouiUpdateScreen(
                                 },
                             onClick = { doCheck(userInitiated = true) },
                         )
+                        Divider()
                         CouiArrowRow(
                             title = "GitHub Releases",
                             onClick = {
@@ -291,36 +299,6 @@ fun CouiUpdateScreen(
             manager = manager,
             releaseInfo = releaseInfo,
             onDismiss = { showDialog = false },
-        )
-    }
-}
-
-@Composable
-private fun CouiTopBarAction(
-    contentDescription: String,
-    onClick: () -> Unit,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    Box(
-        modifier =
-            Modifier
-                .size(40.dp)
-                .clip(CouiShape(radius = 20.dp))
-                .couiButtonFeedback(CouiTheme.isDark, interactionSource)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    enabled = true,
-                    role = Role.Button,
-                    onClick = onClick,
-                ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = MiuixIcons.Back,
-            contentDescription = contentDescription,
-            tint = CouiTheme.colorScheme.onSurface,
-            modifier = Modifier.size(22.dp),
         )
     }
 }
@@ -393,14 +371,18 @@ private fun CouiSectionCard(
                 text = title,
                 kind = CouiTextKind.GroupTitle,
                 color = CouiTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+                textAlign = TextAlign.Start,
+                modifier =
+                    Modifier
+                        .padding(start = 4.dp, bottom = 6.dp)
+                        .semantics { heading() },
             )
         }
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(CouiShape(radius = 20.dp))
+                    .clip(CouiPageDefaults.shape)
                     .background(CouiTheme.colorScheme.card)
                     .padding(14.dp),
             content = content,
@@ -449,7 +431,7 @@ private fun CouiDownloadStatus(state: UpdateDownloadState) {
             Text(
                 text = state.message,
                 kind = CouiTextKind.GroupFooter,
-                color = MiuixTheme.colorScheme.error,
+                color = couiDangerColor(),
             )
         }
         else -> Unit
@@ -530,7 +512,7 @@ private fun CouiActionButton(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(44.dp)
+                .heightIn(min = 48.dp)
                 .clip(CouiCapsuleShape)
                 .background(if (primary) scheme.accent else scheme.container)
                 .couiButtonFeedback(CouiTheme.isDark, interactionSource)

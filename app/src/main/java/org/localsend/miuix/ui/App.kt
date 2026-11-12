@@ -68,6 +68,7 @@ import org.localsend.miuix.ui.component.UpdateDialogHost
 import org.localsend.miuix.ui.coui.component.CouiSkinNavigationBar
 import org.localsend.miuix.ui.coui.dialog.CouiIncomingTransferDialog
 import org.localsend.miuix.ui.coui.dialog.CouiInputDialog
+import org.localsend.miuix.ui.coui.dialog.LocalCouiWindowBackdropAvailable
 import org.localsend.miuix.ui.coui.page.CouiHistoryScreen
 import org.localsend.miuix.ui.coui.page.CouiHomeScreen
 import org.localsend.miuix.ui.coui.page.CouiSettingsScreen
@@ -484,9 +485,6 @@ fun App(manager: LocalSendManager) {
                                                 selectedIndex = pagerState.currentPage,
                                                 onSelect = selectTab,
                                                 backdrop = couiBackdrop,
-                                                badgeVisible = { index ->
-                                                    index == MainTabs.HOME && incomingTaskCount > 0
-                                                },
                                             )
                                         } else {
                                             IosLiquidGlassNavigationBar(
@@ -543,6 +541,8 @@ fun App(manager: LocalSendManager) {
                                                         manager = manager,
                                                         contentPadding = pagePadding,
                                                         actions = homeActions,
+                                                        incomingTaskCount = incomingTaskCount,
+                                                        onOpenIncoming = { dismissedIncomingSessionId = null },
                                                     )
                                                 } else {
                                                     HomeScreen(
@@ -557,6 +557,7 @@ fun App(manager: LocalSendManager) {
                                                         manager = manager,
                                                         contentPadding = pagePadding,
                                                         onOpenHome = { selectTab(MainTabs.HOME) },
+                                                        incomingTaskCount = incomingTaskCount,
                                                     )
                                                 } else {
                                                     HistoryScreen(
@@ -574,6 +575,8 @@ fun App(manager: LocalSendManager) {
                                                         onOpenPortDialog = { showPortDialog = true },
                                                         onPickDirectory = { directoryPickerLauncher.launch(null) },
                                                         onNavigateToUpdate = { backStack.add(AppRoute.Update) },
+                                                        incomingTaskCount = incomingTaskCount,
+                                                        onOpenHome = { selectTab(MainTabs.HOME) },
                                                     )
                                                 } else {
                                                     SettingsScreen(
@@ -591,11 +594,7 @@ fun App(manager: LocalSendManager) {
                             }
                         }
                     }
-                    if (uiSkin == UiSkin.COLOROS) {
-                        CouiSkinTheme { mainEntry() }
-                    } else {
-                        mainEntry()
-                    }
+                    mainEntry()
                 }
 
                 // 独立软件更新页（通过 miuix-nav 连续深度推进展示，支持左滑边缘返回手势）
@@ -619,40 +618,37 @@ fun App(manager: LocalSendManager) {
             // Global Overlay Dialogs & BottomSheets
             if (uiSkin == UiSkin.COLOROS) {
                 // coUI Dialog 的 content 槽能承载多选列表与文本预览，标题与来源设备仍走 title/message 两槽，
-                // 确认/拒绝动作与原实现逐项对应，故 ColorOS 走 coUI 版；
-                // 全局弹窗位于 mainEntry 的 CouiSkinTheme 之外，这里补一层同源皮肤主题，弹窗才取到同一份 coUI 色板。
-                CouiSkinTheme {
-                    CouiIncomingTransferDialog(
-                        session = pendingIncomingSession?.takeIf { it.sessionId != dismissedIncomingSessionId },
-                        onAccept = { selectedIds ->
-                            pendingIncomingSession?.let { session ->
-                                // 弹窗以 null 表示“不限定文件”（打开链接后全部接收），此处换成语义明确的全部接收入口
-                                if (selectedIds == null) {
-                                    manager.acceptAllIncomingTransfer(session.sessionId)
-                                } else {
-                                    manager.acceptIncomingTransfer(session.sessionId, selectedIds)
-                                }
-                            }
-                        },
-                        onAcceptAndCopy = {
-                            pendingIncomingSession?.let { session ->
-                                val text = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent
-                                if (!text.isNullOrEmpty()) {
-                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", text))
-                                    Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
-                                }
+                // 确认/拒绝动作与原实现逐项对应，故 ColorOS 走 coUI 版；CouiSkinTheme 已在窗口根覆盖全路由与弹窗。
+                CouiIncomingTransferDialog(
+                    session = pendingIncomingSession?.takeIf { it.sessionId != dismissedIncomingSessionId },
+                    onAccept = { selectedIds ->
+                        pendingIncomingSession?.let { session ->
+                            // 弹窗以 null 表示“不限定文件”（打开链接后全部接收），此处换成语义明确的全部接收入口
+                            if (selectedIds == null) {
                                 manager.acceptAllIncomingTransfer(session.sessionId)
+                            } else {
+                                manager.acceptIncomingTransfer(session.sessionId, selectedIds)
                             }
-                        },
-                        onDecline = {
-                            pendingIncomingSession?.let { manager.declineIncomingTransfer(it.sessionId) }
-                        },
-                        onDismiss = {
-                            dismissedIncomingSessionId = pendingIncomingSession?.sessionId
-                        },
-                    )
-                }
+                        }
+                    },
+                    onAcceptAndCopy = {
+                        pendingIncomingSession?.let { session ->
+                            val text = session.singleTextMessageContent ?: session.files.firstOrNull()?.textContent
+                            if (!text.isNullOrEmpty()) {
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LocalSend Text", text))
+                                Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                            }
+                            manager.acceptAllIncomingTransfer(session.sessionId)
+                        }
+                    },
+                    onDecline = {
+                        pendingIncomingSession?.let { manager.declineIncomingTransfer(it.sessionId) }
+                    },
+                    onDismiss = {
+                        dismissedIncomingSessionId = pendingIncomingSession?.sessionId
+                    },
+                )
             } else {
                 // HyperOS 皮肤保持原有 Miuix 实现，零行为变化。
                 IncomingTransferDialog(
@@ -690,29 +686,27 @@ fun App(manager: LocalSendManager) {
             if (uiSkin == UiSkin.COLOROS) {
                 // 单行文本 + 非空校验都能用库 InputDialog 真实表达（confirmEnabled 映射禁用的确认按钮），故走 coUI 版；
                 // 库必填的 clearContentDescription 复用已有串 btn_clear（“清空”/Clear），不新增资源。
-                // 全局弹窗位于 mainEntry 的 CouiSkinTheme 之外，这里补一层同源皮肤主题，弹窗才取到同一份 coUI 色板。
-                CouiSkinTheme {
-                    var renameValue by remember(showRenameDialog, settings.alias) {
-                        mutableStateOf(TextFieldValue(settings.alias))
-                    }
-                    CouiInputDialog(
-                        show = showRenameDialog,
-                        title = stringResource(R.string.dialog_rename_title),
-                        value = renameValue,
-                        onValueChange = { renameValue = it },
-                        onConfirm = {
-                            val newAlias = renameValue.text.trim()
-                            manager.updateSettings { it.copy(alias = newAlias) }
-                            Toast.makeText(context, context.getString(R.string.toast_device_renamed, newAlias), Toast.LENGTH_SHORT).show()
-                            showRenameDialog = false
-                        },
-                        onDismissRequest = { showRenameDialog = false },
-                        confirmText = stringResource(R.string.btn_confirm),
-                        clearContentDescription = stringResource(R.string.btn_clear),
-                        message = stringResource(R.string.dialog_rename_label),
-                        confirmEnabled = renameValue.text.isNotBlank(),
-                    )
+                // CouiSkinTheme 已在窗口根覆盖全路由与弹窗，无需在此重复包裹。
+                var renameValue by remember(showRenameDialog, settings.alias) {
+                    mutableStateOf(TextFieldValue(settings.alias))
                 }
+                CouiInputDialog(
+                    show = showRenameDialog,
+                    title = stringResource(R.string.dialog_rename_title),
+                    value = renameValue,
+                    onValueChange = { renameValue = it },
+                    onConfirm = {
+                        val newAlias = renameValue.text.trim()
+                        manager.updateSettings { it.copy(alias = newAlias) }
+                        Toast.makeText(context, context.getString(R.string.toast_device_renamed, newAlias), Toast.LENGTH_SHORT).show()
+                        showRenameDialog = false
+                    },
+                    onDismissRequest = { showRenameDialog = false },
+                    confirmText = stringResource(R.string.btn_confirm),
+                    clearContentDescription = stringResource(R.string.btn_clear),
+                    message = stringResource(R.string.dialog_rename_label),
+                    confirmEnabled = renameValue.text.isNotBlank(),
+                )
             } else {
                 RenameDeviceDialog(
                     show = showRenameDialog,
@@ -810,8 +804,10 @@ fun App(manager: LocalSendManager) {
         }
         if (uiSkin == UiSkin.COLOROS) {
             ProvideCouiMenuBackdrop { windowModifier ->
-                Box(modifier = Modifier.fillMaxSize().then(windowModifier)) {
-                    appWindowContent()
+                CompositionLocalProvider(LocalCouiWindowBackdropAvailable provides true) {
+                    Box(modifier = Modifier.fillMaxSize().then(windowModifier)) {
+                        CouiSkinTheme { appWindowContent() }
+                    }
                 }
             }
         } else {

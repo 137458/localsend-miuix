@@ -85,7 +85,8 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.19.0")
+    // coUI-Kit 0.0.1-alpha10 runtime 传递要求 core-ktx:1.19.1，显式对齐以避免编译/运行版本分裂
+    implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
@@ -94,8 +95,9 @@ dependencies {
     // Provides LocalNavigationEventDispatcherOwner needed by Miuix WindowDialog/NavigationBackHandler
     implementation("androidx.navigationevent:navigationevent-compose:1.1.2")
 
-    // Jetpack Compose
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+    // Jetpack Compose: Miuix 0.9.4 依赖 foundation:1.12.0，coUI 0.0.1-alpha10 强依赖 compose-bom-alpha:2026.08.01
+    // (将 ui/foundation 抬升至 1.13.0-alpha02，同时传递 kotlin-stdlib:2.4.20)。显式锁定同一 BOM 以消除隐式漂移，不可回钉至 1.7.6。
+    val composeBom = platform("androidx.compose:compose-bom-alpha:2026.08.01")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -111,7 +113,7 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:$miuixVersion")
     implementation("top.yukonga.miuix.kmp:miuix-nav-android:$miuixVersion")
 
-    // coUI-Kit (ColorOS Compose 皮肤方案；AAR 强制 minSdk 31)
+    // coUI-Kit (ColorOS Compose 皮肤方案；AAR 强制 minSdk 31，且强依赖 compose-bom-alpha:2026.08.01 与 foundation:1.12.0+)
     implementation("io.github.itoseo:coui:0.0.1-alpha10")
 
     // Kotlinx Coroutines & Serialization

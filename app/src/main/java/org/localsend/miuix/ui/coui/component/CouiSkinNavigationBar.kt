@@ -3,29 +3,53 @@ package org.localsend.miuix.ui.coui.component
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.tappableElement
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.itos.coui.backdrop.CouiBackdrop
 import com.itos.coui.effect.CouiFloatingRenderer
+import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.navigation.CouiNavigationItem
 import com.itos.coui.navigation.NavigationBar
-import com.itos.coui.shape.CouiShape
-import com.itos.coui.theme.CouiColor
+import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.theme.CouiTheme
 import top.yukonga.miuix.kmp.basic.Icon
 
@@ -34,10 +58,9 @@ private const val COUI_FLOATING_NAV_BAR_MIN_SDK = 34
 
 /**
  * ColorOS 皮肤底栏（形态 A）：Android 14 及以上用 coUI-Kit 原厂浮动材质底栏，
- * Android 12–13 退回同色系平面胶囊，保证皮肤在 minSdk 31 上形态一致。
+ * Android 12–13 退回同形制平面胶囊，保证皮肤在 minSdk 31 上形态、无障碍与键盘导航一致。
  *
- * [badgeVisible] 按 Tab 索引给出是否需要角标：库 [NavigationBar] 没有角标槽位，
- * 只有平面兜底栏自绘 coUI 通知点。
+ * 库 [NavigationBar] 没有角标槽位，待接收提示统一由各页面顶栏图标承担。
  */
 @Composable
 internal fun CouiSkinNavigationBar(
@@ -46,7 +69,6 @@ internal fun CouiSkinNavigationBar(
     onSelect: (Int) -> Unit,
     backdrop: CouiBackdrop,
     modifier: Modifier = Modifier,
-    badgeVisible: (Int) -> Boolean = { false },
 ) {
     if (Build.VERSION.SDK_INT >= COUI_FLOATING_NAV_BAR_MIN_SDK) {
         CouiLibraryNavigationBar(
@@ -62,7 +84,6 @@ internal fun CouiSkinNavigationBar(
             selectedIndex = selectedIndex,
             onSelect = onSelect,
             modifier = modifier,
-            badgeVisible = badgeVisible,
         )
     }
 }
@@ -89,60 +110,97 @@ private fun CouiLibraryNavigationBar(
     )
 }
 
-/** 平面兜底：单行胶囊 + 选中态底色块，不依赖 Mesh 材质。 */
+/** 平面兜底：56dp CouiCapsuleShape 胶囊 + 图标与 10sp 标签 + 完整 Tab 语义与键盘切换。 */
 @Composable
 private fun CouiPlainNavigationBar(
     items: List<CouiNavigationItem>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    badgeVisible: (Int) -> Boolean = { false },
 ) {
     val scheme = CouiTheme.colorScheme
     val dark = CouiTheme.isDark
     val tint = if (dark) Color.White else Color.Black
-    // 角标沿用 coUI 固定色板的红，CouiColorScheme 本身没有通知/错误语义色
-    val badgeColor = if (dark) CouiColor.Night.RED else CouiColor.Day.RED
-    Row(
+    val selectedColor = tint.copy(alpha = 230f / 255f)
+    val unselectedColor = tint.copy(alpha = 184f / 255f)
+    val density = LocalDensity.current
+    val bottomMargin = if (WindowInsets.tappableElement.getBottom(density) > 0) 0.dp else 8.dp
+    val maxWidth = 24.dp + 70.dp * items.size + 8.dp * (items.size - 1)
+
+    Box(
         modifier =
             modifier
-                .padding(horizontal = 24.dp)
                 .fillMaxWidth()
-                .height(64.dp)
-                .clip(RoundedCornerShape(32.dp))
-                .background(scheme.container),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
+                .windowInsetsPadding(WindowInsets.tappableElement.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + bottomMargin),
+        contentAlignment = Alignment.Center,
     ) {
-        items.forEachIndexed { index, item ->
-            val selected = index == selectedIndex
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .padding(horizontal = 6.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(if (selected) tint.copy(alpha = 0.12f) else Color.Transparent)
-                        .clickable { onSelect(index) },
-                contentAlignment = Alignment.Center,
-            ) {
-                // 图标容器与图标同尺寸，角标按 TopEnd 对齐图标右上角
-                Box(modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        imageVector = if (selected) item.selectedIcon else item.icon,
-                        contentDescription = item.title,
-                        tint = tint.copy(alpha = if (selected) 1f else 0.6f),
-                        modifier = Modifier.size(24.dp),
-                    )
-                    if (badgeVisible(index)) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .align(Alignment.TopEnd)
-                                    .offset(x = 2.dp, y = (-2).dp)
-                                    .size(8.dp)
-                                    .background(badgeColor, CouiShape(4.dp)),
+        Row(
+            modifier =
+                Modifier
+                    .widthIn(max = maxWidth)
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .clip(CouiCapsuleShape)
+                    .background(scheme.container)
+                    .selectableGroup()
+                    .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items.forEachIndexed { index, item ->
+                val isSelected = index == selectedIndex
+                val contentColor = if (isSelected) selectedColor else unselectedColor
+                val interactionSource = remember { MutableInteractionSource() }
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .clip(CouiCapsuleShape)
+                            .background(if (isSelected) tint.copy(alpha = 0.12f) else Color.Transparent)
+                            .couiButtonFeedback(dark = dark, interactionSource = interactionSource)
+                            .selectable(
+                                selected = isSelected,
+                                interactionSource = interactionSource,
+                                indication = null,
+                                role = Role.Tab,
+                                onClick = { if (!isSelected) onSelect(index) },
+                            ).semantics(mergeDescendants = true) {
+                                selected = isSelected
+                            }.onKeyEvent {
+                                if (it.type == KeyEventType.KeyUp && (it.key == Key.Enter || it.key == Key.Spacebar)) {
+                                    if (!isSelected) onSelect(index)
+                                    true
+                                } else {
+                                    false
+                                }
+                            }.focusable(interactionSource = interactionSource),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(top = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Top,
+                    ) {
+                        Icon(
+                            imageVector = if (isSelected) item.selectedIcon else item.icon,
+                            contentDescription = null,
+                            tint = contentColor,
+                            modifier = Modifier.size(24.dp),
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        BasicText(
+                            text = item.title,
+                            style =
+                                TextStyle(
+                                    color = contentColor,
+                                    fontSize = 10.sp,
+                                    lineHeight = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }

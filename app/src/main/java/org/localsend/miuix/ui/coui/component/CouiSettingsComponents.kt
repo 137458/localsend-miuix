@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import com.itos.coui.effect.couiButtonFeedback
+import com.itos.coui.layout.CouiPageDefaults
 import com.itos.coui.layout.Item
 import com.itos.coui.menu.CouiMenuItem
 import com.itos.coui.menu.Menu
@@ -27,36 +28,56 @@ import com.itos.coui.theme.CouiTheme
 // 行内标题、说明与取值需要页面自己拼。这里把三种文本收敛成统一入口，
 // 保证同一类信息在四张卡片里用同一字阶与同一颜色。
 
-/** 行标题。字阶交给 coUI 主题下发，避免每行各写一份字号。 */
+/** 行标题。字阶交给 coUI 主题下发，禁用态统一取库 `CouiPageDefaults.themeColors().disabled`。 */
 @Composable
-internal fun CouiRowTitle(text: String) {
-    Text(text = text, kind = CouiTextKind.ItemTitle)
+internal fun CouiRowTitle(
+    text: String,
+    enabled: Boolean = true,
+) {
+    val pageColors = CouiPageDefaults.themeColors()
+    Text(
+        text = text,
+        kind = CouiTextKind.ItemTitle,
+        color = if (enabled) pageColors.title else pageColors.disabled,
+    )
 }
 
-/** 行说明。次要色表达从属关系。 */
+/** 行说明。次要色表达从属关系，禁用态统一下沉到库 disabled 色。 */
 @Composable
-internal fun CouiRowSummary(text: String) {
+internal fun CouiRowSummary(
+    text: String,
+    enabled: Boolean = true,
+) {
+    val pageColors = CouiPageDefaults.themeColors()
     Text(
         text = text,
         kind = CouiTextKind.ItemSummary,
-        color = CouiTheme.colorScheme.onSurfaceVariant,
+        color = if (enabled) pageColors.summary else pageColors.disabled,
     )
 }
 
 /** 行尾当前值。只读展示，点击语义归整行。 */
 @Composable
-internal fun CouiRowValue(text: String) {
+internal fun CouiRowValue(
+    text: String,
+    enabled: Boolean = true,
+) {
+    val pageColors = CouiPageDefaults.themeColors()
     Text(
         text = text,
         kind = CouiTextKind.ItemValue,
-        color = CouiTheme.colorScheme.onSurfaceVariant,
+        color = if (enabled) pageColors.summary else pageColors.disabled,
     )
 }
 
 /** 可空文案转成 Item 的 summary 插槽：空文案返回 null，行内不留说明占位。 */
-private fun couiSummaryOrNull(text: String?): (@Composable () -> Unit)? = text?.let(::couiSummary)
-
-private fun couiSummary(text: String): (@Composable () -> Unit) = { CouiRowSummary(text) }
+private fun couiSummaryOrNull(
+    text: String?,
+    enabled: Boolean = true,
+): (@Composable () -> Unit)? =
+    text?.let { content ->
+        { CouiRowSummary(text = content, enabled = enabled) }
+    }
 
 /** 可点击行：标题 + 可选说明，用于跳转类设置项。 */
 @Composable
@@ -66,10 +87,9 @@ internal fun CouiArrowRow(
     summary: String? = null,
     enabled: Boolean = true,
 ) {
-    // 先落成局部 val，lambda 里才能对可空值做智能转换
     Item(
-        title = { CouiRowTitle(title) },
-        summary = couiSummaryOrNull(summary),
+        title = { CouiRowTitle(title, enabled = enabled) },
+        summary = couiSummaryOrNull(summary, enabled = enabled),
         enabled = enabled,
         onClick = onClick,
     )
@@ -107,8 +127,8 @@ internal fun CouiSwitchRow(
                     role = Role.Switch,
                     onValueChange = onCheckedChange,
                 ),
-        title = { CouiRowTitle(title) },
-        summary = couiSummaryOrNull(summary),
+        title = { CouiRowTitle(title, enabled = enabled) },
+        summary = couiSummaryOrNull(summary, enabled = enabled),
         enabled = enabled,
         trailing = {
             Switch(
@@ -145,11 +165,11 @@ internal fun <T> CouiChoiceRow(
                 .couiMenuAnchor(anchor),
     ) {
         Item(
-            title = { CouiRowTitle(title) },
-            summary = couiSummaryOrNull(summary),
-            trailing = { CouiRowValue(value) },
+            title = { CouiRowTitle(title, enabled = enabled) },
+            summary = couiSummaryOrNull(summary, enabled = enabled),
+            trailing = { CouiRowValue(value, enabled = enabled) },
             enabled = enabled,
-            onClick = { anchor.open { expanded = true } },
+            onClick = { if (enabled) anchor.open { expanded = true } },
         )
         Menu(
             expanded = expanded,

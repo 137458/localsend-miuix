@@ -1,17 +1,12 @@
 package org.localsend.miuix.ui.coui.page
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,18 +17,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.itos.coui.dialog.CouiDialogAction
-import com.itos.coui.dialog.CouiDialogActionStyle
-import com.itos.coui.dialog.CouiDialogDefaults
-import com.itos.coui.dialog.Dialog
+import com.itos.coui.layout.Divider
 import com.itos.coui.layout.Group
 import com.itos.coui.layout.Scaffold
 import com.itos.coui.scroll.couiVerticalScroll
-import com.itos.coui.text.CouiTextKind
-import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
 import com.itos.coui.topappbar.TopAppBar
 import org.localsend.miuix.BuildConfig
@@ -43,11 +32,15 @@ import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.DeviceType
 import org.localsend.miuix.ui.MainActivity
+import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.PinDialog
 import org.localsend.miuix.ui.coui.component.CouiArrowRow
 import org.localsend.miuix.ui.coui.component.CouiChoiceRow
+import org.localsend.miuix.ui.coui.component.CouiIconAction
 import org.localsend.miuix.ui.coui.component.CouiSwitchRow
+import org.localsend.miuix.ui.coui.component.CouiTopBarTitle
 import org.localsend.miuix.ui.coui.dialog.CouiAlertDialog
+import org.localsend.miuix.ui.coui.dialog.CouiCertFingerprintDialog
 import org.localsend.miuix.ui.coui.dialog.CouiInputDialog
 import org.localsend.miuix.util.AppLanguage
 import org.localsend.miuix.util.SettingsValidators
@@ -83,6 +76,8 @@ fun CouiSettingsScreen(
     onOpenPortDialog: () -> Unit,
     onPickDirectory: () -> Unit,
     onNavigateToUpdate: () -> Unit = {},
+    incomingTaskCount: Int = 0,
+    onOpenHome: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val settings by manager.settings.collectAsStateWithLifecycle()
@@ -142,17 +137,28 @@ fun CouiSettingsScreen(
 
     // 外层 Box 只负责给 Scaffold 有界约束：库在无界约束下直接 require 失败（Scaffold.kt:81）。
     Box(modifier = Modifier.fillMaxSize()) {
-        // 顶栏玻璃与采样源由库 Scaffold 自建；状态栏 inset 由 TopAppBar 的缺省 windowInsets 消费。
+        // 顶栏玻璃与采样源由库 Scaffold 自建；外围 insets 清零以防和外层 Miuix Scaffold 重复消费。
         Scaffold(
             modifier = Modifier.fillMaxSize(),
+            windowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(
+                        CouiTopBarTitle(
                             text = stringResource(R.string.settings_title),
-                            kind = CouiTextKind.TopBar,
                             color = CouiTheme.colorScheme.onSurface,
                         )
+                    },
+                    actions = {
+                        if (incomingTaskCount > 0) {
+                            CouiIconAction(
+                                icon = AppIcons.Receive,
+                                contentDescription = stringResource(R.string.receive_section_incoming_count, incomingTaskCount),
+                                tint = CouiTheme.colorScheme.accentOnSurface,
+                                onClick = onOpenHome,
+                                showBadgeDot = true,
+                            )
+                        }
                     },
                 )
             },
@@ -175,6 +181,7 @@ fun CouiSettingsScreen(
                         summary = settings.alias,
                         onClick = onOpenRenameDialog,
                     )
+                    Divider()
                     CouiChoiceRow(
                         title = stringResource(R.string.settings_pref_language_title),
                         value = languageOptions.getOrElse(selectedLanguageIndex(languageSettings, settings.language)) { languageOptions[0] },
@@ -186,6 +193,7 @@ fun CouiSettingsScreen(
                             (context as? MainActivity)?.recreate()
                         },
                     )
+                    Divider()
                     CouiChoiceRow(
                         title = stringResource(R.string.settings_pref_device_type_title),
                         value = deviceTypeOptions.getOrElse(currentDeviceTypeIndex) { deviceTypeOptions[0] },
@@ -193,6 +201,7 @@ fun CouiSettingsScreen(
                         current = settings.deviceType,
                         onSelect = { type -> manager.updateSettings { it.copy(deviceType = type) } },
                     )
+                    Divider()
                     CouiChoiceRow(
                         title = stringResource(R.string.settings_pref_theme_title),
                         value = themeOptions.getOrElse(settings.themeModeIndex) { themeOptions[0] },
@@ -200,6 +209,7 @@ fun CouiSettingsScreen(
                         current = settings.themeModeIndex,
                         onSelect = { index -> manager.updateSettings { it.copy(themeModeIndex = index) } },
                     )
+                    Divider()
                     CouiChoiceRow(
                         title = stringResource(R.string.settings_pref_ui_skin_title),
                         value = uiSkinOptions.getOrElse(settings.uiSkinIndex) { uiSkinOptions[0] },
@@ -207,6 +217,7 @@ fun CouiSettingsScreen(
                         current = settings.uiSkinIndex,
                         onSelect = { index -> manager.updateSettings { it.copy(uiSkinIndex = index) } },
                     )
+                    Divider()
                     CouiSwitchRow(
                         title = stringResource(R.string.settings_pref_vibrate_title),
                         checked = settings.vibrateOnComplete,
@@ -214,6 +225,7 @@ fun CouiSettingsScreen(
                             manager.updateSettings { it.copy(vibrateOnComplete = checked) }
                         },
                     )
+                    Divider()
                     CouiSwitchRow(
                         title = stringResource(R.string.settings_pref_auto_finish_title),
                         checked = settings.autoFinish,
@@ -232,6 +244,7 @@ fun CouiSettingsScreen(
                             manager.updateSettings { it.copy(quickSave = checked) }
                         },
                     )
+                    Divider()
                     if (settings.quickSave) {
                         CouiSwitchRow(
                             title = stringResource(R.string.receive_pref_quick_save_from_favorites_title),
@@ -240,6 +253,7 @@ fun CouiSettingsScreen(
                                 manager.updateSettings { it.copy(quickSaveFromFavorites = checked) }
                             },
                         )
+                        Divider()
                     }
                     CouiSwitchRow(
                         title = stringResource(R.string.receive_pref_auto_copy_title),
@@ -249,6 +263,7 @@ fun CouiSettingsScreen(
                             manager.updateSettings { it.copy(autoCopyText = checked) }
                         },
                     )
+                    Divider()
                     CouiSwitchRow(
                         title = stringResource(R.string.settings_pref_save_text_as_file_title),
                         summary = stringResource(R.string.settings_pref_save_text_as_file_desc),
@@ -257,6 +272,7 @@ fun CouiSettingsScreen(
                             manager.updateSettings { it.copy(saveTextAsFile = checked) }
                         },
                     )
+                    Divider()
                     CouiSwitchRow(
                         title = stringResource(R.string.settings_pref_auto_categorize_title),
                         summary = stringResource(R.string.settings_pref_auto_categorize_desc),
@@ -265,6 +281,7 @@ fun CouiSettingsScreen(
                             manager.updateSettings { it.copy(autoCategorizeMedia = checked) }
                         },
                     )
+                    Divider()
                     CouiArrowRow(
                         title = stringResource(R.string.settings_pref_download_path_title),
                         summary = settings.downloadDisplay ?: settings.downloadPath,
@@ -278,12 +295,14 @@ fun CouiSettingsScreen(
                         summary = settings.port.toString(),
                         onClick = onOpenPortDialog,
                     )
+                    Divider()
                     CouiSwitchRow(
                         title = stringResource(R.string.settings_pref_https_title),
                         summary = stringResource(R.string.settings_pref_https_summary),
                         checked = settings.useHttps,
                         onCheckedChange = { checked -> manager.applyUseHttpsChange(checked) },
                     )
+                    Divider()
                     CouiArrowRow(
                         title = stringResource(R.string.settings_pref_pin_title),
                         summary =
@@ -294,6 +313,7 @@ fun CouiSettingsScreen(
                             },
                         onClick = { showPinDialog = true },
                     )
+                    Divider()
                     CouiArrowRow(
                         title = stringResource(R.string.settings_pref_cert_fp_title),
                         summary =
@@ -313,16 +333,19 @@ fun CouiSettingsScreen(
                         summary = settings.networkWhitelist.ifEmpty { "—" },
                         onClick = { editingAdvancedField = AdvancedNetworkField.WHITELIST },
                     )
+                    Divider()
                     CouiArrowRow(
                         title = stringResource(R.string.settings_pref_network_blacklist_title),
                         summary = settings.networkBlacklist.ifEmpty { "—" },
                         onClick = { editingAdvancedField = AdvancedNetworkField.BLACKLIST },
                     )
+                    Divider()
                     CouiArrowRow(
                         title = stringResource(R.string.settings_pref_multicast_group_title),
                         summary = settings.multicastGroup,
                         onClick = { editingAdvancedField = AdvancedNetworkField.MULTICAST_GROUP },
                     )
+                    Divider()
                     CouiArrowRow(
                         title = stringResource(R.string.settings_pref_discovery_timeout_title),
                         summary = settings.discoveryTimeout.toString(),
@@ -336,11 +359,13 @@ fun CouiSettingsScreen(
                         summary = stringResource(R.string.settings_pref_check_update_summary, BuildConfig.VERSION_NAME),
                         onClick = onNavigateToUpdate,
                     )
+                    Divider()
                     CouiArrowRow(
                         title = stringResource(R.string.settings_pref_github_title),
                         summary = ExternalLinks.GITHUB_REPO,
                         onClick = { UpdateManager.openInBrowser(context, ExternalLinks.GITHUB_REPO) },
                     )
+                    Divider()
                     CouiArrowRow(
                         title = stringResource(R.string.settings_pref_license_title),
                         summary = stringResource(R.string.settings_pref_license_summary),
@@ -446,79 +471,9 @@ private fun selectedLanguageIndex(
 ): Int = settings.indexOf(language).coerceAtLeast(0)
 
 /**
- * TLS 证书指纹弹窗，正文用库 Dialog 的 content 槽位：标签 + 可长按复制的指纹。
- *
- * 动作走库的 confirm/dismiss/neutral 三槽：复制是主操作（弹窗不关闭，库的动作是受控回调），
- * 重新生成放在 neutral 上，库对它固定使用破坏性配色（Dialog.kt:167）。
- * 三个动作时库横排转竖排、顺序为 neutral/confirm/dismiss（Dialog.kt:105-106、:123），
- * 与原版「复制 → 重新生成 → 关闭」的上下次序不同，这是库的排版契约。
- */
-@Composable
-private fun CouiCertFingerprintDialog(
-    show: Boolean,
-    fingerprint: String,
-    onDismissRequest: () -> Unit,
-    onRegenerate: () -> Unit,
-) {
-    val context = LocalContext.current
-    val scheme = CouiTheme.colorScheme
-
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        confirmAction =
-            CouiDialogAction(
-                text = stringResource(R.string.dialog_cert_btn_copy),
-                onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Certificate Fingerprint", fingerprint))
-                },
-                style = CouiDialogActionStyle.Primary,
-                colors = CouiDialogDefaults.primaryActionColors(scheme.accent),
-            ),
-        title = stringResource(R.string.dialog_cert_title),
-        message = stringResource(R.string.dialog_cert_desc),
-        neutralAction =
-            CouiDialogAction(
-                text = stringResource(R.string.dialog_cert_btn_regenerate),
-                onClick = onRegenerate,
-            ),
-        dismissAction =
-            CouiDialogAction(
-                text = stringResource(R.string.btn_close),
-                onClick = onDismissRequest,
-            ),
-        visible = show,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = CouiDialogDefaults.contentPadding),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.dialog_cert_label),
-                kind = CouiTextKind.ItemSummary,
-                color = scheme.onSurfaceVariant,
-            )
-            SelectionContainer {
-                Text(
-                    text = fingerprint.ifEmpty { stringResource(R.string.dialog_cert_empty) },
-                    kind = CouiTextKind.ItemValue,
-                    color = scheme.accent,
-                    textAlign = TextAlign.Start,
-                )
-            }
-        }
-    }
-}
-
-/**
  * 高级网络选项的文本编辑弹窗。
  *
- * 校验不通过时置灰确认按钮（库的 CouiDialogAction.enabled），不再 Toast 后保持窗口：
- * 原实现的 Toast 反馈只在点击确认后出现，改成禁用后错误在点击前就可感知。
- * 库输入弹窗没有 maxLength 槽位，等价改写为在 onValueChange 里丢弃超长输入。
+ * 校验不通过或超过 200 字符上限时通过字数计数器变红并禁用确认按钮反馈给用户。
  */
 @Composable
 private fun AdvancedNetworkEditDialog(
@@ -532,17 +487,20 @@ private fun AdvancedNetworkEditDialog(
     var value by remember(show, initialValue) {
         mutableStateOf(TextFieldValue(initialValue, TextRange(initialValue.length)))
     }
+    val overLimit = value.text.length > 200
 
     CouiInputDialog(
         show = show,
         title = title,
         value = value,
-        onValueChange = { if (it.text.length <= 200) value = it },
+        onValueChange = { value = it },
         placeholder = title,
         confirmText = stringResource(R.string.btn_confirm),
         clearContentDescription = stringResource(R.string.btn_clear),
         dismissText = stringResource(R.string.btn_cancel),
-        confirmEnabled = validate(value.text),
+        confirmEnabled = !overLimit && validate(value.text),
+        counter = "${value.text.length}/200",
+        counterIsError = overLimit,
         onConfirm = {
             onSave(value.text)
             onDismissRequest()

@@ -1,3 +1,5 @@
+@file:Suppress("LocalContextGetResourceValueCall")
+
 package org.localsend.miuix.ui.coui.dialog
 
 import android.content.Intent
@@ -7,10 +9,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -49,6 +53,7 @@ import org.localsend.miuix.model.TransferSession
 import org.localsend.miuix.ui.component.FileThumbnail
 import org.localsend.miuix.ui.component.detectWebUrlInText
 import org.localsend.miuix.ui.component.rememberDialogContentMaxHeight
+import org.localsend.miuix.ui.coui.component.couiMinTouchTarget
 
 /**
  * 传入传输请求弹窗的 coUI 版本：标题与来源设备走库的 title/message 槽，
@@ -73,11 +78,18 @@ internal fun CouiIncomingTransferDialog(
     onDecline: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var selectedFileIds by remember(session?.sessionId) {
-        mutableStateOf(session?.files?.map { it.id }?.toSet() ?: emptySet())
+    var lastSession by remember { mutableStateOf(session) }
+    if (session != null) {
+        lastSession = session
     }
-    val primaryActionColors = CouiDialogDefaults.primaryActionColors(CouiTheme.colorScheme.accent)
-    val isTextMessage = session?.isTextMessage == true
+    val renderSession = session ?: lastSession
+    var selectedFileIds by remember(renderSession?.sessionId) {
+        mutableStateOf(renderSession?.files?.map { it.id }?.toSet() ?: emptySet())
+    }
+    val primaryActionColors = couiPrimaryActionColors()
+    val placement = rememberCouiDialogPlacement()
+    val material = rememberCouiDialogMaterial()
+    val isTextMessage = renderSession?.isTextMessage == true
 
     Dialog(
         // 关闭弹窗（点击外部或返回键）只是收起提示，不等于拒绝：请求仍由系统保持待处理，
@@ -101,25 +113,27 @@ internal fun CouiIncomingTransferDialog(
                 )
             },
         title = if (isTextMessage) stringResource(R.string.dialog_incoming_text_title) else stringResource(R.string.dialog_incoming_files_title),
-        message = session?.let { stringResource(R.string.dialog_incoming_from_device, it.device.alias, it.device.ip) },
+        message = renderSession?.let { stringResource(R.string.dialog_incoming_from_device, it.device.alias, it.device.ip) },
         dismissAction = CouiDialogAction(text = stringResource(R.string.btn_decline), onClick = onDecline),
+        placement = placement,
+        material = material,
         visible = session != null,
     ) {
-        if (session != null) {
+        if (renderSession != null) {
             // content 槽位于库自带的纵向滚动区内，四周留白要与 title/message 的 contentPadding 对齐；
             // 因此这里只补水平内边距，纵向间距交给 Column 的 spacedBy。
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = CouiDialogDefaults.contentPadding),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (session.isTextMessage) {
+                if (renderSession.isTextMessage) {
                     CouiIncomingTextBody(
-                        session = session,
+                        session = renderSession,
                         onOpenUrl = { onAccept(null) },
                     )
                 } else {
                     CouiIncomingFileSelection(
-                        session = session,
+                        session = renderSession,
                         selectedFileIds = selectedFileIds,
                         onSelectedFileIdsChange = { selectedFileIds = it },
                     )
@@ -186,6 +200,7 @@ private fun CouiOpenUrlRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .defaultMinSize(minHeight = 48.dp)
                 .clip(CouiShape(12.dp))
                 .couiButtonFeedback(dark = CouiTheme.isDark, interactionSource = interactionSource)
                 .clickable(
@@ -301,27 +316,34 @@ private fun CouiSelectAllToggle(
     onToggle: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    Row(
+    Box(
         modifier =
             Modifier
-                .clip(CouiShape(8.dp))
-                .couiButtonFeedback(dark = CouiTheme.isDark, interactionSource = interactionSource)
                 .toggleable(
                     value = isAllSelected,
                     interactionSource = interactionSource,
                     indication = null,
                     role = Role.Checkbox,
                     onValueChange = { onToggle() },
-                ).padding(horizontal = 4.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
+                ).couiMinTouchTarget(),
+        contentAlignment = Alignment.Center,
     ) {
-        Checkbox(checked = isAllSelected)
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = stringResource(R.string.dialog_incoming_select_all),
-            kind = CouiTextKind.ItemSummary,
-            color = CouiTheme.colorScheme.onSurface,
-        )
+        Row(
+            modifier =
+                Modifier
+                    .clip(CouiShape(8.dp))
+                    .couiButtonFeedback(dark = CouiTheme.isDark, interactionSource = interactionSource)
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(checked = isAllSelected)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = stringResource(R.string.dialog_incoming_select_all),
+                kind = CouiTextKind.ItemSummary,
+                color = CouiTheme.colorScheme.onSurface,
+            )
+        }
     }
 }
 
@@ -338,6 +360,7 @@ private fun CouiIncomingFileRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .defaultMinSize(minHeight = 48.dp)
                 .clip(CouiShape(8.dp))
                 .couiButtonFeedback(
                     dark = CouiTheme.isDark,
