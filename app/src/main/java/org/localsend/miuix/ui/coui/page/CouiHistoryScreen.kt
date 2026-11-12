@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -51,6 +53,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.itos.coui.backdrop.CouiBackdrop
+import com.itos.coui.backdrop.couiBackdrop
+import com.itos.coui.backdrop.rememberCouiBackdrop
 import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.layout.CouiPageDefaults
 import com.itos.coui.layout.Scaffold
@@ -132,6 +137,21 @@ fun CouiHistoryScreen(
     val scrollBehavior =
         CouiTopAppBarDefaults.exitUntilCollapsedScrollBehavior(canScroll = { canScrollBackward.value })
     val density = LocalDensity.current
+    // 筛选胶囊凝光采样源：带页面底色绘制，避免滚动卡片之间透明像素在玻璃边缘产生暗框；主题切换时随底色重建
+    val filterBackdrop =
+        if (Build.VERSION.SDK_INT >= COUI_SEGMENTED_CONTROL_MIN_SDK) {
+            key(scheme.background) {
+                rememberCouiBackdrop(
+                    diagnosticName = "coui-history-filter",
+                    drawSource = {
+                        drawRect(scheme.background)
+                        drawContent()
+                    },
+                )
+            }
+        } else {
+            null
+        }
 
     Scaffold(
         modifier =
@@ -178,6 +198,7 @@ fun CouiHistoryScreen(
                     labels = filterTabs,
                     selectedIndex = selectedFilterIndex,
                     onSelected = { selectedFilterIndex = it },
+                    backdrop = filterBackdrop,
                 )
             }
         },
@@ -188,7 +209,10 @@ fun CouiHistoryScreen(
         // 回弹节点由 LazyColumn 内部的 scrollableArea 挂载，不能再叠 Modifier.overscroll；
         // 顶栏高度只放进列表内侧 contentPadding：正文与栏位同点叠放，内容从栏下穿过才会被顶栏材质采样
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .then(if (filterBackdrop != null) Modifier.couiBackdrop(filterBackdrop) else Modifier),
             state = listState,
             overscrollEffect = historyOverscroll,
             contentPadding =
@@ -295,25 +319,30 @@ fun CouiHistoryScreen(
 private const val COUI_SEGMENTED_CONTROL_MIN_SDK = 34
 
 /**
- * 筛选栏：Android 14 及以上用库 [SegmentedControl]，Android 12-13 退回同形制的自绘三段胶囊。
- * 栏位层叠在正文之上，必须刷页面底色，否则滚动内容会从筛选栏下方透出来。
+ * 筛选栏：Android 14 及以上使用带凝光背景采样的库 [SegmentedControl] 悬浮椭圆胶囊，
+ * Android 12-13 退回同形制的单胶囊外框三段切换；外层保持透明，让滚动内容从胶囊下方穿过。
  */
 @Composable
 private fun CouiHistoryFilterBar(
     labels: List<String>,
     selectedIndex: Int,
     onSelected: (Int) -> Unit,
+    backdrop: CouiBackdrop?,
 ) {
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(CouiKitTheme.colorScheme.background)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                 .padding(horizontal = CouiPageDefaults.horizontalMargin, vertical = 8.dp),
     ) {
         if (Build.VERSION.SDK_INT >= COUI_SEGMENTED_CONTROL_MIN_SDK) {
-            CouiLibraryFilterTabs(labels = labels, selectedIndex = selectedIndex, onSelected = onSelected)
+            CouiLibraryFilterTabs(
+                labels = labels,
+                selectedIndex = selectedIndex,
+                onSelected = onSelected,
+                backdrop = backdrop,
+            )
         } else {
             CouiPlainFilterTabs(labels = labels, selectedIndex = selectedIndex, onSelected = onSelected)
         }
@@ -327,18 +356,20 @@ private fun CouiLibraryFilterTabs(
     labels: List<String>,
     selectedIndex: Int,
     onSelected: (Int) -> Unit,
+    backdrop: CouiBackdrop?,
 ) {
     SegmentedControl(
         modifier = Modifier.fillMaxWidth(),
         labels = labels,
         selectedIndex = selectedIndex,
         onSelected = onSelected,
+        backdrop = backdrop,
         dark = CouiKitTheme.isDark,
         small = true,
     )
 }
 
-/** 平面兜底：低版本沿用等宽三段胶囊，对齐 48dp 命中区、Tab 语义与键盘触发。 */
+/** 平面兜底：低版本包进同一条椭圆胶囊外框，对齐 48dp 命中区、Tab 语义与键盘触发。 */
 @Composable
 private fun CouiPlainFilterTabs(
     labels: List<String>,
@@ -347,44 +378,59 @@ private fun CouiPlainFilterTabs(
 ) {
     val scheme = CouiKitTheme.colorScheme
     val dark = CouiKitTheme.isDark
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
     ) {
-        labels.forEachIndexed { index, label ->
-            val selected = index == selectedIndex
-            val interactionSource = remember { MutableInteractionSource() }
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .couiSelectableTab(
-                            selected = selected,
-                            interactionSource = interactionSource,
-                            onSelect = { onSelected(index) },
-                        ).couiMinTouchTarget(),
-                contentAlignment = Alignment.Center,
-            ) {
+        // 视觉外框与触控行分离：避免外框高度限制内部 couiMinTouchTarget 撑到 48dp
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(32.dp)
+                    .clip(CouiCapsuleShape)
+                    .background(scheme.container),
+        )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 2.dp)
+                    .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            labels.forEachIndexed { index, label ->
+                val selected = index == selectedIndex
+                val interactionSource = remember { MutableInteractionSource() }
                 Box(
                     modifier =
                         Modifier
-                            .fillMaxWidth()
-                            .height(40.dp)
-                            .clip(CouiCapsuleShape)
-                            .background(if (selected) scheme.surface else scheme.container)
-                            .couiButtonFeedback(dark = dark, interactionSource = interactionSource),
+                            .weight(1f)
+                            .couiSelectableTab(
+                                selected = selected,
+                                interactionSource = interactionSource,
+                                onSelect = { onSelected(index) },
+                            ).couiMinTouchTarget(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = label,
-                        kind = CouiTextKind.ItemSummary,
-                        color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(28.dp)
+                                .clip(CouiCapsuleShape)
+                                .background(if (selected) scheme.surface else Color.Transparent)
+                                .couiButtonFeedback(dark = dark, interactionSource = interactionSource),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = label,
+                            kind = CouiTextKind.ItemSummary,
+                            color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }
