@@ -13,3 +13,4 @@ local.properties
 release-assets/
 hs_err_pid*.log
 docs/research/
+.tmp-coui/
