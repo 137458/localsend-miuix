@@ -67,6 +67,7 @@ import org.localsend.miuix.ui.coui.component.CouiSkinNavigationBar
 import org.localsend.miuix.ui.coui.page.CouiHistoryScreen
 import org.localsend.miuix.ui.coui.page.CouiHomeScreen
 import org.localsend.miuix.ui.coui.page.CouiSettingsScreen
+import org.localsend.miuix.ui.coui.page.CouiUpdateScreen
 import org.localsend.miuix.ui.coui.theme.CouiSkinTheme
 import org.localsend.miuix.ui.navigation.AppRoute
 import org.localsend.miuix.ui.navigation.LocalTabGesturePosition
@@ -589,10 +590,17 @@ fun App(manager: LocalSendManager) {
             entry<AppRoute.Update>(
                 swipeDismiss = NavSwipeDirection.LeftToRight,
             ) {
-                UpdateScreen(
-                    manager = manager,
-                    onBack = { backStack.removeLastOrNull() },
-                )
+                if (uiSkin == UiSkin.COLOROS) {
+                    CouiUpdateScreen(
+                        manager = manager,
+                        onBack = { backStack.removeLastOrNull() },
+                    )
+                } else {
+                    UpdateScreen(
+                        manager = manager,
+                        onBack = { backStack.removeLastOrNull() },
+                    )
+                }
             }
         }
 
