@@ -102,6 +102,9 @@
     <string name="settings_pref_alias_title">Device Alias</string>
     <string name="settings_pref_device_type_title">Device Type</string>
     <string name="settings_pref_theme_title">App Theme</string>
+    <string name="settings_pref_ui_skin_title">Interface Style</string>
+    <string name="ui_skin_hyperos">HyperOS</string>
+    <string name="ui_skin_coloros">ColorOS</string>
     <string name="settings_pref_vibrate_title">Vibration on Finish</string>
     <string name="settings_pref_notif_perm_title">Notifications &amp; Live Updates</string>
     <string name="settings_pref_notif_perm_enabled">On</string>

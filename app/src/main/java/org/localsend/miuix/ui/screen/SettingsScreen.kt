@@ -90,6 +90,12 @@ fun SettingsScreen(
             stringResource(R.string.theme_monet_dark),
         )
 
+    val uiSkinOptions =
+        listOf(
+            stringResource(R.string.ui_skin_hyperos),
+            stringResource(R.string.ui_skin_coloros),
+        )
+
     val languageSettings =
         remember {
             listOf(AppLanguage.SETTING_SYSTEM, AppLanguage.SETTING_ZH, AppLanguage.SETTING_EN)
@@ -205,6 +211,14 @@ fun SettingsScreen(
                             selectedIndex = settings.themeModeIndex,
                             onSelectedIndexChange = { index ->
                                 manager.updateSettings { it.copy(themeModeIndex = index) }
+                            },
+                        )
+                        WindowDropdownPreference(
+                            title = stringResource(R.string.settings_pref_ui_skin_title),
+                            items = uiSkinOptions,
+                            selectedIndex = settings.uiSkinIndex,
+                            onSelectedIndexChange = { index ->
+                                manager.updateSettings { it.copy(uiSkinIndex = index) }
                             },
                         )
                         SwitchPreference(

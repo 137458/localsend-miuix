@@ -34,6 +34,8 @@ data class AppSettings(
     // 应用界面语言："system"|"zh"|"en"，attachBaseContext 阶段直接读偏好
     val language: String = "system",
     val themeModeIndex: Int = 0, // 0: System, 1: Light, 2: Dark, 3: MonetSystem, 4: MonetLight, 5: MonetDark
+    // 界面皮肤：0 HyperOS（Miuix）, 1 ColorOS（coUI-Kit）
+    val uiSkinIndex: Int = 0,
     val vibrateOnComplete: Boolean = true,
     val lastSelectedTabIndex: Int = 0, // 记录离开时的 Tab 索引（0: 首页, 1: 传输历史, 2: 设置），进程恢复时自动还原页面
     val autoCheckUpdate: Boolean = true,

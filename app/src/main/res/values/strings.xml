@@ -102,6 +102,9 @@
     <string name="settings_pref_alias_title">设备别名</string>
     <string name="settings_pref_device_type_title">设备类型</string>
     <string name="settings_pref_theme_title">应用主题</string>
+    <string name="settings_pref_ui_skin_title">界面风格</string>
+    <string name="ui_skin_hyperos">HyperOS</string>
+    <string name="ui_skin_coloros">ColorOS</string>
     <string name="settings_pref_vibrate_title">传输完成震动反馈</string>
     <string name="settings_pref_notif_perm_title">系统通知与焦点通知权限</string>
     <string name="settings_pref_notif_perm_enabled">已开启</string>

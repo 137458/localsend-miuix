@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         applicationId = "org.localsend.miuix.app"
-        minSdk = 26
+        minSdk = 31
         targetSdk = 35
         versionCode = 12401
         versionName = "1.24.1"
@@ -110,6 +110,9 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-squircle-android:$miuixVersion")
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:$miuixVersion")
     implementation("top.yukonga.miuix.kmp:miuix-nav-android:$miuixVersion")
+
+    // coUI-Kit (ColorOS Compose 皮肤方案；AAR 强制 minSdk 31)
+    implementation("io.github.itoseo:coui:0.0.1-alpha10")
 
     // Kotlinx Coroutines & Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")

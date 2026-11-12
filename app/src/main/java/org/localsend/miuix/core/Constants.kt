@@ -15,6 +15,7 @@ object PreferenceKeys {
     const val KEY_DOWNLOAD = "download"
     const val KEY_PIN = "pin"
     const val KEY_THEME = "theme_mode_index"
+    const val KEY_UI_SKIN = "ui_skin_index"
     const val KEY_TREE_URI = "download_tree_uri"
     const val KEY_DOWNLOAD_DISPLAY = "download_display"
     const val KEY_VIBRATE = "vibrate_on_complete"

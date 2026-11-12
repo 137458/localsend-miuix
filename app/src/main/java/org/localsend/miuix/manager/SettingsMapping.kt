@@ -46,6 +46,7 @@ internal fun loadSettings(
         webShareAutoAccept = prefs.getBoolean(PreferenceKeys.KEY_WEB_SHARE_AUTO_ACCEPT, false),
         pin = prefs.getString(PreferenceKeys.KEY_PIN, null),
         themeModeIndex = prefs.getInt(PreferenceKeys.KEY_THEME, 0),
+        uiSkinIndex = prefs.getInt(PreferenceKeys.KEY_UI_SKIN, 0),
         language = prefs.getString(PreferenceKeys.KEY_LANGUAGE, AppLanguage.SETTING_SYSTEM) ?: AppLanguage.SETTING_SYSTEM,
         downloadTreeUri = prefs.getString(PreferenceKeys.KEY_TREE_URI, null),
         downloadDisplay = prefs.getString(PreferenceKeys.KEY_DOWNLOAD_DISPLAY, null),
@@ -85,6 +86,7 @@ internal fun persistSettingsTo(
         .putBoolean(PreferenceKeys.KEY_WEB_SHARE_AUTO_ACCEPT, s.webShareAutoAccept)
         .putString(PreferenceKeys.KEY_PIN, s.pin)
         .putInt(PreferenceKeys.KEY_THEME, s.themeModeIndex)
+        .putInt(PreferenceKeys.KEY_UI_SKIN, s.uiSkinIndex)
         .putString(PreferenceKeys.KEY_LANGUAGE, s.language)
         .putBoolean(PreferenceKeys.KEY_VIBRATE, s.vibrateOnComplete)
         .putInt(PreferenceKeys.KEY_LAST_TAB, s.lastSelectedTabIndex)

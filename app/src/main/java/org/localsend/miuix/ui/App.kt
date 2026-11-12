@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -40,6 +41,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.itos.coui.backdrop.couiBackdrop
+import com.itos.coui.backdrop.rememberCouiBackdrop
+import com.itos.coui.navigation.CouiNavigationItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.localsend.miuix.R
@@ -49,6 +53,7 @@ import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.FileItem
 import org.localsend.miuix.model.MainTabs
 import org.localsend.miuix.model.TransferStatus
+import org.localsend.miuix.model.UiSkin
 import org.localsend.miuix.ui.component.AddContentBottomSheet
 import org.localsend.miuix.ui.component.AppIcons
 import org.localsend.miuix.ui.component.AppPickerBottomSheet
@@ -58,6 +63,8 @@ import org.localsend.miuix.ui.component.PortDialog
 import org.localsend.miuix.ui.component.RenameDeviceDialog
 import org.localsend.miuix.ui.component.SendTextDialog
 import org.localsend.miuix.ui.component.UpdateDialogHost
+import org.localsend.miuix.ui.coui.component.CouiSkinNavigationBar
+import org.localsend.miuix.ui.coui.theme.CouiSkinTheme
 import org.localsend.miuix.ui.navigation.AppRoute
 import org.localsend.miuix.ui.navigation.LocalTabGesturePosition
 import org.localsend.miuix.ui.screen.HistoryScreen
@@ -124,6 +131,7 @@ fun App(manager: LocalSendManager) {
             }
         }
     val themeController = remember(colorSchemeMode) { ThemeController(colorSchemeMode) }
+    val uiSkin = remember(settings.uiSkinIndex) { UiSkin.fromIndex(settings.uiSkinIndex) }
 
     // 2. Horizontal Pager State（支持进程重建时恢复离开时的页面）
     val pagerState =
@@ -413,90 +421,137 @@ fun App(manager: LocalSendManager) {
             transition = NavTransitions.MiuixDefault,
         ) {
             entry<AppRoute.Main> {
-                Scaffold(
-                    bottomBar = {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        bottom =
-                                            if (navBarBottomPadding != 0.dp) {
-                                                8.dp + navBarBottomPadding
-                                            } else {
-                                                20.dp
-                                            },
-                                    ),
-                            contentAlignment = Alignment.BottomCenter,
-                        ) {
-                            CompositionLocalProvider(
-                                LocalTabGesturePosition provides tabGesturePosition,
-                            ) {
-                                IosLiquidGlassNavigationBar(
-                                    items = navigationItems,
-                                    selectedIndex = pagerState.currentPage,
-                                    onItemClick = selectTab,
-                                    backdrop = backdrop,
-                                    badge = { index ->
-                                        if (index == MainTabs.HOME && incomingTaskCount > 0) {
-                                            { Badge { Text(incomingTaskCount.toString()) } }
-                                        } else {
-                                            null
-                                        }
-                                    },
-                                )
-                            }
+                // 采样层自带不透明底色：页签转场期只录正文会让底栏回填区域露出透明像素
+                val couiPageBackground = MiuixTheme.colorScheme.background
+                val couiBackdrop =
+                    if (uiSkin == UiSkin.COLOROS) {
+                        key(couiPageBackground) {
+                            rememberCouiBackdrop(
+                                diagnosticName = "localsend-main",
+                                drawSource = {
+                                    drawRect(couiPageBackground)
+                                    drawContent()
+                                },
+                            )
                         }
-                    },
-                ) { innerPadding ->
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
-                    ) {
-                        Box(
+                    } else {
+                        null
+                    }
+                val couiNavItems =
+                    remember(tabHome, tabHistory, tabSettings) {
+                        listOf(
+                            CouiNavigationItem(title = tabHome, icon = AppIcons.Home, selectedIcon = AppIcons.Home),
+                            CouiNavigationItem(title = tabHistory, icon = AppIcons.History, selectedIcon = AppIcons.History),
+                            CouiNavigationItem(title = tabSettings, icon = AppIcons.Settings, selectedIcon = AppIcons.Settings),
+                        )
+                    }
+                val mainEntry: @Composable () -> Unit = {
+                    Scaffold(
+                        bottomBar = {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            bottom =
+                                                if (navBarBottomPadding != 0.dp) {
+                                                    8.dp + navBarBottomPadding
+                                                } else {
+                                                    20.dp
+                                                },
+                                        ),
+                                contentAlignment = Alignment.BottomCenter,
+                            ) {
+                                CompositionLocalProvider(
+                                    LocalTabGesturePosition provides tabGesturePosition,
+                                ) {
+                                    if (couiBackdrop != null) {
+                                        CouiSkinNavigationBar(
+                                            items = couiNavItems,
+                                            selectedIndex = pagerState.currentPage,
+                                            onSelect = selectTab,
+                                            backdrop = couiBackdrop,
+                                        )
+                                    } else {
+                                        IosLiquidGlassNavigationBar(
+                                            items = navigationItems,
+                                            selectedIndex = pagerState.currentPage,
+                                            onItemClick = selectTab,
+                                            backdrop = backdrop,
+                                            badge = { index ->
+                                                if (index == MainTabs.HOME && incomingTaskCount > 0) {
+                                                    { Badge { Text(incomingTaskCount.toString()) } }
+                                                } else {
+                                                    null
+                                                }
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                    ) { innerPadding ->
+                        Row(
                             modifier =
                                 Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
+                                    .fillMaxSize()
+                                    // 两套皮肤各用一套采样源：coUI 底栏采本层像素，HyperOS 玻璃底栏采样层互斥挂载，避免双份全屏采样
+                                    .then(
+                                        when {
+                                            couiBackdrop != null -> Modifier.couiBackdrop(couiBackdrop)
+                                            backdrop != null -> Modifier.layerBackdrop(backdrop)
+                                            else -> Modifier
+                                        },
+                                    ),
                         ) {
-                            HorizontalPager(
-                                state = pagerState,
-                                beyondViewportPageCount = 2,
-                                modifier = Modifier.fillMaxSize(),
-                            ) { page ->
-                                val pagePadding =
-                                    PaddingValues(
-                                        top = innerPadding.calculateTopPadding(),
-                                        bottom = innerPadding.calculateBottomPadding(),
-                                    )
-                                when (page) {
-                                    MainTabs.HOME ->
-                                        HomeScreen(
-                                            manager = manager,
-                                            contentPadding = pagePadding,
-                                            actions = homeActions,
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
+                            ) {
+                                HorizontalPager(
+                                    state = pagerState,
+                                    beyondViewportPageCount = 2,
+                                    modifier = Modifier.fillMaxSize(),
+                                ) { page ->
+                                    val pagePadding =
+                                        PaddingValues(
+                                            top = innerPadding.calculateTopPadding(),
+                                            bottom = innerPadding.calculateBottomPadding(),
                                         )
-                                    MainTabs.HISTORY ->
-                                        HistoryScreen(
-                                            manager = manager,
-                                            contentPadding = pagePadding,
-                                            onOpenHome = { selectTab(MainTabs.HOME) },
-                                        )
-                                    MainTabs.SETTINGS ->
-                                        SettingsScreen(
-                                            manager = manager,
-                                            contentPadding = pagePadding,
-                                            onOpenRenameDialog = { showRenameDialog = true },
-                                            onOpenPortDialog = { showPortDialog = true },
-                                            onPickDirectory = { directoryPickerLauncher.launch(null) },
-                                            onNavigateToUpdate = { backStack.add(AppRoute.Update) },
-                                        )
+                                    when (page) {
+                                        MainTabs.HOME ->
+                                            HomeScreen(
+                                                manager = manager,
+                                                contentPadding = pagePadding,
+                                                actions = homeActions,
+                                            )
+                                        MainTabs.HISTORY ->
+                                            HistoryScreen(
+                                                manager = manager,
+                                                contentPadding = pagePadding,
+                                                onOpenHome = { selectTab(MainTabs.HOME) },
+                                            )
+                                        MainTabs.SETTINGS ->
+                                            SettingsScreen(
+                                                manager = manager,
+                                                contentPadding = pagePadding,
+                                                onOpenRenameDialog = { showRenameDialog = true },
+                                                onOpenPortDialog = { showPortDialog = true },
+                                                onPickDirectory = { directoryPickerLauncher.launch(null) },
+                                                onNavigateToUpdate = { backStack.add(AppRoute.Update) },
+                                            )
+                                    }
                                 }
                             }
                         }
                     }
+                }
+                if (uiSkin == UiSkin.COLOROS) {
+                    CouiSkinTheme { mainEntry() }
+                } else {
+                    mainEntry()
                 }
             }
 
