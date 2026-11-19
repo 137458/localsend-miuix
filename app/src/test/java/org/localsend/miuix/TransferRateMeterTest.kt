@@ -158,4 +158,43 @@ class TransferRateMeterTest {
     fun finishWithoutSamplesReturnsZero() {
         assertEquals("从未采样时 finish 返回 0", 0L, TransferRateMeter().finish(500L, 10 * mebibyte))
     }
+
+    @Test
+    fun averageSpeedReportsCumulativeRateDuringWarmup() {
+        val meter = TransferRateMeter()
+        meter.sample(0L, 0L)
+        // 前 100ms 传完 1MiB：预热期内瞬时读数是 0，会话级读数必须立刻给出真实平均，不能显示“计算中”
+        assertEquals("预热期内瞬时读数保持 0", 0L, meter.sample(100L, mebibyte))
+        val average = meter.averageSpeed(100L, mebibyte)
+        val expected = 10.0 * mebibyte
+        assertEquals("累计平均应从起点开始算，不被预热吞掉", expected, average.toDouble(), expected * tolerance)
+    }
+
+    @Test
+    fun averageSpeedTrailsInstantWhenTransferStalls() {
+        val meter = TransferRateMeter()
+        var accumulated = 0L
+        var now = 0L
+        var stableNow = 0L
+        var stableBytes = 0L
+        while (now <= 1_000L) {
+            stableNow = now
+            stableBytes = accumulated
+            meter.sample(now, accumulated)
+            accumulated += mebibyte
+            now += interval
+        }
+        val burstAverage = meter.averageSpeed(stableNow, stableBytes)
+        // 后 3s 完全停滞：瞬时读数随窗口与低通衰减，累计平均保持正但被整体拉低
+        while (now <= 4_000L) {
+            meter.sample(now, accumulated)
+            now += interval
+        }
+        val instant = meter.sample(now, accumulated)
+        val stalledAverage = meter.averageSpeed(now, accumulated)
+        assertTrue("停滞期累计平均应低于满速期的九成：$stalledAverage vs $burstAverage", stalledAverage * 10 < burstAverage * 9)
+        assertTrue("累计平均在停滞期必须低于速率稳定期：$stalledAverage vs $burstAverage", stalledAverage < burstAverage)
+        assertTrue("累计平均必须高于停滞期的瞬时读数：average=$stalledAverage instant=$instant", stalledAverage > instant)
+        assertTrue("累计平均不得归零，实际 $stalledAverage", stalledAverage > 0L)
+    }
 }

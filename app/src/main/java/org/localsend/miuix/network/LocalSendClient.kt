@@ -380,7 +380,8 @@ class LocalSendClient(
         val startTime = System.currentTimeMillis()
         val digest = if (requestChecksum) MessageDigest.getInstance("SHA-256") else null
         return try {
-            inputStream = openSourceStream(fileItem)?.buffered(128 * 1024)
+            // 读取单位本就是 128 KiB 整块，源流再套一层 BufferedInputStream 只会把每次读复制两遍
+            inputStream = openSourceStream(fileItem)
                 ?: throw IllegalStateException("Cannot open input stream for ${fileItem.name}")
 
             val encodedSessionId = URLEncoder.encode(sessionId, "UTF-8")

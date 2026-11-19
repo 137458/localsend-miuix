@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -17,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -88,6 +90,10 @@ class LocalSendManager(
         )
     private val canceledSessionIds = ConcurrentHashMap.newKeySet<String>()
     private val remoteSessionIds = ConcurrentHashMap<String, String>()
+
+    // 会话快照发布节流状态：上次发布时间与当时的会话状态（状态一变立即放行，不压在节流窗口里）
+    private val snapshotPublishAtMs = ConcurrentHashMap<String, Long>()
+    private val snapshotPublishStatus = ConcurrentHashMap<String, TransferStatus>()
 
     // 默认保存位置说明：公共 Download/LocalSend（通过 MediaStore 写入，Android 10+ 免存储权限）
     private val defaultDownloadPath: String by lazy {
@@ -641,6 +647,10 @@ class LocalSendManager(
 
                 Log.i(TAG, "Starting transfer session $remoteSessionId to '${activeDevice.alias}' (${activeDevice.url}), ${filesToSend.size} files, ${fileTokens.size} tokens granted")
 
+                // 先在原顺序上解析可上传项：纯文本直通、未授权等分支不涉及 I/O，保持串行即可；
+                // 真正的上传按官方 upload_isolate.dart 的 _concurrency = 2 并发执行——单条 TCP 流吃不满
+                // 千兆局域网，两个文件同时在飞才能压满带宽，小文件也能把每份文件各自的建连往返叠起来。
+                val uploadTargets = ArrayList<Pair<FileItem, String>>(filesToSend.size)
                 for ((index, fileItem) in filesToSend.withIndex()) {
                     if (canceledSessionIds.contains(sessionId)) {
                         session.status = TransferStatus.Canceled
@@ -668,55 +678,69 @@ class LocalSendManager(
                         updateSessionState(session)
                         continue
                     }
+                    uploadTargets += fileItem to token
+                }
 
-                    fileItem.status = TransferStatus.InProgress
-                    Log.i(TAG, "Uploading [${index + 1}/${filesToSend.size}]: '${fileItem.name}' (${fileItem.size} bytes, id=${fileItem.id})")
+                val uploadSlots = Semaphore(SEND_CONCURRENCY)
+                coroutineScope {
+                    uploadTargets.forEachIndexed { index, target ->
+                        val (fileItem, token) = target
+                        launch {
+                            uploadSlots.withPermit {
+                                if (canceledSessionIds.contains(sessionId)) return@withPermit
+                                fileItem.status = TransferStatus.InProgress
+                                Log.i(TAG, "Uploading [${index + 1}/${filesToSend.size}]: '${fileItem.name}' (${fileItem.size} bytes, id=${fileItem.id})")
 
-                    // 完整性校验路径与握手前预置共用同一次判定：超出门槛的条目在上传中流式计算摘要并要求接收端回报
-                    val requestChecksum = LocalSendClient.checksumPlan(filesToSend, fileItem) == ChecksumPlan.Streamed
-                    val uploadResult =
-                        client.uploadFile(
-                            targetDevice = activeDevice,
-                            sessionId = remoteSessionId,
-                            fileItem = fileItem,
-                            token = token,
-                            requestChecksum = requestChecksum,
-                            isCanceled = { canceledSessionIds.contains(sessionId) },
-                        ) { bytesWritten, speed ->
-                            fileItem.bytesTransferred = bytesWritten
-                            fileItem.speed = speed
-                            if (fileItem.size > 0) {
-                                fileItem.progress = (bytesWritten.toFloat() / fileItem.size).coerceIn(0f, 1f)
+                                // 完整性校验路径与握手前预置共用同一次判定：超出门槛的条目在上传中流式计算摘要并要求接收端回报
+                                val requestChecksum = LocalSendClient.checksumPlan(filesToSend, fileItem) == ChecksumPlan.Streamed
+                                val uploadResult =
+                                    client.uploadFile(
+                                        targetDevice = activeDevice,
+                                        sessionId = remoteSessionId,
+                                        fileItem = fileItem,
+                                        token = token,
+                                        requestChecksum = requestChecksum,
+                                        isCanceled = { canceledSessionIds.contains(sessionId) },
+                                    ) { bytesWritten, speed ->
+                                        fileItem.bytesTransferred = bytesWritten
+                                        fileItem.speed = speed
+                                        if (fileItem.size > 0) {
+                                            fileItem.progress = (bytesWritten.toFloat() / fileItem.size).coerceIn(0f, 1f)
+                                        }
+                                        session.transferredBytes = filesToSend.sumOf { it.bytesTransferred }
+                                        // 并发时会话级读数取所有在飞文件的瞬时速率之和：
+                                        // 单文件时与文件行一致，两个文件时不会被其中一条的速度覆盖
+                                        session.speed =
+                                            filesToSend.sumOf { item ->
+                                                if (item.status == TransferStatus.InProgress) item.speed else 0L
+                                            }
+                                        updateSessionState(session)
+                                    }
+
+                                if (uploadResult.isSuccess) {
+                                    Log.i(TAG, "File [${index + 1}/${filesToSend.size}] completed: '${fileItem.name}'")
+                                    fileItem.status = TransferStatus.Completed
+                                    fileItem.progress = 1f
+                                    fileItem.bytesTransferred = fileItem.size
+                                } else {
+                                    val errMsg =
+                                        uploadResult.exceptionOrNull()?.message
+                                            ?: context.getString(R.string.msg_upload_failed)
+                                    Log.e(TAG, "File [${index + 1}/${filesToSend.size}] failed: '${fileItem.name}', error: $errMsg")
+                                    fileItem.status = TransferStatus.Failed
+                                    fileItem.error = errMsg
+                                }
+                                updateSessionState(session)
                             }
-                            session.transferredBytes = filesToSend.sumOf { it.bytesTransferred }
-                            session.speed = speed
-                            updateSessionState(session)
                         }
+                    }
+                }
 
-                    if (canceledSessionIds.contains(sessionId)) {
-                        session.status = TransferStatus.Canceled
-                        session.endTime = System.currentTimeMillis()
-                        updateSessionState(session)
-                        return@launch
-                    }
-                    if (uploadResult.isSuccess) {
-                        Log.i(TAG, "File [${index + 1}/${filesToSend.size}] completed: '${fileItem.name}'")
-                        fileItem.status = TransferStatus.Completed
-                        fileItem.progress = 1f
-                        fileItem.bytesTransferred = fileItem.size
-                    } else {
-                        val errMsg =
-                            uploadResult.exceptionOrNull()?.message
-                                ?: context.getString(R.string.msg_upload_failed)
-                        Log.e(TAG, "File [${index + 1}/${filesToSend.size}] failed: '${fileItem.name}', error: $errMsg")
-                        fileItem.status = TransferStatus.Failed
-                        fileItem.error = errMsg
-                    }
+                if (canceledSessionIds.contains(sessionId)) {
+                    session.status = TransferStatus.Canceled
+                    session.endTime = System.currentTimeMillis()
                     updateSessionState(session)
-
-                    if (index < filesToSend.size - 1) {
-                        delay(30)
-                    }
+                    return@launch
                 }
 
                 val outcome =
@@ -779,13 +803,38 @@ class LocalSendManager(
         }
     }
 
+    /**
+     * 会话快照的发布闸门。
+     *
+     * 进度回调按 10 Hz 采样，但每次发布都要复制整张会话的文件表，再在主线程上重建会话列表；
+     * 5 Hz 人眼已分辨不出差别，主线程压力减半。状态变化不受节流约束，终结态一定发布。
+     */
+    private fun shouldPublishSession(session: TransferSession): Boolean {
+        if (isTerminal(session.status)) {
+            snapshotPublishAtMs.remove(session.sessionId)
+            snapshotPublishStatus.remove(session.sessionId)
+            return true
+        }
+        val now = SystemClock.elapsedRealtime()
+        val publishedStatus = snapshotPublishStatus[session.sessionId]
+        val publishedAt = snapshotPublishAtMs[session.sessionId] ?: 0L
+        if (publishedStatus == session.status && now - publishedAt < SNAPSHOT_PUBLISH_INTERVAL_MS) return false
+        snapshotPublishAtMs[session.sessionId] = now
+        snapshotPublishStatus[session.sessionId] = session.status
+        return true
+    }
+
     private fun handleSessionUpdate(session: TransferSession) {
+        if (!shouldPublishSession(session)) return
+        // 快照连文件表一起复制：调用方多在网络协程（IO 线程）上，就地算完再切主线程，
+        // 避免把这笔每秒数次的整表复制压到主线程
+        val snapshot = session.createSnapshot()
+        val terminal = isTerminal(session.status)
         scope.launch {
             updateTransferNotification(session)
 
-            if (isTerminal(session.status)) {
+            if (terminal) {
                 // 先更新快照，让界面展示最终完成/失败/取消状态
-                val snapshot = session.createSnapshot()
                 _activeSessions.update { list ->
                     val index = list.indexOfFirst { it.sessionId == session.sessionId }
                     if (index >= 0) {
@@ -862,7 +911,6 @@ class LocalSendManager(
                 _activeSessions.update { list -> list.filterNot { it.sessionId == session.sessionId } }
                 syncForegroundServiceState(_activeSessions.value.size)
             } else {
-                val snapshot = session.createSnapshot()
                 _activeSessions.update { list ->
                     val index = list.indexOfFirst { it.sessionId == session.sessionId }
                     if (index >= 0) {
@@ -1180,6 +1228,12 @@ class LocalSendManager(
 
         /** 离线设备清理轮询间隔：upsert 只在收包时被动清理，长时间无广播需定时兜底。 */
         private const val DEVICE_PRUNE_INTERVAL_MS = 10_000L
+
+        /** 并发上传上限：对齐官方 upload_isolate.dart 的 _concurrency = 2，单条 TCP 流吃不满局域网。 */
+        private const val SEND_CONCURRENCY = 2
+
+        /** 非终结态会话快照的最小发布间隔：采样 10 Hz，发布降到 5 Hz。 */
+        private const val SNAPSHOT_PUBLISH_INTERVAL_MS = 200L
 
         @Volatile
         private var instance: LocalSendManager? = null

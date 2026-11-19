@@ -29,10 +29,13 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -61,6 +64,7 @@ import org.localsend.miuix.util.Sha256
 import org.localsend.miuix.webshare.WebShareCopy
 import java.io.File
 import java.io.InputStream
+import java.io.OutputStream
 import java.net.URLEncoder
 import java.security.MessageDigest
 import java.util.UUID
@@ -758,41 +762,44 @@ class LocalSendServer(
                                 }
 
                             // 待确认路径先落在临时位置；官方发送端不请求校验，仍按原逻辑立即转正
-                            saveTargetWriter.openSaveStream(fileItem, saveTarget, deferCommit = deferredCommit) { getAutoCategorizeMedia() }.buffered(128 * 1024).use { fos ->
+                            val saveStream = saveTargetWriter.openSaveStream(fileItem, saveTarget, deferCommit = deferredCommit) { getAutoCategorizeMedia() }
+                            saveStream.buffered(RECEIVE_WRITE_BUFFER_SIZE).use { fos ->
                                 val channel = call.receiveChannel()
-                                val buffer = ByteArray(128 * 1024)
                                 // 每个文件独立一只速率表：窗口与低通状态不跨文件累积
                                 val rateMeter = TransferRateMeter()
                                 var lastPublishMs = System.currentTimeMillis()
                                 rateMeter.sample(lastPublishMs, 0L)
 
-                                while (!channel.isClosedForRead) {
-                                    val read = channel.readAvailable(buffer, 0, buffer.size)
-                                    if (read <= 0) break
-                                    fos.write(buffer, 0, read)
-                                    textBuffer?.write(buffer, 0, read)
-                                    digest?.update(buffer, 0, read)
-                                    fileItem.bytesTransferred += read
-
-                                    val now = System.currentTimeMillis()
-                                    session.lastActiveTime = now
-                                    if (session.status == TransferStatus.Canceled) {
-                                        throw kotlinx.coroutines.CancellationException("Transfer session canceled by receiver")
-                                    }
-                                    // 进度与回调按 SAMPLE_INTERVAL_MS 节流：发布得越密，速率读数抖得越厉害
-                                    if (now - lastPublishMs >= TransferRateMeter.SAMPLE_INTERVAL_MS) {
-                                        lastPublishMs = now
-                                        val speed = rateMeter.sample(now, fileItem.bytesTransferred)
-                                        fileItem.speed = speed
-                                        session.speed = speed
-                                        session.transferredBytes = session.files.sumOf { it.bytesTransferred }
-                                        if (fileItem.size > 0) {
-                                            fileItem.progress = (fileItem.bytesTransferred.toFloat() / fileItem.size).coerceIn(0f, 1f)
+                                // 读侧只管收包与发布进度，落盘/摘要/文本缓冲交给独立写协程（见 pipeUploadBody）
+                                pipeUploadBody(
+                                    channel = channel,
+                                    sink = fos,
+                                    onBytesReceived = { received ->
+                                        fileItem.bytesTransferred = received
+                                        val now = System.currentTimeMillis()
+                                        session.lastActiveTime = now
+                                        if (session.status == TransferStatus.Canceled) {
+                                            throw kotlinx.coroutines.CancellationException("Transfer session canceled by receiver")
                                         }
-                                        onSessionUpdated(session)
-                                    }
-                                }
-                                fos.flush()
+                                        // 进度与回调按 SAMPLE_INTERVAL_MS 节流：发布得越密，速率读数抖得越厉害
+                                        if (now - lastPublishMs >= TransferRateMeter.SAMPLE_INTERVAL_MS) {
+                                            lastPublishMs = now
+                                            // 文件行用短窗瞬时速率保持跟手；会话级用累计平均压住抖动（与官方口径一致）
+                                            fileItem.speed = rateMeter.sample(now, received)
+                                            session.speed = rateMeter.averageSpeed(now, received)
+                                            session.transferredBytes = session.files.sumOf { it.bytesTransferred }
+                                            if (fileItem.size > 0) {
+                                                fileItem.progress = (received.toFloat() / fileItem.size).coerceIn(0f, 1f)
+                                            }
+                                            onSessionUpdated(session)
+                                        }
+                                    },
+                                    onChunk = { bytes, length ->
+                                        textBuffer?.write(bytes, 0, length)
+                                        digest?.update(bytes, 0, length)
+                                    },
+                                )
+
                                 // 收尾用全程平均速率：文件小到一个采样点都没有时也不会显示 0 B/s
                                 val finishedAt = System.currentTimeMillis()
                                 if (fileItem.size > 0) {
@@ -1184,7 +1191,71 @@ class LocalSendServer(
             )
         }
     }
+
+    /**
+     * 把上传请求体搬进落盘流，读与写拆到两个协程上跑。
+     *
+     * 接收协程只做一次内存拷贝就把缓冲区交给写协程，随后立刻回去继续收包，
+     * 落盘（MediaStore / FUSE）、摘要与文本缓冲的耗时不再占住 TCP 在飞窗口。
+     * 队列有界：堆积到 [RECEIVE_QUEUE_DEPTH] 块时接收侧才回压，内存上界固定为
+     * 队列深度加一个在写缓冲区。
+     *
+     * @param onBytesReceived 在接收协程上回调累计接收字节数，供进度发布与取消检查使用
+     * @param onChunk 在落盘协程上回调每块字节，供摘要计算与文本缓冲使用
+     */
+    private suspend fun pipeUploadBody(
+        channel: ByteReadChannel,
+        sink: OutputStream,
+        onBytesReceived: (Long) -> Unit,
+        onChunk: (ByteArray, Int) -> Unit,
+    ): Long =
+        coroutineScope {
+            val queue = Channel<UploadChunk>(RECEIVE_QUEUE_DEPTH)
+            // 缓冲区回收通道：写侧用完归还，读侧优先取用，避免每块都新分配半个 MiB
+            val recycled = Channel<ByteArray>(RECEIVE_QUEUE_DEPTH)
+            val writer =
+                launch(Dispatchers.IO) {
+                    for (chunk in queue) {
+                        sink.write(chunk.bytes, 0, chunk.length)
+                        onChunk(chunk.bytes, chunk.length)
+                        recycled.trySend(chunk.bytes)
+                    }
+                    sink.flush()
+                }
+            var received = 0L
+            try {
+                while (!channel.isClosedForRead) {
+                    val bytes = recycled.tryReceive().getOrNull() ?: ByteArray(RECEIVE_CHUNK_SIZE)
+                    val read = channel.readAvailable(bytes, 0, bytes.size)
+                    if (read <= 0) break
+                    queue.send(UploadChunk(bytes, read))
+                    received += read
+                    onBytesReceived(received)
+                }
+            } finally {
+                // 正常结束或被取消都要关队列，写协程才会退出循环做 flush；
+                // 取消场景由结构化并发同时终止写侧，落盘流的关闭交给外层 use
+                queue.close()
+            }
+            writer.join()
+            received
+        }
+
+    /** 上传体搬运块：缓冲区复用，[length] 与实际收到的字节数分离。 */
+    private class UploadChunk(
+        val bytes: ByteArray,
+        val length: Int,
+    )
 }
+
+/** 上传体读缓冲块大小：既是单次落盘写入的单位，也是 TCP 在飞窗口的决策粒度。 */
+private const val RECEIVE_CHUNK_SIZE = 512 * 1024
+
+/** 在飞队列深度：512 KiB × 4 = 2 MiB，比官方接收端（约 8 MiB 在飞）保守。 */
+private const val RECEIVE_QUEUE_DEPTH = 4
+
+/** 落盘写缓冲：不小于块大小，整块写入直接透传，不再多拷贝一次。 */
+private const val RECEIVE_WRITE_BUFFER_SIZE = 512 * 1024
 
 /** 上传是否仍可写入：仅 Completed/Canceled 拒绝重放，Failed/InProgress 保留断线重试能力。 */
 internal fun isUploadFileAcceptable(status: TransferStatus): Boolean = status != TransferStatus.Completed && status != TransferStatus.Canceled

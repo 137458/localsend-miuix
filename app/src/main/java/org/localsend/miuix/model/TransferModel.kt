@@ -87,28 +87,34 @@ enum class IntegrityStatus {
     Unconfirmed,
 }
 
+/**
+ * 单个传输条目。
+ *
+ * 进度类字段由网络协程（IO 线程）写、由会话快照与界面（主线程）读，
+ * 因此可变字段一律加 [Volatile]：既有跨线程可见性保证，也不引入锁竞争。
+ */
 data class FileItem(
     val id: String = UUID.randomUUID().toString(),
     var name: String,
     val size: Long = 0L,
     val uri: Uri? = null,
     val path: String? = null,
-    var textContent: String? = null,
+    @Volatile var textContent: String? = null,
     val mimeType: String = "application/octet-stream",
     val token: String? = null,
     // 发送方在 prepare-upload 中声明的 sha256（可选）；接收方写入后校验，不匹配则回 422
-    var expectedSha256: String? = null,
+    @Volatile var expectedSha256: String? = null,
     // 声明上述摘要时源文件的 (长度, 修改时间) 指纹；发送前指纹不一致即重算，保证声明值与上传内容同源
     var sha256SourceStamp: String? = null,
     // 传输结束后的完整性结论：区分已校验、对端不回报而降级、以及摘要不一致失败
-    var integrity: IntegrityStatus = IntegrityStatus.None,
-    var status: TransferStatus = TransferStatus.WaitingApproval,
-    var progress: Float = 0f,
-    var bytesTransferred: Long = 0L,
-    var speed: Long = 0L,
-    var error: String? = null,
+    @Volatile var integrity: IntegrityStatus = IntegrityStatus.None,
+    @Volatile var status: TransferStatus = TransferStatus.WaitingApproval,
+    @Volatile var progress: Float = 0f,
+    @Volatile var bytesTransferred: Long = 0L,
+    @Volatile var speed: Long = 0L,
+    @Volatile var error: String? = null,
     // 通过 MediaStore 写入公共目录时，记录插入出的 Uri，用于完成后清除 IS_PENDING 标记
-    var mediaStoreUri: Uri? = null,
+    @Volatile var mediaStoreUri: Uri? = null,
     val isTextMessage: Boolean = textContent != null,
 ) {
     /**
@@ -180,15 +186,15 @@ data class TransferSession(
     val device: Device,
     val isIncoming: Boolean,
     val files: List<FileItem>,
-    var totalBytes: Long,
-    var transferredBytes: Long = 0L,
-    var speed: Long = 0L,
-    var status: TransferStatus = TransferStatus.WaitingApproval,
+    @Volatile var totalBytes: Long,
+    @Volatile var transferredBytes: Long = 0L,
+    @Volatile var speed: Long = 0L,
+    @Volatile var status: TransferStatus = TransferStatus.WaitingApproval,
     val startTime: Long = System.currentTimeMillis(),
-    var endTime: Long? = null,
-    var errorMessage: String? = null,
+    @Volatile var endTime: Long? = null,
+    @Volatile var errorMessage: String? = null,
     val updateSeq: Long = 0L,
-    var lastActiveTime: Long = System.currentTimeMillis(),
+    @Volatile var lastActiveTime: Long = System.currentTimeMillis(),
 ) {
     fun createSnapshot(seq: Long = System.nanoTime()): TransferSession =
         copy(
