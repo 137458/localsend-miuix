@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.localsend.miuix.transfer.TransferRateMeter
+import org.localsend.miuix.transfer.cumulativeAverageSpeed
 
 /**
  * [TransferRateMeter] 的对外契约：2000ms 滑动窗口 + 一阶低通，预热期不出读数。
@@ -196,5 +197,24 @@ class TransferRateMeterTest {
         assertTrue("累计平均在停滞期必须低于速率稳定期：$stalledAverage vs $burstAverage", stalledAverage < burstAverage)
         assertTrue("累计平均必须高于停滞期的瞬时读数：average=$stalledAverage instant=$instant", stalledAverage > instant)
         assertTrue("累计平均不得归零，实际 $stalledAverage", stalledAverage > 0L)
+    }
+
+    @Test
+    fun cumulativeAverageSpeedReportsWholeTransferRate() {
+        assertEquals("60MiB/6s 应为 10MiB/s", 10 * mebibyte, cumulativeAverageSpeed(60 * mebibyte, 6_000L))
+        assertEquals("2MiB/100ms 应为 20MiB/s", 20 * mebibyte, cumulativeAverageSpeed(2 * mebibyte, 100L))
+        // 抖动只影响瞬时值：累计平均在字节数与耗时固定时是唯一确定的
+        assertEquals(
+            "同一段传输的累计平均不受采样抖动影响",
+            cumulativeAverageSpeed(60 * mebibyte, 6_000L),
+            cumulativeAverageSpeed(60 * mebibyte, 6_000L),
+        )
+    }
+
+    @Test
+    fun cumulativeAverageSpeedRejectsDegenerateInput() {
+        assertEquals("零耗时不得除零", 0L, cumulativeAverageSpeed(mebibyte, 0L))
+        assertEquals("时钟回退（负耗时）不得产生负速率", 0L, cumulativeAverageSpeed(mebibyte, -5L))
+        assertEquals("零字节传输速率为 0", 0L, cumulativeAverageSpeed(0L, 1_000L))
     }
 }

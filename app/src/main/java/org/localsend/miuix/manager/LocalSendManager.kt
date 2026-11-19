@@ -63,6 +63,7 @@ import org.localsend.miuix.network.TlsStore
 import org.localsend.miuix.network.WebShareHtmlRenderer
 import org.localsend.miuix.notification.TransferNotifier
 import org.localsend.miuix.transfer.TransferOutcome
+import org.localsend.miuix.transfer.cumulativeAverageSpeed
 import org.localsend.miuix.updates.UpdateDomain
 import org.localsend.miuix.util.AutoFinishPolicy
 import java.io.File
@@ -94,6 +95,9 @@ class LocalSendManager(
     // 会话快照发布节流状态：上次发布时间与当时的会话状态（状态一变立即放行，不压在节流窗口里）
     private val snapshotPublishAtMs = ConcurrentHashMap<String, Long>()
     private val snapshotPublishStatus = ConcurrentHashMap<String, TransferStatus>()
+
+    /** 发送方向会话速率的计时起点（首个进度回调的 elapsedRealtime）；终结态随快照闸门一起清理。 */
+    private val sendRateAnchors = ConcurrentHashMap<String, Long>()
 
     // 默认保存位置说明：公共 Download/LocalSend（通过 MediaStore 写入，Android 10+ 免存储权限）
     private val defaultDownloadPath: String by lazy {
@@ -708,12 +712,11 @@ class LocalSendManager(
                                             fileItem.progress = (bytesWritten.toFloat() / fileItem.size).coerceIn(0f, 1f)
                                         }
                                         session.transferredBytes = filesToSend.sumOf { it.bytesTransferred }
-                                        // 并发时会话级读数取所有在飞文件的瞬时速率之和：
-                                        // 单文件时与文件行一致，两个文件时不会被其中一条的速度覆盖
-                                        session.speed =
-                                            filesToSend.sumOf { item ->
-                                                if (item.status == TransferStatus.InProgress) item.speed else 0L
-                                            }
+                                        // 会话级读数用"已传字节 ÷ 已用时间"的累计平均，与接收方向及官方客户端同口径：
+                                        // 两条并发流的瞬时速率相加会随任一流的抖动整体跳动，累计平均只随总进度单调变化
+                                        val now = SystemClock.elapsedRealtime()
+                                        val anchor = sendRateAnchors.getOrPut(session.sessionId) { now }
+                                        session.speed = cumulativeAverageSpeed(session.transferredBytes, now - anchor)
                                         updateSessionState(session)
                                     }
 
@@ -755,6 +758,11 @@ class LocalSendManager(
                 session.status = outcome.status
                 session.errorMessage = outcome.errorMessage
                 session.endTime = System.currentTimeMillis()
+                // 收尾读数同样是全程平均：最后一次进度回调之后可能还有校验往返与落盘收尾，
+                // 若沿用上一次瞬时值，卡片会停在传输中途的读数上
+                sendRateAnchors[session.sessionId]?.let { anchor ->
+                    session.speed = cumulativeAverageSpeed(session.transferredBytes, SystemClock.elapsedRealtime() - anchor)
+                }
                 updateSessionState(session)
             } finally {
                 FingerprintTrust.unpin(targetDevice.fingerprint)
@@ -813,6 +821,7 @@ class LocalSendManager(
         if (isTerminal(session.status)) {
             snapshotPublishAtMs.remove(session.sessionId)
             snapshotPublishStatus.remove(session.sessionId)
+            sendRateAnchors.remove(session.sessionId)
             return true
         }
         val now = SystemClock.elapsedRealtime()

@@ -137,3 +137,20 @@ class TransferRateMeter(
         private const val DIRECT_SNAP_FACTOR = 3.0
     }
 }
+
+/**
+ * 多文件并发上传时的会话级速率：自本次传输起点至今的累计平均（字节/秒）。
+ *
+ * 并发上传时若取若干条独立流的瞬时速率之和，任何一条流抖动都会让读数整体跳动；
+ * 累计平均只取决于"已传字节 ÷ 已用时间"，读数只随总进度单调变化。
+ *
+ * @param bytesTransferred 会话累计已传字节数
+ * @param elapsedMs 自传输起点至今的耗时；小于等于 0（时钟回退、零间隔）时返回 0，不产生负值或除零
+ */
+internal fun cumulativeAverageSpeed(
+    bytesTransferred: Long,
+    elapsedMs: Long,
+): Long {
+    if (bytesTransferred <= 0L || elapsedMs <= 0L) return 0L
+    return bytesTransferred * 1000L / elapsedMs
+}
