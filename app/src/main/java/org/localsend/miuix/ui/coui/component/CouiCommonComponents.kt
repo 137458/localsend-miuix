@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -36,8 +36,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.itos.coui.effect.couiButtonFeedback
+import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
+import com.itos.coui.text.Text
 import com.itos.coui.text.rememberCouiTextStyle
 import com.itos.coui.theme.CouiTheme
 import com.itos.coui.topappbar.CouiTopAppBarScrollBehavior
@@ -46,7 +48,6 @@ import com.itos.coui.topappbar.TopAppBarButton
 import com.itos.coui.topappbar.TopAppBarButtonGroup
 import org.localsend.miuix.R
 import org.localsend.miuix.ui.component.AppIcons
-import org.localsend.miuix.ui.coui.theme.couiDangerColor
 import top.yukonga.miuix.kmp.basic.Icon
 import kotlin.math.roundToInt
 
@@ -81,10 +82,8 @@ internal fun CouiIconAction(
     tint: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    showBadgeDot: Boolean = false,
 ) {
     val source = remember { MutableInteractionSource() }
-    val badgeColor = couiDangerColor()
     Box(
         modifier =
             modifier
@@ -111,17 +110,6 @@ internal fun CouiIconAction(
                 tint = tint,
                 modifier = Modifier.size(22.dp),
             )
-            if (showBadgeDot) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .offset(x = (-7).dp, y = 7.dp)
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(badgeColor),
-                )
-            }
         }
     }
 }
@@ -203,7 +191,6 @@ internal fun CouiTopBarIconAction(
     modifier: Modifier = Modifier,
     tint: Color? = null,
     enabled: Boolean = true,
-    showBadgeDot: Boolean = false,
 ) {
     if (Build.VERSION.SDK_INT >= COUI_TOP_BAR_BUTTON_MIN_SDK) {
         CouiLibraryTopBarIconAction(
@@ -213,7 +200,6 @@ internal fun CouiTopBarIconAction(
             modifier = modifier,
             tint = tint,
             enabled = enabled,
-            showBadgeDot = showBadgeDot,
         )
     } else {
         CouiIconAction(
@@ -222,7 +208,6 @@ internal fun CouiTopBarIconAction(
             tint = tint ?: CouiTheme.colorScheme.onSurface,
             onClick = onClick,
             modifier = modifier,
-            showBadgeDot = showBadgeDot,
         )
     }
 }
@@ -236,39 +221,27 @@ private fun CouiLibraryTopBarIconAction(
     modifier: Modifier = Modifier,
     tint: Color? = null,
     enabled: Boolean = true,
-    showBadgeDot: Boolean = false,
 ) {
-    val badgeColor = couiDangerColor()
     TopAppBarButton(
         modifier = modifier,
         onClick = onClick,
         enabled = enabled,
     ) {
-        val iconTint = tint ?: CouiTheme.colorScheme.onSurface
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = iconTint,
-                modifier = Modifier.size(22.dp),
-            )
-            if (showBadgeDot) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .offset(x = 2.dp, y = (-2).dp)
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(badgeColor),
-                )
-            }
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = tint ?: CouiTheme.colorScheme.onSurface,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 
 /**
- * 顶栏待接收任务红点入口：各主页面复用，统一无障碍文案与红点样式。
+ * 顶栏接收中入口：接收图标 + 计数胶囊，各主页面复用。
+ *
+ * 计数胶囊自绘（coUI 没有 Badge 原语，见 docs/research/coui-capability-gaps.md）：原先"图标按钮 + 红点"
+ * 与相邻编辑/刷新按钮同形，用户看不出它是可点的计数，红点又借用危险色误导语义。
+ * 胶囊为 28dp 高的 accent 底色，外层靠 [couiMinTouchTarget] 撑到 48dp 命中区。
  */
 @Composable
 internal fun CouiIncomingBadgeAction(
@@ -276,13 +249,46 @@ internal fun CouiIncomingBadgeAction(
     onClick: () -> Unit,
 ) {
     if (incomingTaskCount <= 0) return
-    CouiTopBarIconAction(
-        icon = AppIcons.Receive,
-        contentDescription = stringResource(R.string.receive_section_incoming_count, incomingTaskCount),
-        tint = CouiTheme.colorScheme.accentOnSurface,
-        onClick = onClick,
-        showBadgeDot = true,
-    )
+    val source = remember { MutableInteractionSource() }
+    Box(
+        modifier =
+            Modifier
+                .clickable(
+                    interactionSource = source,
+                    indication = null,
+                    enabled = true,
+                    role = Role.Button,
+                    onClick = onClick,
+                ).couiMinTouchTarget(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .clip(CouiCapsuleShape)
+                    // accent 降透明度当容器底色：既区别于纯灰容器，也不与红点共用警示语义
+                    .background(CouiTheme.colorScheme.accent.copy(alpha = 0.14f))
+                    .couiButtonFeedback(CouiTheme.isDark, source)
+                    .height(28.dp)
+                    .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = AppIcons.Receive,
+                // 计数语义只挂在这一处，避免与数字文本重复朗读
+                contentDescription = stringResource(R.string.action_incoming_open_hint, incomingTaskCount),
+                tint = CouiTheme.colorScheme.accentOnSurface,
+                modifier = Modifier.size(15.dp),
+            )
+            Text(
+                text = if (incomingTaskCount > 9) "9+" else incomingTaskCount.toString(),
+                kind = CouiTextKind.ItemSummary,
+                color = CouiTheme.colorScheme.accentOnSurface,
+                maxLines = 1,
+            )
+        }
+    }
 }
 
 /**

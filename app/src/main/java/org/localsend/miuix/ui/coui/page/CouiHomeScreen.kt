@@ -4,6 +4,8 @@ package org.localsend.miuix.ui.coui.page
 
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -35,7 +37,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,7 +66,6 @@ import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.Text
 import com.itos.coui.theme.CouiTheme
 import com.itos.coui.topappbar.CouiTopAppBarDefaults
-import kotlinx.coroutines.launch
 import org.localsend.miuix.R
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.Device
@@ -98,6 +98,15 @@ import top.yukonga.miuix.kmp.icon.extended.ExpandLess
 import top.yukonga.miuix.kmp.icon.extended.ExpandMore
 import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Image
+
+// 首页列表前两项结构固定：0 是本机状态分区，1 是接收分区标题（无接收任务时该分区整体不渲染）。
+// 顶栏接收中胶囊据此定位，避免此前写死索引 1 而在列表结构变化后滚错位置。
+private const val HOME_LOCAL_STATUS_ITEM_INDEX = 0
+private const val HOME_INCOMING_SECTION_ITEM_INDEX = HOME_LOCAL_STATUS_ITEM_INDEX + 1
+
+// 接收分区高亮脉冲：两拍各 150ms，合计约 300ms 淡入再淡出
+private const val INCOMING_PULSE_PEAK_ALPHA = 0.18f
+private const val INCOMING_PULSE_STEP_MS = 150
 
 /**
  * 首页（ColorOS 皮肤）：本机状态、正在接收的传输、待发送队列、快速选择与附近设备。
@@ -216,11 +225,25 @@ fun CouiHomeScreen(
     // 大标题折叠：canScrollBackward 决定正文到顶后才展开标题，回弹期间不提前弹开。
     // derivedStateOf 把滚动状态读取收进派生快照，避免每帧重组整页。
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
     val canScrollBackward = remember(listState) { derivedStateOf { listState.canScrollBackward } }
     val scrollBehavior =
         CouiTopAppBarDefaults.exitUntilCollapsedScrollBehavior(canScroll = { canScrollBackward.value })
     val density = LocalDensity.current
+
+    // 顶栏接收中胶囊的点击反馈：滚到接收分区后让分区底色做一次 alpha 脉冲，
+    // 即使分区已在可见区也有明确响应；脉冲值来自 Animatable，避免每次点击新建动画状态。
+    val incomingPulseAlpha = remember { Animatable(0f) }
+    var incomingPulseRequest by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(incomingPulseRequest) {
+        if (incomingPulseRequest == 0) return@LaunchedEffect
+        val targetIndex =
+            if (incomingSessions.isNotEmpty()) HOME_INCOMING_SECTION_ITEM_INDEX else HOME_LOCAL_STATUS_ITEM_INDEX
+        listState.animateScrollToItem(targetIndex)
+        incomingPulseAlpha.snapTo(0f)
+        incomingPulseAlpha.animateTo(INCOMING_PULSE_PEAK_ALPHA, tween(INCOMING_PULSE_STEP_MS))
+        incomingPulseAlpha.animateTo(0f, tween(INCOMING_PULSE_STEP_MS))
+    }
 
     Scaffold(
         modifier =
@@ -240,10 +263,9 @@ fun CouiHomeScreen(
                         CouiIncomingBadgeAction(
                             incomingTaskCount = incomingTaskCount,
                             onClick = {
+                                // 被 dismiss 的接收弹窗仍需能被重新打开，滚动与高亮由上面的 LaunchedEffect 负责
                                 onOpenIncoming()
-                                coroutineScope.launch {
-                                    listState.animateScrollToItem(if (incomingSessions.isNotEmpty()) 1 else 0)
-                                }
+                                incomingPulseRequest++
                             },
                         )
                         CouiTopBarIconAction(
@@ -315,10 +337,13 @@ fun CouiHomeScreen(
                 }
             }
 
-            // 2. 正在接收的传输：无任务时不渲染标题与卡片
+            // 2. 正在接收的传输：标题在 items 外提一次，卡片按会话逐条；无任务时不渲染标题与卡片
             if (incomingSessions.isNotEmpty()) {
+                item {
+                    CouiSectionTitle(text = stringResource(R.string.receive_section_incoming_count, incomingSessions.size))
+                }
                 items(incomingSessions, key = { "in_" + it.sessionId }) { session ->
-                    CouiHomeSection(title = stringResource(R.string.receive_section_incoming_count, incomingSessions.size)) {
+                    CouiHomeSection(highlightAlpha = incomingPulseAlpha.value) {
                         CouiHomeRow(
                             icon = AppIcons.getDeviceIcon(session.device.deviceType),
                             title = session.device.alias,
@@ -526,10 +551,13 @@ fun CouiHomeScreen(
                 }
             }
 
-            // 7. 收藏设备
+            // 7. 收藏设备：标题在 items 外提一次，卡片仍一台一张
             if (favoriteDeviceList.isNotEmpty()) {
+                item {
+                    CouiSectionTitle(text = stringResource(R.string.send_favorites_title))
+                }
                 items(favoriteDeviceList, key = { "fav_" + it.identityKey }) { device ->
-                    CouiHomeSection(title = stringResource(R.string.send_favorites_title)) {
+                    CouiHomeSection {
                         CouiDeviceCardContent(
                             device = device,
                             isFavorite = true,
@@ -642,10 +670,12 @@ private fun CouiSectionTitle(text: String) {
  *
  * 外边距由外层 LazyColumn 的 `CouiPageDefaults.horizontalMargin`（16dp）统一承担；
  * 卡片形状统一对齐 `CouiPageDefaults.shape`（24dp, 3f 连续曲率）；卡内分隔线统一用库 `layout.Divider`。
+ * [highlightAlpha] 只在顶栏胶囊点击后的脉冲期间非 0，用 accent 底色临时提亮该卡片。
  */
 @Composable
 private fun CouiHomeSection(
     title: String? = null,
+    highlightAlpha: Float = 0f,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -657,7 +687,15 @@ private fun CouiHomeSection(
                 Modifier
                     .fillMaxWidth()
                     .clip(CouiPageDefaults.shape)
-                    .background(CouiTheme.colorScheme.card),
+                    .background(CouiTheme.colorScheme.card)
+                    .then(
+                        // 静止时不叠透明层，只有脉冲期间才多画一层 accent 底色
+                        if (highlightAlpha > 0f) {
+                            Modifier.background(CouiTheme.colorScheme.accent.copy(alpha = highlightAlpha))
+                        } else {
+                            Modifier
+                        },
+                    ),
             content = content,
         )
     }

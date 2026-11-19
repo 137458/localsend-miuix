@@ -59,6 +59,7 @@
     <!-- Home: local status and receiving -->
     <string name="receive_section_local_device">This Device</string>
     <string name="receive_section_incoming_count">Receiving (%1$d)</string>
+    <string name="action_incoming_open_hint">Receiving %1$d files, tap to view</string>
     <string name="receive_pref_quick_save_title">Quick Save</string>
     <string name="receive_pref_auto_copy_title">Auto Copy Text</string>
     <string name="home_status_ready">Ready to receive</string>
