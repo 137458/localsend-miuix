@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -29,6 +31,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -39,7 +42,6 @@ import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.text.CouiTextKind
-import com.itos.coui.text.Text
 import com.itos.coui.text.rememberCouiTextStyle
 import com.itos.coui.theme.CouiTheme
 import com.itos.coui.topappbar.CouiTopAppBarScrollBehavior
@@ -82,6 +84,7 @@ internal fun CouiIconAction(
     tint: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    badgeCount: Int? = null,
 ) {
     val source = remember { MutableInteractionSource() }
     Box(
@@ -104,11 +107,11 @@ internal fun CouiIconAction(
                     .couiButtonFeedback(CouiTheme.isDark, source),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = icon,
+            CouiBadgedIcon(
+                icon = icon,
                 contentDescription = contentDescription,
                 tint = tint,
-                modifier = Modifier.size(22.dp),
+                badgeCount = badgeCount,
             )
         }
     }
@@ -191,6 +194,7 @@ internal fun CouiTopBarIconAction(
     modifier: Modifier = Modifier,
     tint: Color? = null,
     enabled: Boolean = true,
+    badgeCount: Int? = null,
 ) {
     if (Build.VERSION.SDK_INT >= COUI_TOP_BAR_BUTTON_MIN_SDK) {
         CouiLibraryTopBarIconAction(
@@ -200,6 +204,7 @@ internal fun CouiTopBarIconAction(
             modifier = modifier,
             tint = tint,
             enabled = enabled,
+            badgeCount = badgeCount,
         )
     } else {
         CouiIconAction(
@@ -208,6 +213,7 @@ internal fun CouiTopBarIconAction(
             tint = tint ?: CouiTheme.colorScheme.onSurface,
             onClick = onClick,
             modifier = modifier,
+            badgeCount = badgeCount,
         )
     }
 }
@@ -221,27 +227,27 @@ private fun CouiLibraryTopBarIconAction(
     modifier: Modifier = Modifier,
     tint: Color? = null,
     enabled: Boolean = true,
+    badgeCount: Int? = null,
 ) {
     TopAppBarButton(
         modifier = modifier,
         onClick = onClick,
         enabled = enabled,
     ) {
-        Icon(
-            imageVector = icon,
+        CouiBadgedIcon(
+            icon = icon,
             contentDescription = contentDescription,
             tint = tint ?: CouiTheme.colorScheme.onSurface,
-            modifier = Modifier.size(22.dp),
+            badgeCount = badgeCount,
         )
     }
 }
 
 /**
- * 顶栏接收中入口：接收图标 + 计数胶囊，各主页面复用。
+ * 顶栏接收中入口：与相邻编辑、刷新按钮同形同底座的接收图标，右上角叠一枚计数角标，各主页面复用。
  *
- * 计数胶囊自绘（coUI 没有 Badge 原语，见 docs/research/coui-capability-gaps.md）：原先"图标按钮 + 红点"
- * 与相邻编辑/刷新按钮同形，用户看不出它是可点的计数，红点又借用危险色误导语义。
- * 胶囊为 28dp 高的 accent 底色，外层靠 [couiMinTouchTarget] 撑到 48dp 命中区。
+ * 数量角标自绘（coUI 没有 Badge 原语，见 docs/research/coui-capability-gaps.md）：沿用按钮形态，
+ * 用 accent 底色承载数量而不借危险红，避免角标被读成告警。命中区与相邻按钮一致（48dp）。
  */
 @Composable
 internal fun CouiIncomingBadgeAction(
@@ -249,45 +255,75 @@ internal fun CouiIncomingBadgeAction(
     onClick: () -> Unit,
 ) {
     if (incomingTaskCount <= 0) return
-    val source = remember { MutableInteractionSource() }
-    Box(
-        modifier =
-            Modifier
-                .clickable(
-                    interactionSource = source,
-                    indication = null,
-                    enabled = true,
-                    role = Role.Button,
-                    onClick = onClick,
-                ).couiMinTouchTarget(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .clip(CouiCapsuleShape)
-                    // accent 降透明度当容器底色：既区别于纯灰容器，也不与红点共用警示语义
-                    .background(CouiTheme.colorScheme.accent.copy(alpha = 0.14f))
-                    .couiButtonFeedback(CouiTheme.isDark, source)
-                    .height(28.dp)
-                    .padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Icon(
-                imageVector = AppIcons.Receive,
-                // 计数语义只挂在这一处，避免与数字文本重复朗读
-                contentDescription = stringResource(R.string.action_incoming_open_hint, incomingTaskCount),
-                tint = CouiTheme.colorScheme.accentOnSurface,
-                modifier = Modifier.size(15.dp),
-            )
-            Text(
-                text = if (incomingTaskCount > 9) "9+" else incomingTaskCount.toString(),
-                kind = CouiTextKind.ItemSummary,
-                color = CouiTheme.colorScheme.accentOnSurface,
-                maxLines = 1,
+    CouiTopBarIconAction(
+        icon = AppIcons.Receive,
+        // 计数语义只挂在这一处：角标自身不参与朗读，避免与数字重复
+        contentDescription = stringResource(R.string.action_incoming_open_hint, incomingTaskCount),
+        tint = CouiTheme.colorScheme.accentOnSurface,
+        onClick = onClick,
+        badgeCount = incomingTaskCount,
+    )
+}
+
+/**
+ * 22dp 图标 + 可选数量角标。角标按图标定位，两个顶栏按钮分支（库玻璃按钮与低版本平面圆钮）因此共用同一套几何。
+ */
+@Composable
+private fun CouiBadgedIcon(
+    icon: ImageVector,
+    contentDescription: String?,
+    tint: Color,
+    badgeCount: Int?,
+) {
+    Box(contentAlignment = Alignment.Center) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier.size(22.dp),
+        )
+        if (badgeCount != null && badgeCount > 0) {
+            CouiCountBadge(
+                count = badgeCount,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 6.dp, y = (-4).dp),
             )
         }
+    }
+}
+
+/**
+ * 图标角标：accent 底 + onAccent 文字，14dp 高胶囊，多字符靠内边距撑宽，超过 9 显示 "9+"。
+ */
+@Composable
+private fun CouiCountBadge(
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
+    val textStyle =
+        rememberCouiTextStyle(CouiTextKind.ItemSummary).copy(
+            fontSize = 9.sp,
+            color = CouiTheme.colorScheme.onAccent,
+            textAlign = TextAlign.Center,
+        )
+    Box(
+        modifier =
+            modifier
+                .height(14.dp)
+                .widthIn(min = 14.dp)
+                .clip(CouiCapsuleShape)
+                .background(CouiTheme.colorScheme.accent)
+                .clearAndSetSemantics { }
+                .padding(horizontal = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        BasicText(
+            text = if (count > 9) "9+" else count.toString(),
+            style = textStyle,
+            maxLines = 1,
+        )
     }
 }
 
