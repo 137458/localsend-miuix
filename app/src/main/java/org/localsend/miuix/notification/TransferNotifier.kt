@@ -48,6 +48,9 @@ object TransferNotifier {
     const val CHANNEL_SERVICE = "localsend_service"
     const val CHANNEL_LIVE = "localsend_live_channel"
 
+    /** Android 16.1+ 的「允许提升型通知」权限页（Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS）。 */
+    private const val ACTION_NOTIFICATION_PROMOTION_SETTINGS = "android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS"
+
     const val NOTIF_ID_FOREGROUND_SERVICE = 1001
     private const val NOTIF_ID_RECEIVE_BASE = 500_000_000
     private const val NOTIF_ID_SEND_BASE = 800_000_000
@@ -138,7 +141,10 @@ object TransferNotifier {
         nm.createNotificationChannel(receiveRequestChannel)
         nm.createNotificationChannel(sendChannel)
         nm.createNotificationChannel(serviceChannel)
-        nm.deleteNotificationChannel(CHANNEL_RECEIVE_REQUEST_LEGACY)
+        // 旧渠道必须在新建后清理，否则设置页会同时出现新旧两个渠道。删除会连带取消旧渠道
+        // 已发出的通知，且系统设置页会累计「已删除渠道」计数，因此只在迁移时删一次。
+        runCatching { nm.deleteNotificationChannel(CHANNEL_RECEIVE_REQUEST_LEGACY) }
+            .onFailure { Log.w(TAG, "delete legacy notification channel failed", it) }
     }
 
     fun buildForegroundNotification(
@@ -204,32 +210,52 @@ object TransferNotifier {
     fun notificationState(context: Context): NotificationState =
         when {
             !isNotificationsEnabled(context) -> NotificationState.DISABLED
-            !canPostLiveUpdates(context) -> NotificationState.LIVE_UPDATES_DISABLED
+            // 系统没有提升型通知权限页时（Android 16.0 或未开启该特性），
+            // 不存在「实时通知开关」可让用户去开，不能误报未开启。
+            isPromotionSettingsAvailable(context) && !canPostLiveUpdates(context) ->
+                NotificationState.LIVE_UPDATES_DISABLED
             else -> NotificationState.ENABLED
         }
 
-    /** 实时通知是否可发布；低于 Android 16 的系统没有该能力，不作为「未开启」提示。 */
+    /**
+     * 实时通知是否可发布。低于 Android 16.1 的系统没有提升型 ongoing 能力，
+     * 直接访问相关 API 会抛 NoSuchMethodError（与 [LiveUpdatesCompat] 同一门槛），
+     * 这些系统一律视为可用，避免误导用户去开一个不存在的开关。
+     */
     fun canPostLiveUpdates(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < 36) return true
+        if (Build.VERSION.SDK_INT_FULL < Build.VERSION_CODES_FULL.BAKLAVA_1) return true
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        return nm.canPostPromotedNotifications()
+        return runCatching { nm.canPostPromotedNotifications() }.getOrDefault(true)
+    }
+
+    /** 系统是否提供「允许提升型通知」权限页；部分设备即使版本达标也没有该页，需自行校验。 */
+    private fun isPromotionSettingsAvailable(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < 36) return false
+        return runCatching {
+            Intent(ACTION_NOTIFICATION_PROMOTION_SETTINGS)
+                .resolveActivity(context.packageManager) != null
+        }.getOrDefault(false)
     }
 
     /**
      * 跳转至系统当前应用的通知设置页面，以便用户手动授权或开启各渠道通知与焦点通知开关。
      */
     fun openNotificationSettings(context: Context) {
-        if (Build.VERSION.SDK_INT >= 36) {
+        val target =
+            NotificationPermissionPolicy.settingsTarget(
+                promotionAvailable = isPromotionSettingsAvailable(context),
+                liveUpdatesEnabled = canPostLiveUpdates(context),
+            )
+        if (target == NotificationPermissionPolicy.SettingsTarget.PROMOTION) {
             try {
                 val promotionIntent =
-                    Intent("android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS").apply {
-                        putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
+                    Intent(ACTION_NOTIFICATION_PROMOTION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
-                if (promotionIntent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(promotionIntent)
-                    return
-                }
+                context.startActivity(promotionIntent)
+                return
             } catch (e: Exception) {
                 Log.w(TAG, "open notification settings (promotion) failed", e)
             }
@@ -352,8 +378,9 @@ object TransferNotifier {
                 .setContentTitle(title)
                 .setContentText(text)
                 .setSmallIcon(R.drawable.ic_stat_receive)
+                // 悬浮横幅由渠道 IMPORTANCE_HIGH 决定；minSdk 31 起 setPriority 对渠道通知无运行时效果
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                // 消息类别让系统按「即时通讯」对待：允许悬浮提醒，锁屏展示完整内容
+                // 消息类别只影响系统把会话归到「消息」分区，不改变是否悬浮或是否绕过勿扰
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setContentIntent(appPendingIntent(context))

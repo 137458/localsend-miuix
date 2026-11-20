@@ -6,6 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.localsend.miuix.notification.NotificationPermissionPolicy
 import org.localsend.miuix.notification.NotificationPermissionPolicy.EntryAction
+import org.localsend.miuix.notification.NotificationPermissionPolicy.SettingsTarget
 
 /** 通知权限申请策略：冷启动只问一次，永久拒绝后改为直达系统设置。 */
 class NotificationPermissionPolicyTest {
@@ -42,6 +43,22 @@ class NotificationPermissionPolicyTest {
         assertEquals(
             EntryAction.OPEN_SETTINGS,
             NotificationPermissionPolicy.entryAction(sdkInt = 31, granted = false, askRecorded = false, showRationale = false),
+        )
+    }
+
+    @Test
+    fun `settings entry targets the promotion page only when live updates are off and the page exists`() {
+        assertEquals(
+            SettingsTarget.PROMOTION,
+            NotificationPermissionPolicy.settingsTarget(promotionAvailable = true, liveUpdatesEnabled = false),
+        )
+        assertEquals(
+            SettingsTarget.APP,
+            NotificationPermissionPolicy.settingsTarget(promotionAvailable = true, liveUpdatesEnabled = true),
+        )
+        assertEquals(
+            SettingsTarget.APP,
+            NotificationPermissionPolicy.settingsTarget(promotionAvailable = false, liveUpdatesEnabled = false),
         )
     }
 }

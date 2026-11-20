@@ -154,13 +154,9 @@ object LiveUpdatesCompat {
                 nativeBuilder.setProgress(100, session.progressPercent, session.totalBytes <= 0)
             }
 
-            val notification = nativeBuilder.build()
-            // 未请求提升时不能再打提升标记，否则 36.0 上的通知会被系统按提升型处理
-            notification.flags =
-                notification.flags or
-                Notification.FLAG_ONGOING_EVENT or
-                (if (promotedOngoing) Notification.FLAG_PROMOTED_ONGOING else 0)
-            return notification
+            // 提升标记由系统决定：应用自设的 FLAG_PROMOTED_ONGOING 会在入队时被系统清除，
+            // 只有 requestPromotedOngoing + 系统侧授权都满足时系统才会补上该标记。
+            return nativeBuilder.build()
         }
 
         // Android < 36 兼容构建

@@ -16,6 +16,15 @@ object NotificationPermissionPolicy {
         OPEN_SETTINGS,
     }
 
+    /** 系统通知设置的落点。 */
+    enum class SettingsTarget {
+        /** Android 16.1+ 的「允许提升型通知」权限页，只用于开启实时通知。 */
+        PROMOTION,
+
+        /** 应用通知设置页，可查看/修改总开关、横幅、声音、震动与各渠道设置。 */
+        APP,
+    }
+
     /**
      * 冷启动是否自动申请 POST_NOTIFICATIONS：只在从未询问过时询问一次。
      * 之后交给设置页入口，避免每次冷启动都弹窗（用户拒绝后系统会直接静默返回）。
@@ -41,4 +50,14 @@ object NotificationPermissionPolicy {
             !askRecorded || showRationale -> EntryAction.REQUEST
             else -> EntryAction.OPEN_SETTINGS
         }
+
+    /**
+     * 决定点击入口后进入哪个系统页面：只有系统确实提供提升型通知权限页、
+     * 且实时通知尚未开启时，才直达该页；其余情况进入应用通知设置页，
+     * 因为横幅、声音、震动都在那里调整。
+     */
+    fun settingsTarget(
+        promotionAvailable: Boolean,
+        liveUpdatesEnabled: Boolean,
+    ): SettingsTarget = if (promotionAvailable && !liveUpdatesEnabled) SettingsTarget.PROMOTION else SettingsTarget.APP
 }
