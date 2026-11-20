@@ -27,7 +27,9 @@
 
 - 本仓库是官方 LocalSend 客户端的 Android 重写实现，协议行为以官方 Flutter 实现为准：`E:\project\references\localsend-reference`（v1.18.2 / `1.18.2+64`）。
 - 协议常量集中在 `app/src/main/java/org/localsend/miuix/core/Constants.kt`：多播地址 `224.0.0.167`、默认端口 `53317`、协议版本 `2.2`，以及 `/api/localsend/v2/*` 路由。
-- 新增或修改协议交互，必须同时兼容官方客户端与第三方 LocalSend 实现。私有扩展只能落在 `X-Localsend-Miuix-*` 请求头与 `checksum` 相关路由上，不得改动标准字段语义。
+- 新增或修改协议交互，必须同时兼容官方客户端与第三方 LocalSend 实现。私有扩展只能落在 `X-Localsend-Miuix-*` 请求头与 `checksum` 路由（`/api/localsend/v2/checksum-commit`、`checksum-reject`、`checksum-status`）上，不得改动标准字段语义。
+- 校验扩展的语义：`ChecksumHeaders.REQUEST` 为 `1` 时只回报摘要，为 `2` 时回报并暂存待确认；待确认条目 60 s 过期（`PENDING_TTL_MS`），确认结果保留 5 min（`RESOLUTION_TTL_MS`）。确认接口必须幂等，并保留 `checksum-status` 查询，供应答丢失时自愈。
+- 入站不启用 mTLS 是有意取舍，不是待补的缺口：Ktor Netty 的 `sslConnector` 没有读取客户端证书的入口，且强制客户端证书会让未携带证书的对端握手失败。不要补「校验 `register` 请求体指纹」的半成品逻辑。
 
 ### UI 规范
 
@@ -35,6 +37,22 @@
 - ColorOS 皮肤（`ui/coui/`）：只使用 coUI-Kit 原语（`com.itos.coui.*`）；库能力缺口按下面的回退边界处理，禁止直接把 Miuix 组件混进 `ui/coui/`。
 - coUI 代码禁止读取 `MiuixTheme.colorScheme`；危险色必须经 `couiDangerColor()`（`ui/coui/theme/CouiSkinTheme.kt`）取得。
 - 两套皮肤共用同一份业务状态、路由与设置持久化，分派点只在 `ui/App.kt` 根部，由 `model/UiSkin.kt` 的 `UiSkin` 枚举决定。
+
+## 网络与传输
+
+- 服务端引擎按协议分流：纯 HTTP 用 CIO，HTTPS 必须切 Netty（CIO 服务端不支持 TLS）。HTTPS 证书为启动时生成并持久化的自签名证书，本机指纹即证书 SHA-256，出站方向按对端指纹固定校验。
+- 接收写盘走 `transfer/UploadPipe.kt` 的读写分离管道（`RECEIVE_CHUNK_SIZE = 512 KiB`、`RECEIVE_QUEUE_DEPTH = 4`），不要改回「读一块写一块」；发送侧并发上限为 `LocalSendManager.SEND_CONCURRENCY = 2`，不要在文件之间加固定延时。
+- 速率口径：会话卡片与通知显示全程累计平均，单文件行保留 `transfer/TransferRateMeter.kt` 的窗口平滑瞬时值；进度快照按 `SNAPSHOT_PUBLISH_INTERVAL_MS = 200` 节流发布，不要把并发流的瞬时值相加。
+- 传输模型的可变字段（进度、状态、速率）必须加 `@Volatile`：网络协程写、界面线程读。
+- 发现侧子网扫描并发固定为 `Dispatchers.IO.limitedParallelism(32)`、单探针 `SCAN_PROBE_TIMEOUT_MS = 3000`；改这些常数要同步 `ScanProgressReporter` 的进度口径。
+
+## 通知
+
+- 渠道属性创建后不可修改：改音效、震动或重要性必须换新渠道 ID，并在创建后显式删除旧 ID（`localsend_receive_request_v2` 对应的旧渠道 `localsend_receive_request` 每次启动删除）。
+- 悬浮横幅由渠道重要性决定：接收请求固定用 `CHANNEL_RECEIVE_REQUEST`（`IMPORTANCE_HIGH`），进度类通知用低优先级渠道保持静默；`setPriority` 对渠道通知无运行时效果，不要再写。
+- 实时通知与提升型常驻通知统一走 `notification/LiveUpdatesCompat.kt` 的 `SDK_INT` 分派（Android 16 及以上用原生 `Notification.ProgressStyle`，低版本用 `NotificationCompat`），调用点不要自行分支。
+- `POST_NOTIFICATIONS` 只在首次启动询问一次并写 `PreferenceKeys.KEY_NOTIFICATION_ASKED`；其余场景由设置页入口按 `notification/NotificationPermissionPolicy.kt` 的三态返回「再问一次」或「直达系统设置」，该对象必须保持无 Android 依赖的纯函数，由 `NotificationPermissionPolicyTest` 覆盖。
+- 通知动作统一走 `notification/TransferActionReceiver.kt` 与 `Constants.kt` 的 `ACTION_*` 常量，不新增隐式广播。
 
 ## coUI 能力与回退边界
 

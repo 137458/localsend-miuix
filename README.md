@@ -1,72 +1,82 @@
 # LocalSend Miuix
 
-LocalSend Miuix 是基于 Xiaomi HyperOS 设计风格与 Miuix KMP 现代化组件库复刻重构的 Android 局域网文件传输应用，并内置一套 ColorOS（coUI-Kit）风格的界面皮肤。
+LocalSend 协议的 Android 重写客户端：与官方及第三方 LocalSend 客户端互通，界面提供 HyperOS（Miuix）与 ColorOS（coUI-Kit）两套皮肤，共用同一份业务状态、路由与设置持久化。
 
-本项目完全兼容官方 LocalSend Protocol v2 规范，不仅能与局域网内的官方 LocalSend 客户端（Windows、macOS、iOS、Android、Linux）无缝双向发现与文件传输，还提供了纯正的 HyperOS 视觉语言体验与液态玻璃悬浮底栏导航设计。
+## 特性
 
----
+- 设备发现：多播 `224.0.0.167:53317` 加按白/黑名单过滤网卡的定向广播双向宣告；路由器屏蔽组播时用 `/24` 子网扫描兜底（32 并发、单探针 3 s）。
+- 传输服务：Ktor 嵌入式服务端，纯 HTTP 走 CIO，HTTPS 切换到 Netty 并挂载自签名证书；本机指纹即证书 SHA-256，出站按对端指纹固定校验。
+- 内容来源：系统分享（`ACTION_SEND` / `ACTION_SEND_MULTIPLE`）与「打开方式」（`ACTION_VIEW`）、任意文件、媒体、已安装应用 APK、纯文本、剪贴板；待发送列表带图片、视频首帧与应用图标缩略图。
+- 网页快传：待发内容挂到 `http://<本机 IP>:<端口>/`，对端浏览器可预览（图片、视频、音频、文本、JSON/XML）、单个或 zip 下载，并可直接拖拽回传；入口附二维码。
+- 通知：5 个渠道（实时进度、接收、接收请求、发送、后台服务）；接收请求通知为高优先级并带「接收 / 拒绝」动作；Android 16 及以上走原生 `Notification.ProgressStyle` 提升型常驻通知（焦点胶囊与分段进度），低版本回退兼容实现；`POST_NOTIFICATIONS` 仅在首次启动询问一次。
+- 传输完整性：可选端到端 SHA-256 校验，只加自定义请求头，不改标准字段；摘要不一致即删除临时文件并把该文件判为失败，对端不支持时降级为「未校验」；确认应答丢失时先查 `checksum-status` 自愈，不误判失败。
+- 吞吐与读数：接收端读写分离（`512 KiB` 分块、4 块在飞、`512 KiB` 写缓冲），发送端 2 路并发上传；会话速率取全程累计平均（`200 ms` 节流快照），单文件行保留瞬时速率。
+- 记录与更新：传输历史本地 JSON 持久化，支持分类筛选、详情、重发与清空；更新走 GitHub Releases，进程级下载四态，按摘要与字节校验安装包，失败按网络、校验、写盘分类。
+- 外观：6 种主题（跟随系统、浅色、深色、莫奈跟随系统、莫奈浅色、莫奈深色），HyperOS 皮肤使用液态玻璃悬浮底栏（SDF 透镜折射、色散、阻尼滑块），中英双语。
 
-## 核心特性
+## 下载与安装
 
-- **纯正 HyperOS 视觉规范**：基于 Miuix 0.9.4 组件库深度构建，全链路采用 Miuix 推荐的最佳实践与组件（MiuixTheme、Scaffold、TopAppBar、Card、SmallTitle、*Preference、WindowDialog、WindowBottomSheet、LinearProgressIndicator、PullToRefresh 等）。
-- **双皮肤切换**：内建 HyperOS（Miuix）与 ColorOS（coUI-Kit `0.0.1-alpha11`）两套视图实现，共用同一份业务状态、路由与设置持久化，在设置页即时切换，不影响设备发现、传输与历史记录。
-- **悬浮底栏主导航**：HyperOS 皮肤使用自研液态玻璃底栏（`LiquidGlassBottomBar`，有向距离场透镜折射 + 色散 + 阻尼滑块），并以 `Badge` 动态徽标指示未处理的传入传输请求；ColorOS 皮肤使用 coUI `NavigationBar`（Android 14+）与低版本平替。
-- **全协议兼容**：
-  - **UDP 多播与广播发现**：监听与宣告多播地址 `224.0.0.167:53317` 及广播地址 `255.255.255.255:53317`，秒级识别局域网活跃设备。
-  - **子网并发扫描**：对本机所在私有网段的 `1..254` 逐个并发探测，解决路由器 AP 隔离导致的多播阻塞问题。
-  - **HTTP REST 与流式传输**：基于 Ktor 异步引擎实现 `/api/localsend/v2/info`、`/api/localsend/v2/register`、`/api/localsend/v2/prepare-upload`、`/api/localsend/v2/upload` 与 `/api/localsend/v2/cancel` 完整生命周期。
-  - **自签名 TLS/HTTPS**：HTTPS 模式下本机指纹对齐协议 §2（fingerprint=证书 SHA-256），启动时生成并持久化自签名证书，并通过指纹加固 TrustManager 校验对端证书，双向防中间人。
-  - **Web Share（双向网页快传）**：把选中文件共享为局域网链接，对方浏览器打开即可预览并逐个下载；同时支持对方直接在浏览器中拖拽（Drag & Drop）或选择文件高速回传至手机端，无需安装 LocalSend。
-- **丰富的内容发送与系统级分享支持**：支持系统相册、文件管理与第三方应用通过 Android 系统分享菜单（ACTION_SEND / ACTION_SEND_MULTIPLE）直接分享文件/文本至应用，支持从文件管理器“打开方式”（ACTION_VIEW）唤起；同时支持在应用内选择任意文件、多媒体图片/视频、应用 APK 提取、纯文本录入及一键剪贴板文本提取。
-- **待传输文件缩略图与多维内容预览**：针对图片、视频（截取首帧并显示播放标识）、APK 应用图标实现异步加载与双级内存缓存；待发送列表与传输进度卡片中支持点击查看大图、可选择复制的多行纯文本弹窗与文件元数据预览。
-- **完善的交互与控制**：
-  - 快速保存模式（无需确认自动接收信任传输）。
-  - 平滑动画传输进度条、平滑扫描指示器、实时传输速度（MB/s）与剩余时间监控。
-  - 传输历史记录安全本地 JSON 持久化（重启/更新后永不丢失）与一键清理。
-  - 软件在线检测更新系统：支持 GitHub Releases 检查、更新日志展示与 APK 应用内流式下载安装。
-  - 沉浸式色彩主题模式切换（跟随系统、浅色、深色、莫奈跟随系统、莫奈浅色、莫奈深色）。
+- 安装包见 [GitHub Releases](https://github.com/137458/localsend-miuix/releases)。
+- 系统要求：Android 12（API 31）及以上。
+- 自 `v1.24.0` 起沿用同一签名（证书 SHA-256 `48fba404bc562e7287a90a2f932cbdb0a54141b8e642ee5489f4f681d3434909`），该版本及以后可覆盖升级；从 `v1.23.0` 及更早版本升级需先卸载旧版，卸载会清除应用本地数据。
+
+## 页面结构
+
+| 页面 | 关键实现 | 职责 |
+|---|---|---|
+| 主架构 | `MiuixTheme` / `CouiSkinTheme`、`NavDisplay`、`LiquidGlassBottomBar` / `CouiSkinNavigationBar` | 按 `UiSkin` 在 `ui/App.kt` 根部切换皮肤；底栏三页（首页、传输历史、设置）加全局弹窗宿主 |
+| 首页 | `TopAppBar`、`SectionCard`、`PullToRefresh`、`TransferSessionCard` | 本机名称与 IP、正在接收的会话与实时进度、待发送队列、快速选择、收藏设备、附近设备；下拉刷新与子网扫描 |
+| 传输历史 | `SegmentedControl`（低版本平替）、`HistoryStore` | 全部 / 接收 / 发送筛选，卡片增删动效，详情含文本内容与文件列表，重新发送，清空二次确认 |
+| 设置 | `ArrowPreference`、`SwitchPreference`、`WindowDropdownPreference` | 通用（别名、语言、设备类型、主题、皮肤、通知入口）、接收、网络与安全（端口、HTTPS、PIN、证书指纹）、高级网络（白/黑名单、组播地址、发现超时）、关于 |
+| 软件更新 | `BgEffectBackground`、`MarkdownText`、`UpdateDialog` | 检查 Releases、Markdown 更新日志、进程级下载与安装、忽略此版本、HyperOS 3 流光开关 |
+| 弹窗体系 | `WindowDialog` / `WindowBottomSheet`、`Coui*` 弹窗 | 改名、端口、手动 IP、纯文本发送、PIN、证书指纹、接收请求、添加内容、APK 选择器、历史详情、网页快传 |
+
+ColorOS 皮肤位于 `app/src/main/java/org/localsend/miuix/ui/coui/`，覆盖首页、传输历史、设置、软件更新四页与全套弹窗；其余组件与 HyperOS 皮肤共享。
+
+## 协议
+
+| 能力 | 实现 | 备注 |
+|---|---|---|
+| 发现 | 多播与广播宣告、`/api/localsend/v2/register` 回执、子网扫描 | 忽略本机自发宣告；收到对方的 announce 直接登记 |
+| 元信息 | `/api/localsend/v2/info`，兼容 `/api/localsend/v1/info` | 协议版本 `2.2` |
+| 发送 | `prepare-upload`、`upload`、`cancel` | 支持 PIN 校验、限流与逐项选择接收 |
+| 接收 | `prepare-download`、`download`、`download-zip` | 逐文件下载与整包 zip 下载 |
+| 网页快传 | `GET /` 返回本地渲染的 HTML | 预览、下载、拖拽上传，不需要对端安装 LocalSend |
+| 校验扩展 | `X-Localsend-Miuix-Checksum`（`1` 仅回报、`2` 回报并暂存待确认）、`X-Localsend-Miuix-Sha256`、`/api/localsend/v2/checksum-commit`、`checksum-reject`、`checksum-status` | 私有扩展不修改标准字段；待确认暂存 60 s，结果保留 5 min |
 
 ## 已知限制
 
-- **入站不启用双向 TLS（mTLS）**：HTTPS 监听端不要求客户端出示证书，`/register` 仅以请求体中的指纹自证身份，服务端不校验客户端证书。原因：开启客户端证书校验会改变握手流程，旧版与第三方 LocalSend 客户端可能因未携带客户端证书而直接连接失败。出站方向仍按对端指纹固定（TrustManager）校验证书，防中间人能力不受影响。
+- 入站不启用双向 TLS：HTTPS 监听端不要求客户端证书，`/register` 仅信任请求体声明的指纹。原因是 Ktor Netty 的 `sslConnector` 没有读取客户端证书的入口，且强制客户端证书会让未携带证书的旧版与第三方客户端直接握手失败。出站方向仍按对端指纹校验证书。
+- 跨网段不可发现：多播与子网扫描都限定在本机所在子网，不同网段需手动输入 IP。
+- 实时通知（提升型常驻通知与焦点胶囊）需 Android 16 及以上，低版本只提供普通进度通知。
+- 端到端校验只在本应用之间生效，对端为官方或第三方客户端时提示「未校验」。
+- ColorOS 皮肤的大量原语要求 API 34，Android 12–13 走同文件内平替实现，视觉与原语存在差异。
 
----
+## 源码构建
 
-## 页面与组件结构
+环境：JDK 21、Android SDK Platform 37、Gradle 9.6.1、Android Gradle Plugin 9.2.1。
 
-| 页面 / 模块 | 核心组件 | 功能描述 |
-|---|---|---|
-| 主架构 Shell | `MiuixTheme` / `CouiTheme`, `ThemeController`, `NavDisplay`, `Scaffold`, `LiquidGlassBottomBar` / `CouiSkinNavigationBar`, `Badge` | 动态主题控制、miuix-nav 官方路由调度、全局独立窗口级弹窗宿主、悬浮底栏切换 |
-| 首页 · 接收区 | `TopAppBar`, `Card`, `SmallTitle`, `LinearProgressIndicator`, `Button` | 本机名称/IP/端口展示、接收中会话卡片与实时进度、Web Share 分享链接；顶栏提供手动输入 IP 与刷新设备入口 |
-| 首页 · 发送区 | `TopAppBar`, `MiuixScrollBehavior`, `PullToRefresh`, `Card`, `SmallTitle`, `Button`, `IconButton` | 快速选择入口、下拉刷新局域网设备、附近设备列表、待发送内容清单（选择内容后显示） |
-| 设置 (Settings) | `TopAppBar`, `Card`, `SmallTitle`, `ArrowPreference`, `SwitchPreference`, `WindowDropdownPreference` | 设备别名、快速保存、服务端口与多播地址、界面皮肤与主题色彩模式切换、检查更新入口 |
-| 传输历史 (History) | `TopAppBar`, `Card`, `SmallTitle`, `Icon`, `IconButton` | 独立 Tab 页面，支持原生连续深度进退转场与边缘左滑返回手势 |
-| 软件更新 (Update) | `SmallTopAppBar`, `BgEffectBackground`, `MarkdownText`, `UpdateDialog`, `Card`, `SmallTitle`, `BasicComponent`, `Switch` | 完整对齐 HyperOS 官方更新与动效规范，集成 HyperOS 2/3 原生 GPU RuntimeShader 动态流光背景、Markdown 富文本更新日志、官方 UpdateDialog 弹窗与设置通道 |
-| 弹窗交互 (Overlays) | `WindowDialog`, `WindowBottomSheet`, `TextField`, `ButtonDefaults` | 设备名称修改、手动 IP 发送输入、文本消息发送、传输请求接收/拒绝、发送内容选择菜单 |
-
-ColorOS 皮肤的实现位于 `app/src/main/java/org/localsend/miuix/ui/coui/`：`page/` 承载首页、传输历史、设置与软件更新四个页面，`component/` 承载底栏与公共控件，`dialog/` 承载弹窗体系；跨皮肤共用的弹窗与富文本组件仍走 `ui/component/` 共享实现。
-
----
-
-## 系统要求与编译构建
-
-### 系统要求
-- JDK 21
-- Android SDK Platform 37（`compileSdk = 37`、`targetSdk = 35`、`minSdk = 31`）
-- Gradle 9.6.1 + Android Gradle Plugin 9.2.1
-
-### 编译与打包
 ```bash
-# 编译并生成 Debug APK
-./gradlew assembleDebug
-
-# 运行单元测试
-./gradlew testDebugUnitTest
+./gradlew assembleDebug        # 产物 app/build/outputs/apk/debug/app-debug.apk
+./gradlew testDebugUnitTest    # 单元测试
+./gradlew ktlintCheck          # 代码风格（ignoreFailures = false）
+./gradlew :app:lintDebug       # Android Lint
 ```
 
-编译产物位于 `app/build/outputs/apk/debug/app-debug.apk`。
+## 目录
 
----
+| 路径 | 内容 |
+|---|---|
+| `app/src/main/java/org/localsend/miuix/core/` | 协议常量、JSON 编解码与文件存储 |
+| `app/src/main/java/org/localsend/miuix/network/` | 发现、HTTP 服务端与客户端、TLS、限流、网页快传渲染 |
+| `app/src/main/java/org/localsend/miuix/manager/` | 传输会话编排、设置映射、更新管理 |
+| `app/src/main/java/org/localsend/miuix/transfer/` | 读写管道、速率与剩余时间、完整性校验 |
+| `app/src/main/java/org/localsend/miuix/notification/` | 通知渠道、提升型常驻通知、发布与动作接收 |
+| `app/src/main/java/org/localsend/miuix/service/` | 传输前台服务 |
+| `app/src/main/java/org/localsend/miuix/ui/` | HyperOS 皮肤、共享组件与弹窗 |
+| `app/src/main/java/org/localsend/miuix/ui/coui/` | ColorOS 皮肤页面、组件与弹窗 |
+| `app/src/test/java/org/localsend/miuix/` | 54 个单元测试文件，覆盖协议一致性、校验、速率、权限策略等 |
 
-## 开源协议
-本项目基于 Apache 2.0 许可证开源。
+## 许可
+
+基于 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) 开源。
