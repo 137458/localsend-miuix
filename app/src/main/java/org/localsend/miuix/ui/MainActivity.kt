@@ -16,6 +16,7 @@ import org.localsend.miuix.R
 import org.localsend.miuix.core.PreferenceKeys
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.model.MainTabs
+import org.localsend.miuix.notification.NotificationPermissionPolicy
 import org.localsend.miuix.notification.TransferNotifier
 import org.localsend.miuix.util.AppLanguage
 
@@ -72,10 +73,19 @@ class MainActivity :
     fun requestNecessaryPermissions() {
         val permissionsToRequest = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED
+            val granted =
+                checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+            // 通知授权只在首次启动询问：拒绝后系统会静默返回，重复请求既不弹窗也打扰启动，
+            // 后续由设置页「通知与实时通知」入口按策略再申请或直达系统设置。
+            if (NotificationPermissionPolicy.shouldAskOnLaunch(
+                    sdkInt = Build.VERSION.SDK_INT,
+                    granted = granted,
+                    askRecorded = isNotificationAsked(),
+                )
             ) {
                 permissionsToRequest.add(android.Manifest.permission.POST_NOTIFICATIONS)
+                recordNotificationAsked()
             }
         }
         // Android 17+ (API 37+) 局域网访问与多播发现前瞻性运行时权限
@@ -88,6 +98,42 @@ class MainActivity :
         if (permissionsToRequest.isNotEmpty()) {
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
+    }
+
+    /**
+     * 设置页「通知与实时通知」入口：系统仍允许询问就再弹一次授权，否则直达系统通知设置，
+     * 由用户在那里开启通知总开关、悬浮提醒与实时通知。
+     */
+    fun requestNotificationPermissionFromSettings() {
+        val granted =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+        val showRationale =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)
+        val action =
+            NotificationPermissionPolicy.entryAction(
+                sdkInt = Build.VERSION.SDK_INT,
+                granted = granted,
+                askRecorded = isNotificationAsked(),
+                showRationale = showRationale,
+            )
+        when (action) {
+            NotificationPermissionPolicy.EntryAction.REQUEST -> {
+                recordNotificationAsked()
+                permissionLauncher.launch(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS))
+            }
+            NotificationPermissionPolicy.EntryAction.OPEN_SETTINGS -> TransferNotifier.openNotificationSettings(this)
+        }
+    }
+
+    private fun notificationPrefs() = getSharedPreferences(PreferenceKeys.PREF_NAME, Context.MODE_PRIVATE)
+
+    private fun isNotificationAsked(): Boolean = notificationPrefs().getBoolean(PreferenceKeys.KEY_NOTIFICATION_ASKED, false)
+
+    private fun recordNotificationAsked() {
+        notificationPrefs().edit().putBoolean(PreferenceKeys.KEY_NOTIFICATION_ASKED, true).apply()
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

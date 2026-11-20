@@ -34,6 +34,7 @@ object PreferenceKeys {
     const val KEY_NETWORK_BLACKLIST = "network_blacklist"
     const val KEY_MULTICAST_GROUP = "multicast_group"
     const val KEY_DISCOVERY_TIMEOUT = "discovery_timeout"
+    const val KEY_NOTIFICATION_ASKED = "notification_permission_asked"
 }
 
 object ExternalLinks {

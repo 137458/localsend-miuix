@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -35,7 +37,13 @@ object TransferNotifier {
     private const val TAG = "TransferNotifier"
 
     const val CHANNEL_RECEIVE = "localsend_receive"
-    const val CHANNEL_RECEIVE_REQUEST = "localsend_receive_request"
+    const val CHANNEL_RECEIVE_REQUEST = "localsend_receive_request_v2"
+
+    /**
+     * 旧版接收请求渠道。渠道创建后音效与震动属性不可再改，升级到 [CHANNEL_RECEIVE_REQUEST]
+     * 时一并删除，避免设置页出现两个同名渠道。
+     */
+    private const val CHANNEL_RECEIVE_REQUEST_LEGACY = "localsend_receive_request"
     const val CHANNEL_SEND = "localsend_send"
     const val CHANNEL_SERVICE = "localsend_service"
     const val CHANNEL_LIVE = "localsend_live_channel"
@@ -44,6 +52,9 @@ object TransferNotifier {
     private const val NOTIF_ID_RECEIVE_BASE = 500_000_000
     private const val NOTIF_ID_SEND_BASE = 800_000_000
     private const val NOTIF_ID_SUFFIX_MASK = 0x0FFFFFFF
+
+    /** 接收请求提醒的震动节奏：立即短震，间隔 150ms 再震一次。 */
+    private val RECEIVE_REQUEST_VIBRATION = longArrayOf(0L, 200L, 150L, 200L)
 
     @Volatile
     private var allowed = false
@@ -79,7 +90,9 @@ object TransferNotifier {
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 setShowBadge(false)
             }
-        // 接收请求需要用户及时处理（60 秒内不响应即视为拒绝），必须高优先级提醒而非静默通知
+        // 接收请求需要用户及时处理（60 秒内不响应即视为拒绝），必须高优先级提醒而非静默通知。
+        // 提示音与震动在这里显式声明：渠道属性只在创建时生效，所以新版渠道换了 ID，
+        // 老安装升级后也能拿到带声音与震动的默认配置。
         val receiveRequestChannel =
             NotificationChannel(
                 CHANNEL_RECEIVE_REQUEST,
@@ -88,7 +101,18 @@ object TransferNotifier {
             ).apply {
                 description = context.getString(R.string.notif_channel_receive_request_desc)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                setShowBadge(false)
+                setShowBadge(true)
+                enableVibration(true)
+                vibrationPattern = RECEIVE_REQUEST_VIBRATION
+                enableLights(true)
+                setSound(
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                    AudioAttributes
+                        .Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build(),
+                )
             }
         val sendChannel =
             NotificationChannel(
@@ -114,6 +138,7 @@ object TransferNotifier {
         nm.createNotificationChannel(receiveRequestChannel)
         nm.createNotificationChannel(sendChannel)
         nm.createNotificationChannel(serviceChannel)
+        nm.deleteNotificationChannel(CHANNEL_RECEIVE_REQUEST_LEGACY)
     }
 
     fun buildForegroundNotification(
@@ -162,6 +187,32 @@ object TransferNotifier {
         val currentAllowed = isNotificationsEnabled(context)
         allowed = currentAllowed
         return currentAllowed
+    }
+
+    /** 通知在系统里的可用状态，供设置页入口展示。 */
+    enum class NotificationState {
+        /** 通知总开关或运行时权限未开。 */
+        DISABLED,
+
+        /** 通知可用，但 Android 16+ 的实时通知（状态栏胶囊 / 流体云）未开启。 */
+        LIVE_UPDATES_DISABLED,
+
+        /** 通知与实时通知都可用。 */
+        ENABLED,
+    }
+
+    fun notificationState(context: Context): NotificationState =
+        when {
+            !isNotificationsEnabled(context) -> NotificationState.DISABLED
+            !canPostLiveUpdates(context) -> NotificationState.LIVE_UPDATES_DISABLED
+            else -> NotificationState.ENABLED
+        }
+
+    /** 实时通知是否可发布；低于 Android 16 的系统没有该能力，不作为「未开启」提示。 */
+    fun canPostLiveUpdates(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < 36) return true
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        return nm.canPostPromotedNotifications()
     }
 
     /**
@@ -302,6 +353,9 @@ object TransferNotifier {
                 .setContentText(text)
                 .setSmallIcon(R.drawable.ic_stat_receive)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
+                // 消息类别让系统按「即时通讯」对待：允许悬浮提醒，锁屏展示完整内容
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setContentIntent(appPendingIntent(context))
                 .setAutoCancel(true)
                 .addAction(

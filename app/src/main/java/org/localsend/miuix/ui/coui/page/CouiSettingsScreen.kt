@@ -21,6 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.itos.coui.layout.Divider
 import com.itos.coui.layout.Group
@@ -33,6 +34,7 @@ import org.localsend.miuix.core.ExternalLinks
 import org.localsend.miuix.manager.LocalSendManager
 import org.localsend.miuix.manager.UpdateManager
 import org.localsend.miuix.model.DeviceType
+import org.localsend.miuix.notification.TransferNotifier
 import org.localsend.miuix.ui.MainActivity
 import org.localsend.miuix.ui.coui.component.CouiArrowRow
 import org.localsend.miuix.ui.coui.component.CouiChoiceRow
@@ -82,6 +84,13 @@ fun CouiSettingsScreen(
 ) {
     val context = LocalContext.current
     val settings by manager.settings.collectAsStateWithLifecycle()
+
+    // 通知开关可能在系统设置里被改动，每次回到前台重新读取当前状态
+    var notificationState by remember { mutableStateOf(TransferNotifier.notificationState(context)) }
+    LifecycleResumeEffect(Unit) {
+        notificationState = TransferNotifier.notificationState(context)
+        onPauseOrDispose { }
+    }
 
     var showPinDialog by remember { mutableStateOf(false) }
     var showCertDialog by remember { mutableStateOf(false) }
@@ -233,6 +242,23 @@ fun CouiSettingsScreen(
                         checked = settings.autoFinish,
                         onCheckedChange = { checked ->
                             manager.updateSettings { it.copy(autoFinish = checked) }
+                        },
+                    )
+                    Divider()
+                    CouiArrowRow(
+                        title = stringResource(R.string.settings_pref_notifications_title),
+                        summary =
+                            when (notificationState) {
+                                TransferNotifier.NotificationState.ENABLED ->
+                                    stringResource(R.string.settings_pref_notifications_on)
+                                TransferNotifier.NotificationState.LIVE_UPDATES_DISABLED ->
+                                    stringResource(R.string.settings_pref_notifications_live_off)
+                                TransferNotifier.NotificationState.DISABLED ->
+                                    stringResource(R.string.settings_pref_notifications_off)
+                            },
+                        onClick = {
+                            (context as? MainActivity)?.let { it.requestNotificationPermissionFromSettings() }
+                                ?: TransferNotifier.openNotificationSettings(context)
                         },
                     )
                 }

@@ -107,9 +107,10 @@
     <string name="ui_skin_hyperos">HyperOS</string>
     <string name="ui_skin_coloros">ColorOS</string>
     <string name="settings_pref_vibrate_title">Vibration on Finish</string>
-    <string name="settings_pref_notif_perm_title">Notifications &amp; Live Updates</string>
-    <string name="settings_pref_notif_perm_enabled">On</string>
-    <string name="settings_pref_notif_perm_disabled">Off · Tap to allow</string>
+    <string name="settings_pref_notifications_title">Notifications &amp; Live Updates</string>
+    <string name="settings_pref_notifications_on">On · Tap for system settings</string>
+    <string name="settings_pref_notifications_off">Off · Tap to allow</string>
+    <string name="settings_pref_notifications_live_off">Live updates off · Tap to enable</string>
     <string name="settings_pref_wide_nav_rail_title">Wide Screen Side Navigation</string>
     <string name="settings_pref_wide_nav_rail_summary">Show side rail on wide screens</string>
     <string name="settings_section_receive">Receive Settings</string>
