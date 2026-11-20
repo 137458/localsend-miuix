@@ -146,7 +146,7 @@
     <string name="settings_pref_check_update_summary">Version v%1$s</string>
     <string name="settings_pref_github_title">GitHub Repository</string>
     <string name="settings_pref_license_title">Open Source &amp; Standards</string>
-    <string name="settings_pref_license_summary">LocalSend Protocol v2.1 • Apache 2.0 License</string>
+    <string name="settings_pref_license_summary">LocalSend Protocol v2.2 • Apache 2.0 License</string>
 
     <string name="theme_system">System Default</string>
     <string name="theme_light">Light Mode</string>

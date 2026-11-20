@@ -146,7 +146,7 @@
     <string name="settings_pref_check_update_summary">当前版本 v%1$s</string>
     <string name="settings_pref_github_title">GitHub 开源主页</string>
     <string name="settings_pref_license_title">开源协议与标准</string>
-    <string name="settings_pref_license_summary">LocalSend Protocol v2.1 • Apache 2.0 License</string>
+    <string name="settings_pref_license_summary">LocalSend Protocol v2.2 • Apache 2.0 License</string>
 
     <string name="theme_system">跟随系统</string>
     <string name="theme_light">浅色模式</string>
