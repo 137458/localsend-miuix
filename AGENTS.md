@@ -1,33 +1,57 @@
 # localsend-miuix — Agent 约束入口
 
-LocalSend 协议（v2）兼容的 Android 原生重写版，Compose + Miuix（HyperOS 风格），与官方客户端局域网互通。
+本文件是 AI Agent 与协作者进入本仓库的唯一约束入口：构建验证口径、协议对齐要求、两套皮肤的 UI 边界都在这里，改动前先读完对应小节。
 
 ## 构建与验证
 
-- **环境要求**：JDK 17/21、Android SDK Platform 35/37、Gradle 9.6.1 + AGP 9.2.1
-- **构建命令**：
-  - 编译 Debug APK：`./gradlew assembleDebug`（产物位于 `app/build/outputs/apk/debug/app-debug.apk`）
-  - 单元测试：`./gradlew testDebugUnitTest`
-  - 代码风格检查：`./gradlew ktlintCheck`（ktlint 已接入构建门禁）
-  - Android Lint 检查：`./gradlew :app:lintDebug`
-- **完成标准**：编译、测试、ktlint、lint 全部通过。
+环境要求：
+
+- JDK 21（`jvmTarget = JVM_21`、`sourceCompatibility/targetCompatibility = 21`）
+- Android SDK Platform 37（`compileSdk = 37`、`targetSdk = 35`、`minSdk = 31`）
+- Gradle 9.6.1 + Android Gradle Plugin 9.2.1
+
+验证命令：
+
+```bash
+./gradlew assembleDebug
+./gradlew testDebugUnitTest
+./gradlew ktlintCheck
+./gradlew :app:lintDebug
+```
+
+完成标准：以上四项全部通过，才算改动完成。`app/build.gradle.kts` 中 `ktlint.ignoreFailures = false`，格式不合规会直接失败，不做人工豁免。
 
 ## 项目约定
 
-- **协议对齐**：以官方 LocalSend 协议为准，参考源码位于 `../localsend-reference`（冻结于官方 v1.18.2，只读）。设备发现、握手、传输及 Web Share 行为必须对照官方实现。
-- **协议常量**：组播发现地址 `224.0.0.167:53317`、默认服务端口 `53317` 严格与官方一致。
-- **UI 规范**：
-  - HyperOS 皮肤严格使用 `top.yukonga.miuix.kmp` 官方组件，严禁引入 Material 3 控件；组件与规范契约审查见 `docs/research/`。
-  - ColorOS 皮肤（`ui/coui/`）优先使用 `com.itos.coui` 官方原语，严禁引入 Material 3 控件；仅当 coUI 明确存在能力缺口（如数字输入弹窗、进度条、图标库、多文件详情复用组件，见 `docs/research/coui-capability-gaps.md`）时按能力边界清单回退到共享或自绘组件，并在对应页面保留 `@RequiresApi` 守卫与低版本平替。
-  - coUI 页面、弹窗与组件禁止直接读取 `MiuixTheme.colorScheme` 语义色（危险色统一经 `couiDangerColor()` 取 `CouiColor.Day/Night.RED`）；交互控件最小命中区不低于 48dp。
+### 协议对齐
 
-## 内部文档索引
+- 本仓库是官方 LocalSend 客户端的 Android 重写实现，协议行为以官方 Flutter 实现为准：`E:\project\references\localsend-reference`（v1.18.2 / `1.18.2+64`）。
+- 协议常量集中在 `app/src/main/java/org/localsend/miuix/core/Constants.kt`：多播地址 `224.0.0.167`、默认端口 `53317`、协议版本 `2.2`，以及 `/api/localsend/v2/*` 路由。
+- 新增或修改协议交互，必须同时兼容官方客户端与第三方 LocalSend 实现。私有扩展只能落在 `X-Localsend-Miuix-*` 请求头与 `checksum` 相关路由上，不得改动标准字段语义。
 
-| 业务场景 | 文档路径 | 核心内容 |
-|---|---|---|
-| **UI 规范审查** | `docs/research/miuix-0.9.4-rc01-ui-review.md` | Miuix 0.9.4-rc01 官方组件契约、偏差改写清单与落点速查 |
-| **coUI 合规审查** | `docs/research/coui-alpha10-compliance-review.md` | coUI `0.0.1-alpha10` 合规性评估、P1/P2/P3 问题清单与重构落点 |
-| **coUI 能力边界** | `docs/research/coui-capability-gaps.md` | coUI `0.0.1-alpha10` 已有原语、API 门槛（`@RequiresApi`）与自绘/复用边界 |
-| **TabRow 架构调研** | `docs/research/miuix-tabrow-implementation-research.md` | Miuix TabRow 与 TabRowWithContour 契约剖析、测量算法与落地建议 |
-| **全量质量评估** | `docs/research/quality-assessment-report.md` | 23 项缺陷矩阵（P0~P3）、根因定位与整改路线图 |
-| **对外更新日志** | `CHANGELOG.md` | 外部发布历史与版本变更记录（对外文档） |
+### UI 规范
+
+- HyperOS 皮肤（`ui/screen/`、`ui/component/`）：只使用 Miuix 原件（`top.yukonga.miuix.kmp.*`），禁止引入 Material 3 组件。
+- ColorOS 皮肤（`ui/coui/`）：只使用 coUI-Kit 原语（`com.itos.coui.*`）；库能力缺口按下面的回退边界处理，禁止直接把 Miuix 组件混进 `ui/coui/`。
+- coUI 代码禁止读取 `MiuixTheme.colorScheme`；危险色必须经 `couiDangerColor()`（`ui/coui/theme/CouiSkinTheme.kt`）取得。
+- 两套皮肤共用同一份业务状态、路由与设置持久化，分派点只在 `ui/App.kt` 根部，由 `model/UiSkin.kt` 的 `UiSkin` 枚举决定。
+
+## coUI 能力与回退边界
+
+当前依赖 `io.github.itoseo:coui:0.0.1-alpha11`，模块 `minSdk = 31`，而库中若干原语要求 API 34。处理方式统一为“`SDK_INT` 分派 + 同文件内低版本平替”，不允许为了用库而抬高 `minSdk`。
+
+- TopAppBar 按钮组（`CouiCommonComponents.kt`，`COUI_TOP_BAR_BUTTON_MIN_SDK = 34`）：API 34 及以上用 `TopAppBarButtonGroup` / `TopAppBarButton`，低版本回退 `CouiIconAction` 与紧凑 `Row`。
+- 悬浮导航栏（`CouiSkinNavigationBar.kt`，`COUI_FLOATING_NAV_BAR_MIN_SDK = 34`）：API 34 及以上用库 `NavigationBar`，低版本用同文件的 `CouiPlainNavigationBar`。
+- 分段控件（`CouiHistoryScreen.kt`，`COUI_SEGMENTED_CONTROL_MIN_SDK = 34`）：API 34 及以上用 `SegmentedControl`，低版本用 `CouiPlainFilterTabs`。
+- 命中区：库原语的视觉尺寸小于触控目标，图标按钮统一走 `CouiMinTouchTargetSize = 48.dp` 与 `Modifier.couiMinTouchTarget()`，视觉圆钮 40dp、命中区 48dp。
+- 数量角标：库没有 Badge 原语，角标自绘，统一用 `CouiCountBadge` / `CouiBadgedIcon` / `CouiIncomingBadgeAction`，语义走 accent，禁止借用危险红。
+- 文本输入：库 `InputDialog` 未暴露键盘类型槽位，需要数字键盘或多行、附加内容的场景统一用项目自建的 `CouiTextInputDialog`（`ui/coui/dialog/CouiDeviceAndInputDialogs.kt`，`keyboardType` 参数 + `CouiDialogTextField`），不要在 `ui/coui/` 里回退到 Miuix 输入弹窗。
+- 嵌套 Scaffold：`ui/coui/` 内嵌在 `App` 底栏之上的页面必须显式传 `windowInsets = WindowInsets(0, 0, 0, 0)`，避免重复消费系统栏 inset；独立顶层路由（如 `CouiUpdateScreen`）保留默认 insets。
+- 开关、单选、复选框、菜单、下拉、滚动与过度滚动等其余原语，优先用库实现（`Switch`、`RadioButton`、`Checkbox`、`Menu`、`couiVerticalScroll` / `rememberCouiOverscrollEffect`），不要手写等价控件。
+
+## 文档与提交
+
+- 活文档只有 `README.md`、本文件与 `CHANGELOG.md`。仓库不保留时点调研报告、代码审查报告与实施计划，能力边界与约束写进本文件。
+- `CHANGELOG.md` 只向顶部的“未发布”区块追加条目，不改历史版本区块，不为文档修正单独开版本条目。
+- 中文技术文档遵循中英文与数字之间加空格、路径与命令用反引号、标题层级不跳级、不使用 Emoji。
+- 提交信息使用 Conventional Commits 中文描述，禁止 Emoji；一个逻辑变更一个提交，只 `git add` 实际改动路径。

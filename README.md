@@ -1,18 +1,19 @@
 # LocalSend Miuix
 
-LocalSend Miuix 是基于 Xiaomi HyperOS 设计风格与 Miuix KMP 现代化组件库完整复刻重构的跨平台局域网文件传输应用。
+LocalSend Miuix 是基于 Xiaomi HyperOS 设计风格与 Miuix KMP 现代化组件库复刻重构的 Android 局域网文件传输应用，并内置一套 ColorOS（coUI-Kit）风格的界面皮肤。
 
-本项目完全兼容官方 LocalSend Protocol v2 规范，不仅能与局域网内的官方 LocalSend 客户端（Windows、macOS、iOS、Android、Linux）无缝双向发现与文件传输，还提供了纯正的 HyperOS 视觉语言体验与悬浮底栏（FloatingNavigationBar）导航设计。
+本项目完全兼容官方 LocalSend Protocol v2 规范，不仅能与局域网内的官方 LocalSend 客户端（Windows、macOS、iOS、Android、Linux）无缝双向发现与文件传输，还提供了纯正的 HyperOS 视觉语言体验与液态玻璃悬浮底栏导航设计。
 
 ---
 
 ## 核心特性
 
-- **纯正 HyperOS 视觉规范**：基于 Miuix 0.9.4 组件库深度构建，全链路采用 Miuix 推荐的最佳实践与组件（MiuixTheme、Scaffold、FloatingNavigationBar、Card、SmallTitle、*Preference、OverlayDialog、OverlayBottomSheet、LinearProgressIndicator 等）。
-- **悬浮底栏主导航**：采用 HyperOS 标志性的 `FloatingNavigationBar` 作为应用底栏入口，支持 Badge 动态徽标指示未处理的传入传输请求。
+- **纯正 HyperOS 视觉规范**：基于 Miuix 0.9.4 组件库深度构建，全链路采用 Miuix 推荐的最佳实践与组件（MiuixTheme、Scaffold、TopAppBar、Card、SmallTitle、*Preference、WindowDialog、WindowBottomSheet、LinearProgressIndicator、PullToRefresh 等）。
+- **双皮肤切换**：内建 HyperOS（Miuix）与 ColorOS（coUI-Kit `0.0.1-alpha11`）两套视图实现，共用同一份业务状态、路由与设置持久化，在设置页即时切换，不影响设备发现、传输与历史记录。
+- **悬浮底栏主导航**：HyperOS 皮肤使用自研液态玻璃底栏（`LiquidGlassBottomBar`，有向距离场透镜折射 + 色散 + 阻尼滑块），并以 `Badge` 动态徽标指示未处理的传入传输请求；ColorOS 皮肤使用 coUI `NavigationBar`（Android 14+）与低版本平替。
 - **全协议兼容**：
   - **UDP 多播与广播发现**：监听与宣告多播地址 `224.0.0.167:53317` 及广播地址 `255.255.255.255:53317`，秒级识别局域网活跃设备。
-  - **子网异步并发扫描**：支持对 `192.168.x.1..254` 网段进行并发探测，解决路由器 AP 隔离导致的多播阻塞问题。
+  - **子网并发扫描**：对本机所在私有网段的 `1..254` 逐个并发探测，解决路由器 AP 隔离导致的多播阻塞问题。
   - **HTTP REST 与流式传输**：基于 Ktor 异步引擎实现 `/api/localsend/v2/info`、`/api/localsend/v2/register`、`/api/localsend/v2/prepare-upload`、`/api/localsend/v2/upload` 与 `/api/localsend/v2/cancel` 完整生命周期。
   - **自签名 TLS/HTTPS**：HTTPS 模式下本机指纹对齐协议 §2（fingerprint=证书 SHA-256），启动时生成并持久化自签名证书，并通过指纹加固 TrustManager 校验对端证书，双向防中间人。
   - **Web Share（双向网页快传）**：把选中文件共享为局域网链接，对方浏览器打开即可预览并逐个下载；同时支持对方直接在浏览器中拖拽（Drag & Drop）或选择文件高速回传至手机端，无需安装 LocalSend。
@@ -27,29 +28,31 @@ LocalSend Miuix 是基于 Xiaomi HyperOS 设计风格与 Miuix KMP 现代化组�
 
 ## 已知限制
 
-- **入站不启用双向 TLS（mTLS）**：HTTPS 监听端不要求客户端出示证书，`/register` 仅以请求体中的指纹自证身份，服务端不校验客户端证书。原因：开启 `needClientAuth` 会改变握手流程，旧版与第三方 LocalSend 客户端可能因未携带客户端证书而直接连接失败。出站方向仍按对端指纹固定（TrustManager）校验证书，防中间人能力不受影响。
+- **入站不启用双向 TLS（mTLS）**：HTTPS 监听端不要求客户端出示证书，`/register` 仅以请求体中的指纹自证身份，服务端不校验客户端证书。原因：开启客户端证书校验会改变握手流程，旧版与第三方 LocalSend 客户端可能因未携带客户端证书而直接连接失败。出站方向仍按对端指纹固定（TrustManager）校验证书，防中间人能力不受影响。
 
 ---
 
 ## 页面与组件结构
 
-| 页面 / 模块 | 核心 Miuix 组件 | 功能描述 |
+| 页面 / 模块 | 核心组件 | 功能描述 |
 |---|---|---|
-| 主架构 Shell | `MiuixTheme`, `ThemeController`, `NavDisplay`, `Scaffold`, `LiquidGlassBottomBar`, `Badge` | 动态主题控制、miuix-nav 官方路由调度、全局独立窗口级弹窗宿主、悬浮底栏切换 |
-| 接收 (Receive) | `TopAppBar`, `Card`, `SmallTitle`, `LinearProgressIndicator`, `Button` | 本机名称/IP/端口展示、实时传输进度、Web Share 分享链接，点击右上角图标进入传输历史路由 |
-| 发送 (Send) | `TopAppBar`, `MiuixScrollBehavior`, `PullToRefresh`, `Card`, `SmallTitle`, `Button`, `IconButton` | 快速选择入口、下拉刷新局域网设备、附近设备列表、待发送内容清单（选择内容后显示） |
-| 设置 (Settings) | `TopAppBar`, `Card`, `SmallTitle`, `ArrowPreference`, `SwitchPreference`, `WindowDropdownPreference` | 设备别名、快速保存、服务端口与多播地址、主题色彩模式切换、检查更新入口 |
-| 传输历史 (History) | `TopAppBar`, `Card`, `SmallTitle`, `Icon`, `IconButton` | 独立路由页面，支持原生连续深度进退转场与边缘左滑返回手势 |
+| 主架构 Shell | `MiuixTheme` / `CouiTheme`, `ThemeController`, `NavDisplay`, `Scaffold`, `LiquidGlassBottomBar` / `CouiSkinNavigationBar`, `Badge` | 动态主题控制、miuix-nav 官方路由调度、全局独立窗口级弹窗宿主、悬浮底栏切换 |
+| 首页 · 接收区 | `TopAppBar`, `Card`, `SmallTitle`, `LinearProgressIndicator`, `Button` | 本机名称/IP/端口展示、接收中会话卡片与实时进度、Web Share 分享链接；顶栏提供手动输入 IP 与刷新设备入口 |
+| 首页 · 发送区 | `TopAppBar`, `MiuixScrollBehavior`, `PullToRefresh`, `Card`, `SmallTitle`, `Button`, `IconButton` | 快速选择入口、下拉刷新局域网设备、附近设备列表、待发送内容清单（选择内容后显示） |
+| 设置 (Settings) | `TopAppBar`, `Card`, `SmallTitle`, `ArrowPreference`, `SwitchPreference`, `WindowDropdownPreference` | 设备别名、快速保存、服务端口与多播地址、界面皮肤与主题色彩模式切换、检查更新入口 |
+| 传输历史 (History) | `TopAppBar`, `Card`, `SmallTitle`, `Icon`, `IconButton` | 独立 Tab 页面，支持原生连续深度进退转场与边缘左滑返回手势 |
 | 软件更新 (Update) | `SmallTopAppBar`, `BgEffectBackground`, `MarkdownText`, `UpdateDialog`, `Card`, `SmallTitle`, `BasicComponent`, `Switch` | 完整对齐 HyperOS 官方更新与动效规范，集成 HyperOS 2/3 原生 GPU RuntimeShader 动态流光背景、Markdown 富文本更新日志、官方 UpdateDialog 弹窗与设置通道 |
 | 弹窗交互 (Overlays) | `WindowDialog`, `WindowBottomSheet`, `TextField`, `ButtonDefaults` | 设备名称修改、手动 IP 发送输入、文本消息发送、传输请求接收/拒绝、发送内容选择菜单 |
+
+ColorOS 皮肤的实现位于 `app/src/main/java/org/localsend/miuix/ui/coui/`：`page/` 承载首页、传输历史、设置与软件更新四个页面，`component/` 承载底栏与公共控件，`dialog/` 承载弹窗体系；跨皮肤共用的弹窗与富文本组件仍走 `ui/component/` 共享实现。
 
 ---
 
 ## 系统要求与编译构建
 
 ### 系统要求
-- JDK 17 或 JDK 21 (推荐 Android Studio 自带 JBR 21)
-- Android SDK Platform 35 / 37 (Build Tools 35.0.0+)
+- JDK 21
+- Android SDK Platform 37（`compileSdk = 37`、`targetSdk = 35`、`minSdk = 31`）
 - Gradle 9.6.1 + Android Gradle Plugin 9.2.1
 
 ### 编译与打包

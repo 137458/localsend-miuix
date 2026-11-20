@@ -246,7 +246,7 @@ private fun CouiLibraryTopBarIconAction(
 /**
  * 顶栏接收中入口：与相邻编辑、刷新按钮同形同底座的接收图标，右上角叠一枚计数角标，各主页面复用。
  *
- * 数量角标自绘（coUI 没有 Badge 原语，见 docs/research/coui-capability-gaps.md）：沿用按钮形态，
+ * 数量角标自绘（coUI 没有 Badge 原语，见 AGENTS.md「coUI 能力与回退边界」）：沿用按钮形态，
  * 用 accent 底色承载数量而不借危险红，避免角标被读成告警。命中区与相邻按钮一致（48dp）。
  */
 @Composable
